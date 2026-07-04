@@ -30,7 +30,7 @@ final class IndexedDocument extends Model
     ];
 
     protected $casts = [
-        'cluster' => 'array',
+        'cluster' => 'string',
         'data' => 'array',
     ];
 
@@ -75,6 +75,6 @@ final class IndexedDocument extends Model
 
     public function getClusterVO(): ClusterVO
     {
-        return new ClusterVO($this->cluster['value'] ?? '');
+        return new ClusterVO($this->cluster);
     }
 }

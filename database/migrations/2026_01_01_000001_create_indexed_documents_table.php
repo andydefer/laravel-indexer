@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('indexed_documents', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('fingerprint')->unique();
-            $table->json('cluster');
+            $table->string('cluster');
             $table->json('data');
             $table->timestamps();
 

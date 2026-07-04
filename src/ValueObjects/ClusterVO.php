@@ -88,11 +88,12 @@ final class ClusterVO extends AbstractValueObject
     }
 
     /**
-     * Récupère toutes les paires clé-valeur sous forme de StrictAssociative
+     * Récupère toutes les paires clé-valeur sous forme de string
      */
-    public function getValue(): StrictAssociative
+    public function getValue(): string
     {
-        return StrictAssociative::from($this->parsed);
+        return $this->value;
+
     }
 
     /**
