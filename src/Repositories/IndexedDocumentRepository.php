@@ -79,7 +79,7 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
 
     public function findByClusterKeyValue(string $key, string $value): Collection
     {
-        $search = $key.'-'.$value;
+        $search = $key.':'.$value;
 
         return $this->model->newQuery()
             ->where('cluster', 'LIKE', '%'.$search.'%')
@@ -121,7 +121,7 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
 
     public function deleteByClusterKeyValue(string $key, string $value): int
     {
-        $search = $key.'-'.$value;
+        $search = $key.':'.$value;
 
         return $this->model->newQuery()
             ->where('cluster', 'LIKE', '%'.$search.'%')
@@ -144,7 +144,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
 
     public function getDistinctNamespaces(): Collection
     {
-        // SQLite n'a pas SUBSTRING_INDEX, on utilise une approche différente
         $documents = $this->model->newQuery()
             ->select('fingerprint')
             ->get();
@@ -192,8 +191,11 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             $vo = new ClusterVO($cluster);
             if ($vo->has($key)) {
                 $value = $vo->get($key);
-                if (! $values->contains($value)) {
-                    $values->add($value);
+                // $value est un array, on ajoute chaque valeur individuellement
+                foreach ($value as $val) {
+                    if (! $values->contains($val)) {
+                        $values->add($val);
+                    }
                 }
             }
         }

@@ -52,8 +52,9 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
         }
 
         if ($filters->cluster_key !== null && $filters->cluster_value !== null) {
-            $query->whereHas('document', function ($q) use ($filters) {
-                $q->whereJsonContains('cluster->'.$filters->cluster_key, $filters->cluster_value);
+            $search = $filters->cluster_key.':'.$filters->cluster_value;
+            $query->whereHas('document', function ($q) use ($search) {
+                $q->where('cluster', 'LIKE', '%'.$search.'%');
             });
         }
 
@@ -102,21 +103,20 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
 
     public function findByCluster(ClusterVO $cluster): Collection
     {
-        $query = $this->model->newQuery();
-        foreach ($cluster->all() as $key => $value) {
-            $query->whereHas('document', function ($q) use ($key, $value) {
-                $q->whereJsonContains('cluster->'.$key, $value);
-            });
-        }
-
-        return $query->get();
+        return $this->model->newQuery()
+            ->whereHas('document', function ($q) use ($cluster) {
+                $q->where('cluster', $cluster->value);
+            })
+            ->get();
     }
 
     public function findByClusterKeyValue(string $key, string $value): Collection
     {
+        $search = $key.':'.$value;
+
         return $this->model->newQuery()
-            ->whereHas('document', function ($q) use ($key, $value) {
-                $q->whereJsonContains('cluster->'.$key, $value);
+            ->whereHas('document', function ($q) use ($search) {
+                $q->where('cluster', 'LIKE', '%'.$search.'%');
             })
             ->get();
     }
@@ -149,14 +149,12 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
 
     public function findByTokenAndCluster(string $token, ClusterVO $cluster): Collection
     {
-        $query = $this->model->newQuery()->where('token', $token);
-        foreach ($cluster->all() as $key => $value) {
-            $query->whereHas('document', function ($q) use ($key, $value) {
-                $q->whereJsonContains('cluster->'.$key, $value);
-            });
-        }
-
-        return $query->get();
+        return $this->model->newQuery()
+            ->where('token', $token)
+            ->whereHas('document', function ($q) use ($cluster) {
+                $q->where('cluster', $cluster->value);
+            })
+            ->get();
     }
 
     public function findByTokenFieldAndNamespace(string $token, string $field, string $namespace): Collection
@@ -216,35 +214,27 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
 
     public function getDocumentIdsForTokenAndCluster(string $token, ClusterVO $cluster): Collection
     {
-        $query = $this->model->newQuery()
+        return $this->model->newQuery()
             ->where('token', $token)
+            ->whereHas('document', function ($q) use ($cluster) {
+                $q->where('cluster', $cluster->value);
+            })
             ->select('document_id')
-            ->distinct();
-
-        foreach ($cluster->all() as $key => $value) {
-            $query->whereHas('document', function ($q) use ($key, $value) {
-                $q->whereJsonContains('cluster->'.$key, $value);
-            });
-        }
-
-        return $query->pluck('document_id');
+            ->distinct()
+            ->pluck('document_id');
     }
 
     public function getDocumentIdsForTokenFieldAndCluster(string $token, string $field, ClusterVO $cluster): Collection
     {
-        $query = $this->model->newQuery()
+        return $this->model->newQuery()
             ->where('token', $token)
             ->where('field', $field)
+            ->whereHas('document', function ($q) use ($cluster) {
+                $q->where('cluster', $cluster->value);
+            })
             ->select('document_id')
-            ->distinct();
-
-        foreach ($cluster->all() as $key => $value) {
-            $query->whereHas('document', function ($q) use ($key, $value) {
-                $q->whereJsonContains('cluster->'.$key, $value);
-            });
-        }
-
-        return $query->pluck('document_id');
+            ->distinct()
+            ->pluck('document_id');
     }
 
     public function countDistinctTokens(): int
@@ -296,21 +286,20 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
 
     public function deleteByCluster(ClusterVO $cluster): int
     {
-        $query = $this->model->newQuery();
-        foreach ($cluster->all() as $key => $value) {
-            $query->whereHas('document', function ($q) use ($key, $value) {
-                $q->whereJsonContains('cluster->'.$key, $value);
-            });
-        }
-
-        return $query->delete();
+        return $this->model->newQuery()
+            ->whereHas('document', function ($q) use ($cluster) {
+                $q->where('cluster', $cluster->value);
+            })
+            ->delete();
     }
 
     public function deleteByClusterKeyValue(string $key, string $value): int
     {
+        $search = $key.':'.$value;
+
         return $this->model->newQuery()
-            ->whereHas('document', function ($q) use ($key, $value) {
-                $q->whereJsonContains('cluster->'.$key, $value);
+            ->whereHas('document', function ($q) use ($search) {
+                $q->where('cluster', 'LIKE', '%'.$search.'%');
             })
             ->delete();
     }

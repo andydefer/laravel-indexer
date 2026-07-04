@@ -30,7 +30,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $fingerprint = 'App.Models.User|'.$id;
         $record = IndexedDocumentRecord::from([
             'fingerprint' => $fingerprint,
-            'cluster' => 'model-User|tenant-company_abc|env-production',
+            'cluster' => 'model:User|tenant:company_abc|env:production',
             'data' => [
                 'name' => $name,
                 'email' => $email,
@@ -45,7 +45,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $fingerprint = 'App.Models.Product|'.$id;
         $record = IndexedDocumentRecord::from([
             'fingerprint' => $fingerprint,
-            'cluster' => 'model-Product|category-electronics|env-production',
+            'cluster' => 'model:Product|category:electronics|env:production',
             'data' => [
                 'name' => $name,
                 'price' => $price,
@@ -60,7 +60,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
     public function test_create_persists_document(): void
     {
         $fingerprint = 'App.Models.User|123';
-        $cluster = 'model-User|tenant-company_abc';
+        $cluster = 'model:User|tenant:company_abc';
         $data = [
             'name' => 'John Doe',
             'email' => 'john@example.com',
@@ -91,7 +91,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $fingerprint = 'App.Models.User|456';
         $data = [
             'fingerprint' => $fingerprint,
-            'cluster' => 'model-User|tenant-company_xyz',
+            'cluster' => 'model:User|tenant:company_xyz',
             'data' => json_encode(['name' => 'Jane Doe']),
         ];
 
@@ -100,7 +100,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->assertInstanceOf(IndexedDocument::class, $document);
         $this->assertNotNull($document->id);
         $this->assertEquals($fingerprint, $document->fingerprint);
-        $this->assertEquals('model-User|tenant-company_xyz', $document->cluster);
+        $this->assertEquals('model:User|tenant:company_xyz', $document->cluster);
     }
 
     // ==================== TESTS FIND ====================
@@ -192,8 +192,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
         $this->createProductDocument('789', 'Laptop', 999.99);
 
-        // Recherche par cluster complet
-        $cluster = new ClusterVO('model-User|tenant-company_abc|env-production');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
         $results = $this->repository->findByCluster($cluster);
 
         $this->assertInstanceOf(Collection::class, $results);
@@ -201,7 +200,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
 
         foreach ($results as $doc) {
             $this->assertInstanceOf(IndexedDocument::class, $doc);
-            $this->assertEquals('model-User|tenant-company_abc|env-production', $doc->cluster);
+            $this->assertEquals('model:User|tenant:company_abc|env:production', $doc->cluster);
         }
     }
 
@@ -217,7 +216,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
 
         foreach ($results as $doc) {
             $this->assertInstanceOf(IndexedDocument::class, $doc);
-            $this->assertStringContainsString('model-User', $doc->cluster);
+            $this->assertStringContainsString('model:User', $doc->cluster);
         }
     }
 
@@ -259,7 +258,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
 
         $updatedRecord = IndexedDocumentRecord::from([
             'fingerprint' => 'App.Models.User|123',
-            'cluster' => 'model-User|tenant-company_xyz|env-production',
+            'cluster' => 'model:User|tenant:company_xyz|env:production',
             'data' => [
                 'name' => 'John Updated',
                 'email' => 'john.updated@example.com',
@@ -271,7 +270,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->assertInstanceOf(IndexedDocument::class, $updated);
         $this->assertEquals($created->id, $updated->id);
         $this->assertEquals('App.Models.User|123', $updated->fingerprint);
-        $this->assertEquals('model-User|tenant-company_xyz|env-production', $updated->cluster);
+        $this->assertEquals('model:User|tenant:company_xyz|env:production', $updated->cluster);
         $this->assertEquals(
             ['name' => 'John Updated', 'email' => 'john.updated@example.com'],
             $updated->data
@@ -282,7 +281,6 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
     {
         $created = $this->createUserDocument('123', 'John Doe', 'john@example.com');
 
-        // ✅ PASSER UN TABLEAU, PAS DU JSON ENCODE
         $data = [
             'data' => ['name' => 'John Raw Updated'],
         ];
@@ -358,8 +356,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
         $this->createProductDocument('789', 'Laptop', 999.99);
 
-        // Utiliser le cluster complet
-        $cluster = new ClusterVO('model-User|tenant-company_abc|env-production');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
         $count = $this->repository->deleteByCluster($cluster);
         $this->assertEquals(2, $count);
 
@@ -403,8 +400,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
         $this->createProductDocument('789', 'Laptop', 999.99);
 
-        // Utiliser le cluster complet
-        $cluster = new ClusterVO('model-User|tenant-company_abc|env-production');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
         $count = $this->repository->countByCluster($cluster);
         $this->assertEquals(2, $count);
     }
@@ -468,8 +464,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
     {
         $this->createUserDocument('123', 'John Doe', 'john@example.com');
 
-        // Utiliser le cluster complet
-        $cluster = new ClusterVO('model-User|tenant-company_abc|env-production');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
         $exists = $this->repository->existsByCluster($cluster);
         $this->assertTrue($exists);
     }
@@ -572,8 +567,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
         $this->createProductDocument('789', 'Laptop', 999.99);
 
-        // Utiliser le cluster complet
-        $cluster = new ClusterVO('model-User|tenant-company_abc|env-production');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
         $filters = new IndexedDocumentFiltersRecord(
             cluster: $cluster
         );
@@ -590,7 +584,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
 
         foreach ($results as $doc) {
             $this->assertInstanceOf(IndexedDocument::class, $doc);
-            $this->assertEquals('model-User|tenant-company_abc|env-production', $doc->cluster);
+            $this->assertEquals('model:User|tenant:company_abc|env:production', $doc->cluster);
         }
     }
 
