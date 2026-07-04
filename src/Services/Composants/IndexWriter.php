@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Services\Composants;
 
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
-use AndyDefer\LaravelIndexer\Contracts\Indexable;
+use AndyDefer\LaravelIndexer\Records\IndexableRecord;
 
 final class IndexWriter
 {
@@ -14,7 +14,7 @@ final class IndexWriter
         //
     }
 
-    public function index(Indexable $entity): void
+    public function index(IndexableRecord $entity): void
     {
         // TODO: Implémenter la logique d'indexation
     }

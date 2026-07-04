@@ -7,6 +7,7 @@ namespace AndyDefer\LaravelIndexer\Contracts;
 use AndyDefer\LaravelIndexer\Collections\IndexableFingerPrintVOCollection;
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
 use AndyDefer\LaravelIndexer\Collections\IndexableSearchResultCollection;
+use AndyDefer\LaravelIndexer\Records\IndexableRecord;
 use AndyDefer\LaravelIndexer\Records\IndexableSearchResultRecord;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
@@ -16,7 +17,7 @@ interface IndexerInterface
     /**
      * Indexe une entité.
      */
-    public function index(Indexable $entity): void;
+    public function index(IndexableRecord $entity): void;
 
     /**
      * Indexe plusieurs entités.
@@ -53,7 +54,7 @@ interface IndexerInterface
     /**
      * Rafraîchit un document dans l'index (delete + index).
      */
-    public function refresh(Indexable $entity): void;
+    public function refresh(IndexableRecord $entity): void;
 
     /**
      * Rafraîchit plusieurs documents dans l'index (delete + index).

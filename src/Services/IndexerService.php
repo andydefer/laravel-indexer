@@ -7,8 +7,8 @@ namespace AndyDefer\LaravelIndexer\Services;
 use AndyDefer\LaravelIndexer\Collections\IndexableFingerPrintVOCollection;
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
 use AndyDefer\LaravelIndexer\Collections\IndexableSearchResultCollection;
-use AndyDefer\LaravelIndexer\Contracts\Indexable;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
+use AndyDefer\LaravelIndexer\Records\IndexableRecord;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexDeleter;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexSearcher;
@@ -25,7 +25,7 @@ final class IndexerService implements IndexerInterface
         //
     }
 
-    public function index(Indexable $entity): void
+    public function index(IndexableRecord $entity): void
     {
         $this->writer->index($entity);
     }
@@ -63,7 +63,7 @@ final class IndexerService implements IndexerInterface
     /**
      * Rafraîchit un document (delete + index).
      */
-    public function refresh(Indexable $entity): void
+    public function refresh(IndexableRecord $entity): void
     {
         // TODO: Implémenter la logique de rafraîchissement
         // 1. Récupérer le fingerprint de l'entité
