@@ -5,22 +5,21 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\ValueObjects;
 
 use AndyDefer\DomainStructures\Abstracts\AbstractValueObject;
-use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use InvalidArgumentException;
 
 /**
- * Value Object représentant un identifiant d'entité indexable.
+ * Value Object représentant un fingerprint d'entité indexable.
  *
  * Format: "{namespace}|{id}"
  * où namespace est le FQCN avec les \ remplacés par .
  *
  * @example
- * $id = new IndexableEntityIdVO('App.Models.User|123');
+ * $id = new IndexableFingerPrintVO('App.Models.User|123');
  * $id->getId(); // '123'
  * $id->getNamespace(); // 'App.Models.User'
- * $id->getValue(); // StrictAssociative(['namespace' => 'App.Models.User', 'id' => '123'])
+ * $id->getValue(); // 'App.Models.User|123'
  */
-final class IndexableEntityIdVO extends AbstractValueObject
+final class IndexableFingerPrintVO extends AbstractValueObject
 {
     private const SEPARATOR = '|';
 
@@ -37,7 +36,7 @@ final class IndexableEntityIdVO extends AbstractValueObject
     private function validate(string $value): void
     {
         if (empty($value)) {
-            throw new InvalidArgumentException('IndexableEntityId cannot be empty');
+            throw new InvalidArgumentException('IndexableFingerPrint cannot be empty');
         }
 
         if (! str_contains($value, self::SEPARATOR)) {
@@ -76,52 +75,31 @@ final class IndexableEntityIdVO extends AbstractValueObject
         [$this->namespace, $this->id] = explode(self::SEPARATOR, $value, 2);
     }
 
-    /**
-     * Récupère l'ID
-     */
     public function getId(): string
     {
         return $this->id;
     }
 
-    /**
-     * Récupère le namespace (avec . à la place de \)
-     */
     public function getNamespace(): string
     {
         return $this->namespace;
     }
 
-    /**
-     * Retourne la valeur sous forme de StrictAssociative
-     */
-    public function getValue(): StrictAssociative
+    public function getValue(): string
     {
-        return StrictAssociative::from([
-            'namespace' => $this->namespace,
-            'id' => $this->id,
-        ]);
+        return $this->value;
     }
 
-    /**
-     * Vérifie si l'entité appartient à un namespace donné
-     */
     public function belongsTo(string $namespace): bool
     {
         return $this->namespace === $namespace;
     }
 
-    /**
-     * Vérifie si l'entité appartient à un des namespaces donnés
-     */
     public function belongsToAny(array $namespaces): bool
     {
         return in_array($this->namespace, $namespaces, true);
     }
 
-    /**
-     * Récupère le namespace original (avec \)
-     */
     public function getOriginalNamespace(): string
     {
         return str_replace('.', '\\', $this->namespace);

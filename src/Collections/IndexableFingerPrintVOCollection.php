@@ -7,14 +7,14 @@ namespace AndyDefer\LaravelIndexer\Collections;
 use AndyDefer\DomainStructures\Abstracts\AbstractTypedCollection;
 use AndyDefer\DomainStructures\Collections\Core\TypedCollection;
 use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableEntityIdVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
 /**
- * Collection spécialisée pour les IndexableEntityIdVO.
+ * Collection spécialisée pour les IndexableFingerPrintVO.
  *
- * @method IndexableEntityIdVO|null first()
- * @method IndexableEntityIdVO|null last()
- * @method IndexableEntityIdVO|null find(callable $callback)
+ * @method IndexableFingerPrintVO|null first()
+ * @method IndexableFingerPrintVO|null last()
+ * @method IndexableFingerPrintVO|null find(callable $callback)
  * @method self filter(callable $callback)
  * @method self mapPreserveType(callable $callback)
  * @method TypedCollection map(callable $callback)
@@ -24,30 +24,30 @@ use AndyDefer\LaravelIndexer\ValueObjects\IndexableEntityIdVO;
  * @method self reverse()
  * @method self sort(int $flags = SORT_REGULAR)
  */
-final class IndexableEntityIdVOCollection extends AbstractTypedCollection
+final class IndexableFingerPrintVOCollection extends AbstractTypedCollection
 {
     public function __construct()
     {
-        parent::__construct(IndexableEntityIdVO::class);
+        parent::__construct(IndexableFingerPrintVO::class);
     }
 
     /**
-     * Récupère les IDs par namespace
+     * Récupère les fingerprints par namespace
      */
     public function filterByNamespace(string $namespace): self
     {
         return $this->filter(
-            fn (IndexableEntityIdVO $id) => $id->belongsTo($namespace)
+            fn (IndexableFingerPrintVO $fp) => $fp->belongsTo($namespace)
         );
     }
 
     /**
-     * Récupère les IDs par multiple namespaces
+     * Récupère les fingerprints par multiple namespaces
      */
     public function filterByNamespaces(array $namespaces): self
     {
         return $this->filter(
-            fn (IndexableEntityIdVO $id) => $id->belongsToAny($namespaces)
+            fn (IndexableFingerPrintVO $fp) => $fp->belongsToAny($namespaces)
         );
     }
 
@@ -57,8 +57,8 @@ final class IndexableEntityIdVOCollection extends AbstractTypedCollection
     public function getIds(): StringTypedCollection
     {
         $ids = new StringTypedCollection;
-        foreach ($this->items as $id) {
-            $ids->add($id->getId());
+        foreach ($this->items as $fp) {
+            $ids->add($fp->getId());
         }
 
         return $ids;
@@ -70,8 +70,8 @@ final class IndexableEntityIdVOCollection extends AbstractTypedCollection
     public function getNamespaces(): StringTypedCollection
     {
         $namespaces = new StringTypedCollection;
-        foreach ($this->items as $id) {
-            $namespaces->add($id->getNamespace());
+        foreach ($this->items as $fp) {
+            $namespaces->add($fp->getNamespace());
         }
 
         return $namespaces;
@@ -83,27 +83,27 @@ final class IndexableEntityIdVOCollection extends AbstractTypedCollection
     public function getOriginalNamespaces(): StringTypedCollection
     {
         $namespaces = new StringTypedCollection;
-        foreach ($this->items as $id) {
-            $namespaces->add($id->getOriginalNamespace());
+        foreach ($this->items as $fp) {
+            $namespaces->add($fp->getOriginalNamespace());
         }
 
         return $namespaces;
     }
 
     /**
-     * Groupe les IDs par namespace
+     * Groupe les fingerprints par namespace
      *
      * @return array<string, self>
      */
     public function groupByNamespace(): array
     {
         $groups = [];
-        foreach ($this->items as $id) {
-            $namespace = $id->getNamespace();
+        foreach ($this->items as $fp) {
+            $namespace = $fp->getNamespace();
             if (! isset($groups[$namespace])) {
                 $groups[$namespace] = new self;
             }
-            $groups[$namespace]->add($id);
+            $groups[$namespace]->add($fp);
         }
 
         return $groups;
@@ -138,9 +138,9 @@ final class IndexableEntityIdVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Récupère un ID par sa valeur brute
+     * Récupère un fingerprint par sa valeur brute
      */
-    public function findByValue(string $value): ?IndexableEntityIdVO
+    public function findByValue(string $value): ?IndexableFingerPrintVO
     {
         foreach ($this->items as $item) {
             if ($item->getValue() === $value) {
@@ -152,9 +152,9 @@ final class IndexableEntityIdVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Récupère un ID par son ID et namespace
+     * Récupère un fingerprint par son ID et namespace
      */
-    public function findByIdAndNamespace(string $id, string $namespace): ?IndexableEntityIdVO
+    public function findByIdAndNamespace(string $id, string $namespace): ?IndexableFingerPrintVO
     {
         foreach ($this->items as $item) {
             if ($item->getId() === $id && $item->belongsTo($namespace)) {

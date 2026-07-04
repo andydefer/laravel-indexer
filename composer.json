@@ -5,6 +5,11 @@
             "AndyDefer\\LaravelIndexer\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "AndyDefer\\LaravelIndexer\\Tests\\": "tests/"
+        }
+    },
     "authors": [
         {
             "name": "Andy Kani",
