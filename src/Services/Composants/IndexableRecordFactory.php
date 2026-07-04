@@ -15,9 +15,9 @@ final class IndexableRecordFactory
      * Convertit une entité Indexable en IndexedDocumentRecord.
      *
      * @param  Indexable  $entity  L'entité à convertir
-     * @param  ClusterVO|null  $cluster  Cluster optionnel (si null, pas de cluster)
+     * @param  ClusterVO  $cluster  Cluster obligatoire
      */
-    public static function convert(Indexable $entity, ?ClusterVO $cluster = null): IndexedDocumentRecord
+    public static function convert(Indexable $entity, ClusterVO $cluster): IndexedDocumentRecord
     {
         $data = $entity->getIndexableData();
         $key = $entity->getKey();

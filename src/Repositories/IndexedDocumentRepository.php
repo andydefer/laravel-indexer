@@ -13,6 +13,7 @@ use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Repository\AbstractRepository;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
 final class IndexedDocumentRepository extends AbstractRepository implements IndexedDocumentRepositoryInterface
@@ -51,6 +52,11 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         if ($filters->document_ids !== null && ! $filters->document_ids->isEmpty()) {
             $query->whereIn('id', $filters->document_ids->toArray());
         }
+    }
+
+    public function getModel(): Model
+    {
+        return $this->model;
     }
 
     public function findByFingerPrint(IndexableFingerPrintVO $fingerPrint): ?IndexedDocument

@@ -17,7 +17,7 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
 {
     // ==================== TESTS CONVERT ====================
 
-    public function test_convert_returns_indexed_document_record_without_cluster(): void
+    public function test_convert_returns_indexed_document_record_with_cluster(): void
     {
         $entity = new TestIndexableEntity(
             key: '123',
@@ -28,16 +28,18 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
             ],
         );
 
-        $record = IndexableRecordFactory::convert($entity);
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $record = IndexableRecordFactory::convert($entity, $cluster);
 
         $this->assertInstanceOf(IndexedDocumentRecord::class, $record);
         $this->assertInstanceOf(IndexableFingerPrintVO::class, $record->fingerprint);
         $this->assertInstanceOf(StrictAssociative::class, $record->data);
-        $this->assertNull($record->cluster);
+        $this->assertNotNull($record->cluster);
 
         $this->assertEquals('App.Models.User|123', $record->fingerprint->getValue());
         $this->assertEquals('123', $record->fingerprint->getId());
         $this->assertEquals('App.Models.User', $record->fingerprint->getNamespace());
+        $this->assertEquals('model:User|tenant:company_abc|env:production', $record->cluster->value);
         $this->assertEquals(['name' => 'John Doe', 'email' => 'john@example.com'], $record->data->toArray());
     }
 
@@ -80,7 +82,8 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
             ],
         );
 
-        $record = IndexableRecordFactory::convert($entity);
+        $cluster = new ClusterVO('model:Complex|type:test');
+        $record = IndexableRecordFactory::convert($entity, $cluster);
 
         $this->assertInstanceOf(IndexedDocumentRecord::class, $record);
         $this->assertEquals('App.Models.Complex|999', $record->fingerprint->getValue());
@@ -103,9 +106,10 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
             ],
         );
 
-        // La factory ne vérifie pas shouldBeIndexed, c'est la responsabilité de l'appelant
-        $record = IndexableRecordFactory::convert($entity);
+        $cluster = new ClusterVO('model:Inactive');
+        $record = IndexableRecordFactory::convert($entity, $cluster);
 
+        // La factory ne vérifie pas shouldBeIndexed, c'est la responsabilité de l'appelant
         $this->assertInstanceOf(IndexedDocumentRecord::class, $record);
         $this->assertEquals('App.Models.Inactive|123', $record->fingerprint->getValue());
     }

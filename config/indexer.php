@@ -24,7 +24,7 @@ return [
     'token_types' => [
         'ngrams' => [
             'min_size' => 2,
-            'max_size' => 4,
+            'max_size' => 5,
         ],
         'metaphone' => true,
     ],

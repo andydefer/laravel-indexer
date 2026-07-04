@@ -43,13 +43,19 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
         return $this->documentRepository->create($record);
     }
 
-    private function createToken(string $documentId, string $token, string $field, GramType $type = GramType::LEXICAL): IndexedToken
-    {
+    private function createToken(
+        string $documentId,
+        string $token,
+        string $field,
+        string $originalText,
+        GramType $type = GramType::LEXICAL
+    ): IndexedToken {
         $record = new IndexedTokenRecord(
             document_id: $documentId,
             token_type: $type,
             token: $token,
             field: $field,
+            original_text: $originalText,
         );
 
         return $this->repository->create($record);
@@ -65,6 +71,7 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
             token_type: GramType::LEXICAL,
             token: 'john',
             field: 'name',
+            original_text: 'John',
         );
 
         $token = $this->repository->create($record);
@@ -75,11 +82,13 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
         $this->assertEquals('lexical', $token->token_type->value);
         $this->assertEquals('john', $token->token);
         $this->assertEquals('name', $token->field);
+        $this->assertEquals('John', $token->original_text);
 
         $found = $this->repository->find($token->id);
         $this->assertNotNull($found);
         $this->assertInstanceOf(IndexedToken::class, $found);
         $this->assertEquals('john', $found->token);
+        $this->assertEquals('John', $found->original_text);
     }
 
     // ==================== TESTS FIND ====================
@@ -87,7 +96,7 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
     public function test_find_returns_token(): void
     {
         $doc = $this->createDocument('App.Models.User|123', 'model:User');
-        $created = $this->createToken($doc->id, 'john', 'name');
+        $created = $this->createToken($doc->id, 'john', 'name', 'John');
 
         $found = $this->repository->find($created->id);
 
@@ -95,6 +104,7 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
         $this->assertInstanceOf(IndexedToken::class, $found);
         $this->assertEquals($created->id, $found->id);
         $this->assertEquals('john', $found->token);
+        $this->assertEquals('John', $found->original_text);
     }
 
     public function test_find_returns_null_when_not_found(): void
@@ -108,9 +118,9 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
     public function test_find_by_token_returns_collection(): void
     {
         $doc = $this->createDocument('App.Models.User|123', 'model:User');
-        $this->createToken($doc->id, 'john', 'name');
-        $this->createToken($doc->id, 'john', 'email');
-        $this->createToken($doc->id, 'jane', 'name');
+        $this->createToken($doc->id, 'john', 'name', 'John');
+        $this->createToken($doc->id, 'john', 'email', 'John');
+        $this->createToken($doc->id, 'jane', 'name', 'Jane');
 
         $results = $this->repository->findByToken('john');
 
@@ -128,9 +138,9 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
     public function test_find_by_type_returns_collection(): void
     {
         $doc = $this->createDocument('App.Models.User|123', 'model:User');
-        $this->createToken($doc->id, 'john', 'name', GramType::LEXICAL);
-        $this->createToken($doc->id, 'JN', 'name', GramType::METAPHONE);
-        $this->createToken($doc->id, 'jane', 'name', GramType::LEXICAL);
+        $this->createToken($doc->id, 'john', 'name', 'John', GramType::LEXICAL);
+        $this->createToken($doc->id, 'JN', 'name', 'John', GramType::METAPHONE);
+        $this->createToken($doc->id, 'jane', 'name', 'Jane', GramType::LEXICAL);
 
         $results = $this->repository->findByType(GramType::LEXICAL);
 
@@ -148,9 +158,9 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
     public function test_find_by_field_returns_collection(): void
     {
         $doc = $this->createDocument('App.Models.User|123', 'model:User');
-        $this->createToken($doc->id, 'john', 'name');
-        $this->createToken($doc->id, 'doe', 'name');
-        $this->createToken($doc->id, 'john', 'email');
+        $this->createToken($doc->id, 'john', 'name', 'John');
+        $this->createToken($doc->id, 'doe', 'name', 'Doe');
+        $this->createToken($doc->id, 'john', 'email', 'John');
 
         $results = $this->repository->findByField('name');
 
@@ -170,9 +180,9 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
         $doc1 = $this->createDocument('App.Models.User|123', 'model:User');
         $doc2 = $this->createDocument('App.Models.User|456', 'model:User');
 
-        $this->createToken($doc1->id, 'john', 'name');
-        $this->createToken($doc1->id, 'doe', 'name');
-        $this->createToken($doc2->id, 'jane', 'name');
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc1->id, 'doe', 'name', 'Doe');
+        $this->createToken($doc2->id, 'jane', 'name', 'Jane');
 
         $results = $this->repository->findByDocumentId($doc1->id);
 
@@ -192,9 +202,9 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
         $doc1 = $this->createDocument('App.Models.User|123', 'model:User');
         $doc2 = $this->createDocument('App.Models.Product|456', 'model:Product');
 
-        $this->createToken($doc1->id, 'john', 'name');
-        $this->createToken($doc1->id, 'doe', 'name');
-        $this->createToken($doc2->id, 'laptop', 'name');
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc1->id, 'doe', 'name', 'Doe');
+        $this->createToken($doc2->id, 'laptop', 'name', 'Laptop');
 
         $results = $this->repository->findByNamespace('App.Models.User');
 
@@ -211,9 +221,9 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
     public function test_autocomplete_returns_distinct_tokens(): void
     {
         $doc = $this->createDocument('App.Models.User|123', 'model:User');
-        $this->createToken($doc->id, 'john', 'name');
-        $this->createToken($doc->id, 'john', 'email');
-        $this->createToken($doc->id, 'jane', 'name');
+        $this->createToken($doc->id, 'john', 'name', 'John');
+        $this->createToken($doc->id, 'john', 'email', 'John');
+        $this->createToken($doc->id, 'jane', 'name', 'Jane');
 
         $results = $this->repository->autocomplete('jo', 10);
 
@@ -229,9 +239,9 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
         $doc1 = $this->createDocument('App.Models.User|123', 'model:User');
         $doc2 = $this->createDocument('App.Models.User|456', 'model:User');
 
-        $this->createToken($doc1->id, 'john', 'name');
-        $this->createToken($doc1->id, 'john', 'email');
-        $this->createToken($doc2->id, 'john', 'name');
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc1->id, 'john', 'email', 'John');
+        $this->createToken($doc2->id, 'john', 'name', 'John');
 
         $results = $this->repository->getDocumentIdsForToken('john');
 
@@ -246,9 +256,9 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
     public function test_count_distinct_tokens(): void
     {
         $doc = $this->createDocument('App.Models.User|123', 'model:User');
-        $this->createToken($doc->id, 'john', 'name');
-        $this->createToken($doc->id, 'john', 'email');
-        $this->createToken($doc->id, 'jane', 'name');
+        $this->createToken($doc->id, 'john', 'name', 'John');
+        $this->createToken($doc->id, 'john', 'email', 'John');
+        $this->createToken($doc->id, 'jane', 'name', 'Jane');
 
         $count = $this->repository->countDistinctTokens();
         $this->assertEquals(2, $count);
@@ -259,8 +269,8 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
     public function test_delete_by_document_id(): void
     {
         $doc = $this->createDocument('App.Models.User|123', 'model:User');
-        $this->createToken($doc->id, 'john', 'name');
-        $this->createToken($doc->id, 'doe', 'name');
+        $this->createToken($doc->id, 'john', 'name', 'John');
+        $this->createToken($doc->id, 'doe', 'name', 'Doe');
 
         $count = $this->repository->deleteByDocumentId($doc->id);
         $this->assertEquals(2, $count);
@@ -274,8 +284,8 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
     public function test_find_by_with_token_filter(): void
     {
         $doc = $this->createDocument('App.Models.User|123', 'model:User');
-        $this->createToken($doc->id, 'john', 'name');
-        $this->createToken($doc->id, 'doe', 'name');
+        $this->createToken($doc->id, 'john', 'name', 'John');
+        $this->createToken($doc->id, 'doe', 'name', 'Doe');
 
         $filters = new IndexedTokenFiltersRecord(
             token: 'john'
@@ -296,5 +306,66 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
             $this->assertInstanceOf(IndexedToken::class, $token);
             $this->assertEquals('john', $token->token);
         }
+    }
+
+    // ==================== TESTS FREQUENCY ====================
+
+    public function test_increment_frequency(): void
+    {
+        $doc = $this->createDocument('App.Models.User|123', 'model:User');
+        $token = $this->createToken($doc->id, 'john', 'name', 'John');
+
+        $this->assertEquals(1, $token->frequency);
+
+        $this->repository->incrementFrequency($token->id);
+
+        $found = $this->repository->find($token->id);
+        $this->assertEquals(2, $found->frequency);
+
+        $this->repository->incrementFrequency($token->id);
+
+        $found = $this->repository->find($token->id);
+        $this->assertEquals(3, $found->frequency);
+    }
+
+    public function test_find_by_token_field_and_document(): void
+    {
+        $doc = $this->createDocument('App.Models.User|123', 'model:User');
+
+        $this->createToken($doc->id, 'john', 'name', 'John', GramType::LEXICAL);
+        $this->createToken($doc->id, 'john', 'email', 'John', GramType::LEXICAL);
+        $this->createToken($doc->id, 'JN', 'name', 'John', GramType::METAPHONE);
+
+        $found = $this->repository->findByTokenFieldAndDocument(
+            'john',
+            'name',
+            $doc->id,
+            GramType::LEXICAL
+        );
+
+        $this->assertNotNull($found);
+        $this->assertEquals('john', $found->token);
+        $this->assertEquals('name', $found->field);
+        $this->assertEquals($doc->id, $found->document_id);
+        $this->assertEquals(GramType::LEXICAL, $found->token_type);
+
+        $notFound = $this->repository->findByTokenFieldAndDocument(
+            'john',
+            'email',
+            $doc->id,
+            GramType::LEXICAL
+        );
+
+        $this->assertNotNull($notFound);
+        $this->assertEquals('email', $notFound->field);
+
+        $null = $this->repository->findByTokenFieldAndDocument(
+            'john',
+            'name',
+            $doc->id,
+            GramType::METAPHONE
+        );
+
+        $this->assertNull($null);
     }
 }

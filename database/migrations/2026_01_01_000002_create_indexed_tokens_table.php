@@ -12,16 +12,15 @@ return new class extends Migration
     {
         Schema::create('indexed_tokens', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->uuid('document_id');
+            $table->foreignUuid('document_id')
+                ->constrained('indexed_documents')
+                ->onDelete('cascade');
             $table->string('token_type');
             $table->string('token');
-            $table->string('field')->nullable();
+            $table->string('field');
+            $table->string('original_text')->comment('Le mot de provenance du token');
+            $table->unsignedBigInteger('frequency')->default(1);
             $table->timestamps();
-
-            $table->foreign('document_id')
-                ->references('id')
-                ->on('indexed_documents')
-                ->onDelete('cascade');
 
             $table->index(['token', 'field']);
             $table->index(['token_type', 'token']);

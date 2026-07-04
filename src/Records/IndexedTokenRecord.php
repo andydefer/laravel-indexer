@@ -15,5 +15,7 @@ final class IndexedTokenRecord extends AbstractRecord
         public readonly ?GramType $token_type = null,
         public readonly ?string $token = null,
         public readonly ?string $field = null,
+        public readonly ?string $original_text = null,
+        public readonly ?int $frequency = 1,
     ) {}
 }

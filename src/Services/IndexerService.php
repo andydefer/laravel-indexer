@@ -65,10 +65,11 @@ final class IndexerService implements IndexerInterface
      */
     public function refresh(IndexableRecord $entity): void
     {
-        // TODO: Implémenter la logique de rafraîchissement
-        // 1. Récupérer le fingerprint de l'entité
-        // 2. Supprimer l'ancien document
-        // 3. Indexer le nouveau
+        // 1. Supprimer l'ancien document
+        $this->deleter->delete($entity->finger_print);
+
+        // 2. Indexer le nouveau
+        $this->writer->index($entity);
     }
 
     /**
@@ -76,9 +77,16 @@ final class IndexerService implements IndexerInterface
      */
     public function refreshMany(IndexableRecordCollection $records): void
     {
-        // TODO: Implémenter la logique de rafraîchissement multiple
         // 1. Récupérer tous les fingerprints
+        $fingerPrints = new IndexableFingerPrintVOCollection;
+        foreach ($records as $record) {
+            $fingerPrints->add($record->finger_print);
+        }
+
         // 2. Supprimer tous les anciens documents
+        $this->deleter->deleteMany($fingerPrints);
+
         // 3. Indexer tous les nouveaux
+        $this->writer->indexMany($records);
     }
 }

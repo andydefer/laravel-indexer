@@ -188,4 +188,19 @@ interface IndexedTokenRepositoryInterface extends AbstractRepositoryInterface
      * @return Collection<int, string>
      */
     public function getDistinctFields(): Collection;
+
+    /**
+     * Trouve un token par token, champ, document et type.
+     */
+    public function findByTokenFieldAndDocument(
+        string $token,
+        string $field,
+        string $documentId,
+        GramType $tokenType
+    ): ?IndexedToken;
+
+    /**
+     * Incrémente la fréquence d'un token.
+     */
+    public function incrementFrequency(string $id): int;
 }

@@ -27,10 +27,13 @@ final class IndexedToken extends Model
         'token_type',
         'token',
         'field',
+        'original_text',
+        'frequency',
     ];
 
     protected $casts = [
         'token_type' => GramType::class,
+        'frequency' => 'integer',
     ];
 
     public function document(): BelongsTo

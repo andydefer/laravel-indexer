@@ -14,6 +14,7 @@ use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Repository\AbstractRepository;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
 final class IndexedTokenRepository extends AbstractRepository implements IndexedTokenRepositoryInterface
@@ -61,6 +62,11 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
         if ($filters->document_ids !== null && ! $filters->document_ids->isEmpty()) {
             $query->whereIn('document_id', $filters->document_ids->toArray());
         }
+    }
+
+    public function getModel(): Model
+    {
+        return $this->model;
     }
 
     public function findByToken(string $token): Collection
@@ -237,6 +243,20 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->pluck('document_id');
     }
 
+    public function findByTokenFieldAndDocument(
+        string $token,
+        string $field,
+        string $documentId,
+        GramType $tokenType
+    ): ?IndexedToken {
+        return $this->model->newQuery()
+            ->where('token', $token)
+            ->where('field', $field)
+            ->where('document_id', $documentId)
+            ->where('token_type', $tokenType)
+            ->first();
+    }
+
     public function countDistinctTokens(): int
     {
         return $this->model->newQuery()->distinct('token')->count('token');
@@ -332,5 +352,12 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->select('field')
             ->distinct()
             ->pluck('field');
+    }
+
+    public function incrementFrequency(string $id): int
+    {
+        return $this->model->newQuery()
+            ->where('id', $id)
+            ->increment('frequency');
     }
 }
