@@ -8,14 +8,22 @@ use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Records\IndexableRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class IndexedDocument extends Model
 {
+    use HasUuids;
+
+    public $incrementing = false;
+
+    protected $keyType = 'string';
+
     protected $table = 'indexed_documents';
 
     protected $fillable = [
+        'id',
         'fingerprint',
         'cluster',
         'data',

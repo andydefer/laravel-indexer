@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('indexed_documents', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('fingerprint')->unique();
             $table->json('cluster');
             $table->json('data');
