@@ -1,5 +1,6 @@
 {
     "name": "andydefer/laravel-indexer",
+    "description": "A powerful and flexible indexing system for Laravel with Eloquent support, n-gram and metaphone tokenization, and advanced search capabilities.",
     "autoload": {
         "psr-4": {
             "AndyDefer\\LaravelIndexer\\": "src/"
