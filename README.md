@@ -505,7 +505,7 @@ $results = $this->indexer->search($query);
 // Itération
 foreach ($results as $result) {
     $item = $result->item;
-    $fingerprint = $item->finger_print->getValue();
+    $fingerprint = $item->fingerprint->getValue();
     $field = $result->field;
     $gram = $result->gram_value;
     $type = $result->gram_type->value; // 'lexical' ou 'metaphone'

@@ -99,7 +99,7 @@ final class IndexableSearchResultCollection extends AbstractTypedCollection
     }
 
     /**
-     * Récupère les items (IndexableRecord) des résultats.
+     * Récupère les items (IndexedDocumentRecord) des résultats.
      */
     public function getItems(): IndexableRecordCollection
     {

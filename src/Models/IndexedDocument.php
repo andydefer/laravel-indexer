@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -59,9 +59,9 @@ final class IndexedDocument extends Model
         return $this->getFingerPrintVO()->getId();
     }
 
-    public function toIndexableRecord(): IndexableRecord
+    public function toIndexableRecord(): IndexedDocumentRecord
     {
-        return new IndexableRecord(
+        return new IndexedDocumentRecord(
             fingerprint: $this->getFingerPrintVO(),
             cluster: $this->getClusterVO(),
             data: StrictAssociative::from($this->data),

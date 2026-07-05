@@ -6,7 +6,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Integration\Services\Composants;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Collections\IndexableFingerPrintVOCollection;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexDeleter;
@@ -42,7 +42,7 @@ final class IndexDeleterTest extends IntegrationTestCase
     ): void {
         $fingerPrint = new IndexableFingerPrintVO($fingerprint);
         $clusterVO = new ClusterVO($cluster);
-        $record = new IndexableRecord(
+        $record = new IndexedDocumentRecord(
             fingerprint: $fingerPrint,
             data: StrictAssociative::from($data),
             cluster: $clusterVO,

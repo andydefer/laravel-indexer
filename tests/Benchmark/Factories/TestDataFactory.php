@@ -6,7 +6,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Benchmark\Factories;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use Faker\Factory;
@@ -21,7 +21,7 @@ final class TestDataFactory
         $this->faker = Factory::create('fr_FR');
     }
 
-    public function createRecord(string $namespace = 'App.Models.User'): IndexableRecord
+    public function createRecord(string $namespace = 'App.Models.User'): IndexedDocumentRecord
     {
         $id = $this->faker->unique()->numberBetween(1, 1000000);
         $fingerprint = new IndexableFingerPrintVO($namespace.'|'.$id);
@@ -60,7 +60,7 @@ final class TestDataFactory
         }
         $clusterString = rtrim($clusterString, '|');
 
-        return new IndexableRecord(
+        return new IndexedDocumentRecord(
             fingerprint: $fingerprint,
             data: $data,
             cluster: new ClusterVO($clusterString),

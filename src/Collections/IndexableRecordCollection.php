@@ -6,14 +6,14 @@ namespace AndyDefer\LaravelIndexer\Collections;
 
 use AndyDefer\DomainStructures\Collections\Core\TypedCollection;
 use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 
 /**
- * Collection spécialisée pour les IndexableRecord.
+ * Collection spécialisée pour les IndexedDocumentRecord.
  *
- * @method IndexableRecord|null first()
- * @method IndexableRecord|null last()
- * @method IndexableRecord|null find(callable $callback)
+ * @method IndexedDocumentRecord|null first()
+ * @method IndexedDocumentRecord|null last()
+ * @method IndexedDocumentRecord|null find(callable $callback)
  * @method self filter(callable $callback)
  * @method self mapPreserveType(callable $callback)
  * @method TypedCollection map(callable $callback)
@@ -27,7 +27,7 @@ final class IndexableRecordCollection extends TypedCollection
 {
     public function __construct()
     {
-        parent::__construct(IndexableRecord::class);
+        parent::__construct(IndexedDocumentRecord::class);
     }
 
     /**
@@ -66,7 +66,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function filterByNamespace(string $namespace): self
     {
         return $this->filter(
-            fn (IndexableRecord $record) => $record->fingerprint->belongsTo($namespace)
+            fn (IndexedDocumentRecord $record) => $record->fingerprint->belongsTo($namespace)
         );
     }
 
@@ -76,7 +76,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function filterByNamespaces(array $namespaces): self
     {
         return $this->filter(
-            fn (IndexableRecord $record) => $record->fingerprint->belongsToAny($namespaces)
+            fn (IndexedDocumentRecord $record) => $record->fingerprint->belongsToAny($namespaces)
         );
     }
 
@@ -86,7 +86,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function filterByCluster(string $key, string $value): self
     {
         return $this->filter(
-            fn (IndexableRecord $record) => $record->cluster->get($key) === $value
+            fn (IndexedDocumentRecord $record) => $record->cluster->get($key) === $value
         );
     }
 
@@ -96,7 +96,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function filterByClusters(array $clusters): self
     {
         return $this->filter(
-            function (IndexableRecord $record) use ($clusters) {
+            function (IndexedDocumentRecord $record) use ($clusters) {
                 foreach ($clusters as $key => $value) {
                     if ($record->cluster->get($key) !== $value) {
                         return false;
@@ -114,7 +114,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function filterByDataField(string $field, mixed $value): self
     {
         return $this->filter(
-            fn (IndexableRecord $record) => ($record->data[$field] ?? null) === $value
+            fn (IndexedDocumentRecord $record) => ($record->data[$field] ?? null) === $value
         );
     }
 
@@ -218,7 +218,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function searchData(callable $callback): self
     {
         return $this->filter(
-            fn (IndexableRecord $record) => $callback($record->data)
+            fn (IndexedDocumentRecord $record) => $callback($record->data)
         );
     }
 
@@ -228,7 +228,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function searchTextInData(string $search): self
     {
         return $this->filter(
-            function (IndexableRecord $record) use ($search) {
+            function (IndexedDocumentRecord $record) use ($search) {
                 $search = strtolower($search);
                 foreach ($record->data->toArray() as $value) {
                     if (is_string($value) && str_contains(strtolower($value), $search)) {
@@ -247,7 +247,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function hasDataField(string $field): self
     {
         return $this->filter(
-            fn (IndexableRecord $record) => isset($record->data[$field])
+            fn (IndexedDocumentRecord $record) => isset($record->data[$field])
         );
     }
 
@@ -257,7 +257,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function sortByDataField(string $field, bool $ascending = true): self
     {
         $sorted = $this->items;
-        usort($sorted, function (IndexableRecord $a, IndexableRecord $b) use ($field, $ascending) {
+        usort($sorted, function (IndexedDocumentRecord $a, IndexedDocumentRecord $b) use ($field, $ascending) {
             $valA = $a->data[$field] ?? null;
             $valB = $b->data[$field] ?? null;
 
@@ -327,7 +327,7 @@ final class IndexableRecordCollection extends TypedCollection
     /**
      * Récupère un enregistrement par ID
      */
-    public function findById(string $id): ?IndexableRecord
+    public function findById(string $id): ?IndexedDocumentRecord
     {
         foreach ($this->items as $record) {
             if ($record->fingerprint->getId() === $id) {
@@ -341,7 +341,7 @@ final class IndexableRecordCollection extends TypedCollection
     /**
      * Récupère un enregistrement par ID et namespace
      */
-    public function findByIdAndNamespace(string $id, string $namespace): ?IndexableRecord
+    public function findByIdAndNamespace(string $id, string $namespace): ?IndexedDocumentRecord
     {
         foreach ($this->items as $record) {
             if ($record->fingerprint->getId() === $id && $record->fingerprint->belongsTo($namespace)) {
@@ -358,7 +358,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function withClusterKeys(array $keys): self
     {
         return $this->filter(
-            fn (IndexableRecord $record) => $record->cluster->hasAll($keys)
+            fn (IndexedDocumentRecord $record) => $record->cluster->hasAll($keys)
         );
     }
 
@@ -368,7 +368,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function withAnyClusterKeys(array $keys): self
     {
         return $this->filter(
-            fn (IndexableRecord $record) => $record->cluster->hasAny($keys)
+            fn (IndexedDocumentRecord $record) => $record->cluster->hasAny($keys)
         );
     }
 }

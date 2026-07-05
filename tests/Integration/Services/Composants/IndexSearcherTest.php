@@ -9,7 +9,7 @@ use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Collections\IndexableSearchResultCollection;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
 use AndyDefer\LaravelIndexer\Enums\GramType;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
@@ -57,7 +57,7 @@ final class IndexSearcherTest extends IntegrationTestCase
     ): void {
         $fingerPrint = new IndexableFingerPrintVO($fingerprint);
         $clusterVO = new ClusterVO($cluster);
-        $record = new IndexableRecord(
+        $record = new IndexedDocumentRecord(
             fingerprint: $fingerPrint,
             data: StrictAssociative::from($data),
             cluster: $clusterVO,

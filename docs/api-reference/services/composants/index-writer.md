@@ -2,7 +2,7 @@
 
 ## Description
 
-Service d'indexation qui transforme des `IndexableRecord` en documents persistés avec leurs tokens associés (n-grammes lexicaux et métaphones).
+Service d'indexation qui transforme des `IndexedDocumentRecord` en documents persistés avec leurs tokens associés (n-grammes lexicaux et métaphones).
 
 ## Hiérarchie / Implémentations
 
@@ -37,11 +37,11 @@ Assure l'intégralité du pipeline d'indexation :
 
 ---
 
-### `index(IndexableRecord $entity): void`
+### `index(IndexedDocumentRecord $entity): void`
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$entity` | `IndexableRecord` | L'enregistrement à indexer |
+| `$entity` | `IndexedDocumentRecord` | L'enregistrement à indexer |
 
 **Retourne :** `void`
 
@@ -49,8 +49,8 @@ Assure l'intégralité du pipeline d'indexation :
 
 **Exemple :**
 ```php
-$record = new IndexableRecord(
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
+$record = new IndexedDocumentRecord(
+    fingerprint: new IndexableFingerPrintVO('App.Models.User|123'),
     cluster: new ClusterVO('model:User|tenant:company_abc'),
     data: StrictAssociative::from(['name' => 'John Doe'])
 );
@@ -115,8 +115,8 @@ $writer->indexMany($records);
 ```php
 <?php
 
-$record = new IndexableRecord(
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
+$record = new IndexedDocumentRecord(
+    fingerprint: new IndexableFingerPrintVO('App.Models.User|123'),
     cluster: new ClusterVO('model:User'),
     data: StrictAssociative::from([
         'name' => 'John Doe',
@@ -143,8 +143,8 @@ $writer->index($record);
 
 $longText = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit... (500 caractères)';
 
-$record = new IndexableRecord(
-    finger_print: new IndexableFingerPrintVO('App.Models.Product|1'),
+$record = new IndexedDocumentRecord(
+    fingerprint: new IndexableFingerPrintVO('App.Models.Product|1'),
     cluster: new ClusterVO('model:Product'),
     data: StrictAssociative::from([
         'description' => $longText
@@ -162,7 +162,7 @@ $writer->index($record);
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ IndexWriter::index(IndexableRecord $entity)                               │
+│ IndexWriter::index(IndexedDocumentRecord $entity)                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  1. resetBuffers()                                                         │
@@ -249,7 +249,7 @@ $writer->index($record);
 declare(strict_types=1);
 
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
@@ -264,8 +264,8 @@ $writer = new IndexWriter(
 );
 
 // 2. Création d'un enregistrement
-$record = new IndexableRecord(
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
+$record = new IndexedDocumentRecord(
+    fingerprint: new IndexableFingerPrintVO('App.Models.User|123'),
     cluster: new ClusterVO('model:User|tenant:company_abc|env:production'),
     data: StrictAssociative::from([
         'name' => 'John Doe',
@@ -303,7 +303,7 @@ $writer->indexMany($records);
 
 - `IndexedDocumentRepository` - Gestion des documents
 - `IndexedTokenRepository` - Gestion des tokens
-- `IndexableRecord` - Record d'entrée
+- `IndexedDocumentRecord` - Record d'entrée
 - `IndexedDocumentRecord` - Record de document
 - `GramType` - Types de tokens (LEXICAL, METAPHONE)
 - `NGramGeneratorInterface` - Générateur de n-grammes

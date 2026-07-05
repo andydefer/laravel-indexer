@@ -6,7 +6,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Integration\Services;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\IndexerService;
@@ -31,9 +31,9 @@ final class IndexerServiceTest extends IntegrationTestCase
         $this->tokenRepository = $this->app->make(IndexedTokenRepository::class);
     }
 
-    private function createRecord(string $fingerprint, array $data, string $cluster = 'model:User|tenant:company_abc|env:production'): IndexableRecord
+    private function createRecord(string $fingerprint, array $data, string $cluster = 'model:User|tenant:company_abc|env:production'): IndexedDocumentRecord
     {
-        return new IndexableRecord(
+        return new IndexedDocumentRecord(
             fingerprint: new IndexableFingerPrintVO($fingerprint),
             data: StrictAssociative::from($data),
             cluster: new ClusterVO($cluster),

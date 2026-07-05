@@ -7,7 +7,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Integration\Services\Composants;
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
 use AndyDefer\LaravelIndexer\Enums\GramType;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
@@ -43,7 +43,7 @@ final class IndexWriterTest extends IntegrationTestCase
             'email' => 'john@example.com',
         ]);
 
-        $record = new IndexableRecord(
+        $record = new IndexedDocumentRecord(
             fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
@@ -80,7 +80,7 @@ final class IndexWriterTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
-        $record1 = new IndexableRecord(
+        $record1 = new IndexedDocumentRecord(
             fingerprint: $fingerPrint1,
             data: $data,
             cluster: $cluster,
@@ -98,7 +98,7 @@ final class IndexWriterTest extends IntegrationTestCase
         $this->assertEquals(1, $token->frequency);
 
         $fingerPrint2 = new IndexableFingerPrintVO('App.Models.User|789');
-        $record2 = new IndexableRecord(
+        $record2 = new IndexedDocumentRecord(
             fingerprint: $fingerPrint2,
             data: StrictAssociative::from([
                 'name' => 'John Doe',
@@ -133,7 +133,7 @@ final class IndexWriterTest extends IntegrationTestCase
             ],
         ]);
 
-        $record = new IndexableRecord(
+        $record = new IndexedDocumentRecord(
             fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
@@ -186,7 +186,7 @@ final class IndexWriterTest extends IntegrationTestCase
             ],
         ]);
 
-        $record = new IndexableRecord(
+        $record = new IndexedDocumentRecord(
             fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
@@ -229,7 +229,7 @@ final class IndexWriterTest extends IntegrationTestCase
             'tags' => null,
         ]);
 
-        $record = new IndexableRecord(
+        $record = new IndexedDocumentRecord(
             fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
@@ -256,7 +256,7 @@ final class IndexWriterTest extends IntegrationTestCase
             'name' => 'John',
         ]);
 
-        $record = new IndexableRecord(
+        $record = new IndexedDocumentRecord(
             fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
@@ -291,14 +291,14 @@ final class IndexWriterTest extends IntegrationTestCase
     {
         $records = new IndexableRecordCollection;
 
-        $record1 = new IndexableRecord(
+        $record1 = new IndexedDocumentRecord(
             fingerprint: new IndexableFingerPrintVO('App.Models.User|1'),
             data: StrictAssociative::from(['name' => 'User 1']),
             cluster: new ClusterVO('model:User|tenant:company_abc|env:production'),
         );
         $records->add($record1);
 
-        $record2 = new IndexableRecord(
+        $record2 = new IndexedDocumentRecord(
             fingerprint: new IndexableFingerPrintVO('App.Models.User|2'),
             data: StrictAssociative::from(['name' => 'User 2']),
             cluster: new ClusterVO('model:User|tenant:company_abc|env:production'),
@@ -333,7 +333,7 @@ final class IndexWriterTest extends IntegrationTestCase
             'description' => $longText,
         ]);
 
-        $record = new IndexableRecord(
+        $record = new IndexedDocumentRecord(
             fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
@@ -379,7 +379,7 @@ final class IndexWriterTest extends IntegrationTestCase
             'name' => $longWord,
         ]);
 
-        $record = new IndexableRecord(
+        $record = new IndexedDocumentRecord(
             fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
@@ -412,7 +412,7 @@ final class IndexWriterTest extends IntegrationTestCase
             'long' => 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
         ]);
 
-        $record = new IndexableRecord(
+        $record = new IndexedDocumentRecord(
             fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
@@ -457,7 +457,7 @@ final class IndexWriterTest extends IntegrationTestCase
             'description' => $textWithSpecialChars,
         ]);
 
-        $record = new IndexableRecord(
+        $record = new IndexedDocumentRecord(
             fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,

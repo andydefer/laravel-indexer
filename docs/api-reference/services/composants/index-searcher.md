@@ -36,11 +36,11 @@ Assure la recherche dans l'index en combinant :
 
 ---
 
-### `exists(IndexableFingerPrintVO $finger_print): bool`
+### `exists(IndexableFingerPrintVO $fingerprint): bool`
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$finger_print` | `IndexableFingerPrintVO` | Fingerprint à vérifier |
+| `$fingerprint` | `IndexableFingerPrintVO` | Fingerprint à vérifier |
 
 **Retourne :** `bool` - `true` si le document existe, `false` sinon
 
@@ -74,7 +74,7 @@ $query = new SearchQueryRecord(
 $results = $searcher->search($query);
 
 foreach ($results as $result) {
-    echo $result->item->finger_print->getValue(); // 'App.Models.User|123'
+    echo $result->item->fingerprint->getValue(); // 'App.Models.User|123'
     echo $result->field; // 'name'
     echo $result->gram_value; // 'john'
     echo $result->gram_type->value; // 'lexical'
@@ -150,7 +150,7 @@ use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
 $query = new SearchQueryRecord(
     query: new SearchQueryVO('john=name'),
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123')
+    fingerprint: new IndexableFingerPrintVO('App.Models.User|123')
 );
 
 $results = $searcher->search($query);
@@ -267,7 +267,7 @@ $results = $searcher->search($query);
 foreach ($results as $result) {
     echo sprintf(
         "Document: %s | Champ: %s | Token: %s | Type: %s\n",
-        $result->item->finger_print->getValue(),
+        $result->item->fingerprint->getValue(),
         $result->field,
         $result->gram_value,
         $result->gram_type->value

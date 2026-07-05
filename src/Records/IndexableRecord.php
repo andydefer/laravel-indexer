@@ -9,7 +9,7 @@ use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
-final class IndexableRecord extends AbstractRecord
+final class IndexedDocumentRecord extends AbstractRecord
 {
     public function __construct(
         public readonly IndexableFingerPrintVO $fingerprint,

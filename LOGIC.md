@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-Le système d'indexation permet de stocker et de récupérer rapidement des données structurées via des tokens (n-grammes et metaphones) générés à partir des champs d'un `IndexableRecord`.
+Le système d'indexation permet de stocker et de récupérer rapidement des données structurées via des tokens (n-grammes et metaphones) générés à partir des champs d'un `IndexedDocumentRecord`.
 
 **Objectif :** Recherche en **O(k)** où `k` est le nombre de résultats, sans parcours linéaire sur de grands volumes.
 
@@ -12,11 +12,11 @@ Le système d'indexation permet de stocker et de récupérer rapidement des donn
 
 ## 2. Structure des données
 
-### 2.1 IndexableRecord
+### 2.1 IndexedDocumentRecord
 
 ```php
-$record = new IndexableRecord(
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
+$record = new IndexedDocumentRecord(
+    fingerprint: new IndexableFingerPrintVO('App.Models.User|123'),
     cluster: new ClusterVO('model-User|tenant-company_abc|env-production'),
     data: StrictAssociative::from([
         'name' => 'John Doe',
@@ -84,7 +84,7 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Models;
 
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
@@ -115,10 +115,10 @@ final class IndexedDocument extends Model
         return $this->hasMany(IndexedToken::class, 'document_id');
     }
 
-    public function toIndexableRecord(): IndexableRecord
+    public function toIndexableRecord(): IndexedDocumentRecord
     {
-        return new IndexableRecord(
-            finger_print: new IndexableFingerPrintVO($this->fingerprint),
+        return new IndexedDocumentRecord(
+            fingerprint: new IndexableFingerPrintVO($this->fingerprint),
             cluster: new ClusterVO($this->cluster['value'] ?? ''),
             data: StrictAssociative::from($this->data),
         );
@@ -187,7 +187,7 @@ final class IndexedToken extends Model
 ### 3.1 Étapes
 
 ```
-1. Réception d'un IndexableRecord
+1. Réception d'un IndexedDocumentRecord
     ↓
 2. Sauvegarde du document
    → indexed_documents table
@@ -217,8 +217,8 @@ final class IndexedToken extends Model
 
 **Donnée :**
 ```php
-$record = new IndexableRecord(
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
+$record = new IndexedDocumentRecord(
+    fingerprint: new IndexableFingerPrintVO('App.Models.User|123'),
     cluster: new ClusterVO('model-User|tenant-company_abc|env-production'),
     data: StrictAssociative::from([
         'name' => 'John Doe',
@@ -392,8 +392,8 @@ public function search(SearchQueryRecord $query): IndexableSearchResultCollectio
     }
     
     // Filtrer par namespace
-    if ($query->finger_print) {
-        $tokenQuery->where('namespace', $query->finger_print->getNamespace());
+    if ($query->fingerprint) {
+        $tokenQuery->where('namespace', $query->fingerprint->getNamespace());
     }
     
     // Filtrer par cluster
@@ -480,7 +480,7 @@ CREATE INDEX idx_namespace_entity ON indexed_documents (namespace, entity_id);
 │                               INDEXATION                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  IndexableRecord → Normalisation → Tokenisation → Stockage SQL             │
+│  IndexedDocumentRecord → Normalisation → Tokenisation → Stockage SQL             │
 │                                                                             │
 │  indexed_documents:                                                         │
 │  └── fingerprint, namespace, entity_id, cluster, data, fields              │
@@ -521,7 +521,7 @@ CREATE INDEX idx_namespace_entity ON indexed_documents (namespace, entity_id);
 <?php
 
 use AndyDefer\LaravelIndexer\Services\IndexerService;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
@@ -529,8 +529,8 @@ use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 
 // 1. Indexation
-$record = new IndexableRecord(
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
+$record = new IndexedDocumentRecord(
+    fingerprint: new IndexableFingerPrintVO('App.Models.User|123'),
     cluster: new ClusterVO('model-User|tenant-company_abc|env-production'),
     data: StrictAssociative::from([
         'name' => 'John Doe',
@@ -551,7 +551,7 @@ $results = $indexer->search($query);
 
 // 3. Affichage des résultats
 foreach ($results as $result) {
-    echo $result->item->finger_print->getId(); // '123'
+    echo $result->item->fingerprint->getId(); // '123'
     echo $result->item->data['name']; // 'John Doe'
 }
 ```

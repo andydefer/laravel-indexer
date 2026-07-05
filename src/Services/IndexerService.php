@@ -8,7 +8,7 @@ use AndyDefer\LaravelIndexer\Collections\IndexableFingerPrintVOCollection;
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
 use AndyDefer\LaravelIndexer\Collections\IndexableSearchResultCollection;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexDeleter;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexSearcher;
@@ -36,7 +36,7 @@ final class IndexerService implements IndexerInterface
     /**
      * {@inheritDoc}
      */
-    public function index(IndexableRecord $entity): void
+    public function index(IndexedDocumentRecord $entity): void
     {
         $this->writer->index($entity);
     }
@@ -92,7 +92,7 @@ final class IndexerService implements IndexerInterface
     /**
      * {@inheritDoc}
      */
-    public function refresh(IndexableRecord $entity): void
+    public function refresh(IndexedDocumentRecord $entity): void
     {
         $this->deleter->delete($entity->fingerprint);
         $this->writer->index($entity);

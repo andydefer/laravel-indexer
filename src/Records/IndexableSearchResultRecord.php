@@ -13,7 +13,7 @@ use AndyDefer\LaravelIndexer\Enums\GramType;
 final class IndexableSearchResultRecord extends AbstractRecord
 {
     public function __construct(
-        public readonly IndexableRecord $item,
+        public readonly IndexedDocumentRecord $item,
         public readonly string $field,
         public readonly string $gram_value,
         public readonly GramType $gram_type,

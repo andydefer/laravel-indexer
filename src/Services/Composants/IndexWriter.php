@@ -8,7 +8,6 @@ use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
@@ -59,9 +58,9 @@ final class IndexWriter
      *
      * Creates the document, generates all tokens, and persists them to the index.
      *
-     * @param  IndexableRecord  $entity  The record to index
+     * @param  IndexedDocumentRecord  $entity  The record to index
      */
-    public function index(IndexableRecord $entity): void
+    public function index(IndexedDocumentRecord $entity): void
     {
         $this->resetBuffers();
 

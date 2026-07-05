@@ -46,11 +46,11 @@ $indexer = new IndexerService(
 
 ---
 
-### `index(IndexableRecord $entity): void`
+### `index(IndexedDocumentRecord $entity): void`
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$entity` | `IndexableRecord` | L'enregistrement à indexer |
+| `$entity` | `IndexedDocumentRecord` | L'enregistrement à indexer |
 
 **Retourne :** `void`
 
@@ -175,17 +175,17 @@ $query = new SearchQueryRecord(
 $results = $indexer->search($query);
 
 foreach ($results as $result) {
-    echo $result->item->finger_print->getValue(); // 'App.Models.User|123'
+    echo $result->item->fingerprint->getValue(); // 'App.Models.User|123'
 }
 ```
 
 ---
 
-### `refresh(IndexableRecord $entity): void`
+### `refresh(IndexedDocumentRecord $entity): void`
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$entity` | `IndexableRecord` | L'enregistrement à rafraîchir |
+| `$entity` | `IndexedDocumentRecord` | L'enregistrement à rafraîchir |
 
 **Retourne :** `void`
 
@@ -304,9 +304,9 @@ $indexer->clear();
 ### Refresh d'un document unique
 
 ```
-refresh(IndexableRecord $entity)
+refresh(IndexedDocumentRecord $entity)
     ↓
-delete($entity->finger_print)  ──→ IndexDeleter
+delete($entity->fingerprint)  ──→ IndexDeleter
     ↓
 index($entity)                  ──→ IndexWriter
 ```
@@ -359,19 +359,19 @@ indexMany($records)             ──→ IndexWriter
 declare(strict_types=1);
 
 use AndyDefer\LaravelIndexer\Services\IndexerService;
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
+use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableRecord;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexedDocumentRecord;
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 
 $indexer = app(IndexerService::class);
 
 // 1. Indexer un utilisateur
-$record = new IndexableRecord(
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
+$record = new IndexedDocumentRecord(
+    fingerprint: new IndexableFingerPrintVO('App.Models.User|123'),
     cluster: new ClusterVO('model:User|tenant:company_abc'),
     data: StrictAssociative::from([
         'name' => 'John Doe',
@@ -388,7 +388,7 @@ $query = new SearchQueryRecord(
 $results = $indexer->search($query);
 
 foreach ($results as $result) {
-    echo $result->item->finger_print->getId() . "\n";
+    echo $result->item->fingerprint->getId() . "\n";
     echo $result->field . "\n";
     echo $result->gram_value . "\n";
 }
@@ -400,8 +400,8 @@ if ($indexer->exists($fingerPrint)) {
 }
 
 // 4. Mettre à jour
-$updatedRecord = new IndexableRecord(
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
+$updatedRecord = new IndexedDocumentRecord(
+    fingerprint: new IndexableFingerPrintVO('App.Models.User|123'),
     cluster: new ClusterVO('model:User|tenant:company_abc'),
     data: StrictAssociative::from([
         'name' => 'John Updated',
@@ -423,6 +423,6 @@ $indexer->clear();
 - `IndexDeleter` - Service de suppression
 - `IndexSearcher` - Service de recherche
 - `IndexerInterface` - Interface du service
-- `IndexableRecord` - Record d'entrée
+- `IndexedDocumentRecord` - Record d'entrée
 - `SearchQueryRecord` - Record de requête
 - `IndexableFingerPrintVO` - Value Object pour les fingerprints
