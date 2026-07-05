@@ -1,73 +1,23 @@
 # Laravel Indexer
 
-**Un système d'indexation puissant et flexible pour Laravel avec support d'Eloquent, tokenisation par n-grammes et métaphones, et capacités de recherche avancées.**
-
-[![Version PHP](https://img.shields.io/badge/PHP-8.1%2B-blue)](https://php.net)
-[![Version Laravel](https://img.shields.io/badge/Laravel-12.x%20|%2013.x%20|%2014.x%20|%2015.x-blue)](https://laravel.com)
-[![Licence](https://img.shields.io/badge/Licence-MIT-green)](LICENSE)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/andydefer/laravel-indexer.svg)](https://packagist.org/packages/andydefer/laravel-indexer)
+[![PHP Version Require](https://img.shields.io/packagist/php-v/andydefer/laravel-indexer.svg)](https://packagist.org/packages/andydefer/laravel-indexer)
+[![Laravel Version](https://img.shields.io/badge/Laravel-10%2F11%2F12%2F13%2F14%2F15-ff2d20.svg)](https://laravel.com)
+[![License](https://img.shields.io/packagist/l/andydefer/laravel-indexer.svg)](https://packagist.org/packages/andydefer/laravel-indexer)
 
 ---
 
 ## Table des matières
 
-1. [Introduction](#introduction)
-2. [Fonctionnalités](#fonctionnalités)
-3. [Installation](#installation)
-4. [Configuration](#configuration)
-5. [Structure des tables](#structure-des-tables)
-6. [Concepts fondamentaux](#concepts-fondamentaux)
-7. [Guide de démarrage](#guide-de-démarrage)
-8. [Indexation des entités](#indexation-des-entités)
-9. [Recherche](#recherche)
-10. [Suppression et nettoyage](#suppression-et-nettoyage)
-11. [Architecture détaillée](#architecture-détaillée)
-12. [Performances](#performances)
-13. [Bonnes pratiques](#bonnes-pratiques)
-14. [Dépannage](#dépannage)
-15. [Tests](#tests)
-16. [License](#license)
-
----
-
-## Introduction
-
-**Laravel Indexer** est un package d'indexation full-text conçu pour Laravel qui transforme vos modèles Eloquent en documents recherchables. Il génère des tokens à partir de vos données (n-grammes lexicaux et métaphones phonétiques) et les stocke dans une base de données SQL, permettant des recherches ultra-rapides en **O(k)** où `k` est le nombre de résultats.
-
-Contrairement aux solutions Elasticsearch ou Algolia qui nécessitent des services externes, Laravel Indexer fonctionne directement avec votre base de données existante, sans infrastructure supplémentaire.
-
-### Comment ça fonctionne ?
-
-1. **Indexation** : Vos entités sont transformées en documents avec des tokens (n-grammes et métaphones)
-2. **Stockage** : Les documents et tokens sont persistés dans des tables SQL avec des index optimisés
-3. **Recherche** : Les requêtes sont transformées en tokens et exécutées via des requêtes SQL optimisées
-
----
-
-## Fonctionnalités
-
-### Core
-
-- ✅ **Recherche full-text** avec n-grammes (taille configurable : 3-5 par défaut)
-- ✅ **Recherche phonétique** avec métaphones (tolérance aux fautes d'orthographe)
-- ✅ **Filtrage avancé** par champ, cluster, namespace, fingerprint
-- ✅ **Indexation en masse** avec bufferisation pour des performances optimales
-- ✅ **Recherche multi-critères** (AND logique)
-- ✅ **Architecture Repository** pour une séparation claire des responsabilités
-
-### Stockage
-
-- ✅ **Support de SQLite, MySQL, PostgreSQL**
-- ✅ **Index automatiques** sur les colonnes de recherche
-- ✅ **Bulk insert** pour l'indexation massive
-- ✅ **Transactions** pour l'intégrité des données
-
-### Développement
-
-- ✅ **Injection de dépendances** et interfaces pour une intégration facile
-- ✅ **Framework-agnostique** (utilise uniquement Laravel et PHP pur)
-- ✅ **Type-safe** avec PHP 8.1+ (types stricts, readonly properties)
-- ✅ **Tests unitaires et d'intégration** complets
-- ✅ **Benchmarks** pour mesurer les performances
+- [Installation](#installation)
+- [Préparer votre modèle](#préparer-votre-modèle)
+- [Indexer des données](#indexer-des-données)
+- [Rechercher](#rechercher)
+- [Les clusters](#les-clusters)
+- [Autocomplétion](#autocomplétion)
+- [Supprimer](#supprimer)
+- [Repositories](#repositories)
+- [Collections](#collections)
 
 ---
 
@@ -77,66 +27,22 @@ Contrairement aux solutions Elasticsearch ou Algolia qui nécessitent des servic
 composer require andydefer/laravel-indexer
 ```
 
-### Prérequis
-
-| Dépendance | Version |
-|------------|---------|
-| PHP | 8.1 ou supérieur |
-| Laravel | 12.x, 13.x, 14.x ou 15.x |
-| `andydefer/laravel-repository` | ^2.9.2 |
-| `andydefer/laravel-directive` | ^3.31 |
-| `andydefer/php-console` | ^1.2 |
-| `andydefer/jsonl-cache` | ^0.3.7 |
-| `andydefer/laravel-logger` | ^3.8 |
-| `andydefer/inverted-index-search` | ^0.3.0 |
-
-### Publier les migrations
+### Migrations
 
 ```bash
 php artisan vendor:publish --tag=indexer-migrations
 php artisan migrate
 ```
 
-### Publier la configuration (Optionnel)
+### Configuration (optionnel)
 
 ```bash
 php artisan vendor:publish --tag=indexer-config
 ```
 
----
-
-## Configuration
-
-Le fichier de configuration `config/indexer.php` :
-
 ```php
-<?php
-
+// config/indexer.php
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Storage Path
-    |--------------------------------------------------------------------------
-    |
-    | The path where index files will be stored (legacy, kept for compatibility).
-    |
-    */
-    'storage_path' => storage_path('indexer'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Token Types
-    |--------------------------------------------------------------------------
-    |
-    | Configuration des tokens générés lors de l'indexation.
-    |
-    | min_size  : Taille minimale des n-grammes (défaut: 3)
-    | max_size  : Taille maximale des n-grammes (défaut: 5)
-    | metaphone : Activer/désactiver les métaphones (défaut: true)
-    |
-    | Note: Plus la plage est large, plus la recherche est précise,
-    |       mais plus l'indexation est lente et l'espace de stockage important.
-    */
     'token_types' => [
         'ngrams' => [
             'min_size' => 3,
@@ -144,226 +50,27 @@ return [
         ],
         'metaphone' => true,
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Default Limit
-    |--------------------------------------------------------------------------
-    |
-    | Limite par défaut pour les résultats de recherche.
-    |
-    */
     'default_limit' => 100,
-
-    /*
-    |--------------------------------------------------------------------------
-    | Enable Cache
-    |--------------------------------------------------------------------------
-    |
-    | Mettre en cache les résultats de recherche (défaut: true).
-    |
-    */
-    'enable_cache' => true,
-
-    /*
-    |--------------------------------------------------------------------------
-    | Cache TTL
-    |--------------------------------------------------------------------------
-    |
-    | Durée de vie du cache en secondes (défaut: 3600).
-    |
-    */
-    'cache_ttl' => 3600,
 ];
 ```
 
 ---
 
-## Structure des tables
+## Préparer votre modèle
 
-### Table `indexed_documents`
-
-Stocke les documents indexés avec leurs métadonnées.
-
-```sql
-CREATE TABLE indexed_documents (
-    id CHAR(36) PRIMARY KEY,                    -- UUID du document
-    fingerprint VARCHAR(255) UNIQUE NOT NULL,    -- "App.Models.User|123"
-    cluster VARCHAR(255) NOT NULL,              -- "model:User|tenant:company_abc"
-    data JSON NOT NULL,                          -- Données indexées
-    created_at TIMESTAMP NULL,
-    updated_at TIMESTAMP NULL,
-    
-    INDEX idx_fingerprint (fingerprint),
-    INDEX idx_cluster (cluster)
-);
-```
-
-### Table `indexed_tokens`
-
-Stocke tous les tokens générés pour chaque document.
-
-```sql
-CREATE TABLE indexed_tokens (
-    id CHAR(36) PRIMARY KEY,                    -- UUID du token
-    document_id CHAR(36) NOT NULL,               -- Référence au document
-    token_type VARCHAR(20) NOT NULL,            -- 'lexical' ou 'metaphone'
-    token VARCHAR(255) NOT NULL,                -- La valeur du token
-    field VARCHAR(255) NOT NULL,                -- Le champ source
-    original_text VARCHAR(255) NOT NULL,        -- Texte original (casse préservée)
-    frequency BIGINT UNSIGNED DEFAULT 1,        -- Fréquence d'apparition
-    created_at TIMESTAMP NULL,
-    updated_at TIMESTAMP NULL,
-    
-    FOREIGN KEY (document_id) REFERENCES indexed_documents(id) ON DELETE CASCADE,
-    INDEX idx_token_field (token, field),
-    INDEX idx_token_type_token (token_type, token),
-    INDEX idx_token (token),
-    INDEX idx_field (field)
-);
-```
-
----
-
-## Concepts fondamentaux
-
-### 1. IndexableRecord
-
-Le `IndexableRecord` est un DTO (Data Transfer Object) qui représente un document à indexer.
-
-```php
-use AndyDefer\LaravelIndexer\Records\IndexableRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
-use AndyDefer\DomainStructures\Utils\StrictAssociative;
-
-$record = new IndexableRecord(
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
-    cluster: new ClusterVO('model:User|tenant:company_abc|env:production'),
-    data: StrictAssociative::from([
-        'name' => 'John Doe',
-        'email' => 'john@example.com',
-        'description' => 'Software Developer'
-    ])
-);
-```
-
-### 2. Indexable (Interface)
-
-Les entités que vous souhaitez indexer doivent implémenter l'interface `Indexable` :
-
-```php
-use AndyDefer\LaravelIndexer\Contracts\Indexable;
-use AndyDefer\DomainStructures\Utils\StrictAssociative;
-
-class User extends Model implements Indexable
-{
-    /**
-     * Détermine si l'entité doit être indexée.
-     */
-    public function shouldBeIndexed(): bool
-    {
-        return $this->is_active;
-    }
-
-    /**
-     * Retourne les données à indexer.
-     */
-    public function getIndexableData(): StrictAssociative
-    {
-        return StrictAssociative::from([
-            'name' => $this->name,
-            'email' => $this->email,
-            'description' => $this->description,
-        ]);
-    }
-
-    /**
-     * Retourne l'ID de l'entité.
-     */
-    public function getKey(): int
-    {
-        return $this->id;
-    }
-
-    /**
-     * Retourne le type de l'entité.
-     */
-    public function getMorphClass(): string
-    {
-        return self::class;
-    }
-}
-```
-
-### 3. Cluster
-
-Le cluster est un système de **tags structurés** permettant de filtrer les résultats par catégorie.
-
-```php
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
-
-// Format: "clé:valeur|clé:valeur"
-$cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
-
-// Récupération des valeurs (toujours un tableau)
-$cluster->get('model');    // ['User']
-$cluster->get('tenant');   // ['company_abc']
-$cluster->get('env');      // ['production']
-
-// Vérifications
-$cluster->has('model');    // true
-$cluster->has('unknown');  // false
-
-// Support des valeurs multiples
-$cluster = new ClusterVO('category:electronics,music,books');
-$cluster->get('category'); // ['electronics', 'music', 'books']
-```
-
-### 4. Fingerprint
-
-Le fingerprint est un identifiant unique combinant le type d'entité et son ID.
-
-```php
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
-
-$fingerprint = new IndexableFingerPrintVO('App.Models.User|123');
-
-$fingerprint->getId();        // '123'
-$fingerprint->getNamespace(); // 'App.Models.User'
-$fingerprint->getValue();     // 'App.Models.User|123'
-```
-
-### 5. GramType
-
-Enum définissant les types de tokens.
-
-```php
-use AndyDefer\LaravelIndexer\Enums\GramType;
-
-GramType::LEXICAL;    // N-grammes lexicaux
-GramType::METAPHONE;  // Métaphones phonétiques
-```
-
----
-
-## Guide de démarrage
-
-### Étape 1 : Implémenter l'interface Indexable
+Votre modèle doit implémenter l'interface `Indexable`.
 
 ```php
 <?php
 
 namespace App\Models;
 
-use AndyDefer\LaravelIndexer\Contracts\Indexable;
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelIndexer\Contracts\Indexable;
 use Illuminate\Database\Eloquent\Model;
 
-class Product extends Model implements Indexable
+class User extends Model implements Indexable
 {
-    protected $fillable = ['id', 'name', 'reference', 'description', 'is_active'];
-
     public function shouldBeIndexed(): bool
     {
         return $this->is_active;
@@ -373,12 +80,17 @@ class Product extends Model implements Indexable
     {
         return StrictAssociative::from([
             'name' => $this->name,
-            'reference' => $this->reference,
-            'description' => $this->description,
+            'email' => $this->email,
+            'bio' => $this->bio,
+            'skills' => $this->skills,
+            'profile' => [
+                'twitter' => $this->twitter,
+                'github' => $this->github,
+            ],
         ]);
     }
 
-    public function getKey(): int
+    public function getKey(): int|string
     {
         return $this->id;
     }
@@ -390,520 +102,510 @@ class Product extends Model implements Indexable
 }
 ```
 
-### Étape 2 : Créer le cluster
+---
+
+## Indexer des données
+
+### Indexer un document
 
 ```php
+use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
+use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 
-$cluster = new ClusterVO('model:Product|tenant:my_tenant|env:production');
+class UserService
+{
+    public function __construct(
+        private IndexerInterface $indexer
+    ) {}
+
+    public function indexUser(User $user): void
+    {
+        $cluster = new ClusterVO('tenant:' . $user->tenant_id);
+        $record = IndexableRecordFactory::convert($user, $cluster);
+        $this->indexer->index($record);
+    }
+}
 ```
 
-### Étape 3 : Indexer une entité
+### Indexer en masse
 
 ```php
-use AndyDefer\LaravelIndexer\Services\IndexerService;
-use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
+use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
 
-$product = Product::find(1);
-$cluster = new ClusterVO('model:Product|tenant:company_abc|env:production');
+public function indexAllUsers(): void
+{
+    $records = new IndexableRecordCollection;
 
-$record = IndexableRecordFactory::convert($product, $cluster);
+    foreach (User::where('is_active', true)->cursor() as $user) {
+        $cluster = new ClusterVO('tenant:' . $user->tenant_id);
+        $records->add(IndexableRecordFactory::convert($user, $cluster));
+    }
 
-$indexer = app(IndexerService::class);
-$indexer->index($record);
+    $this->indexer->indexMany($records);
+}
 ```
 
-### Étape 4 : Rechercher
+### Rafraîchir (mise à jour)
+
+```php
+public function updateUser(User $user): void
+{
+    $user->save();
+    
+    $cluster = new ClusterVO('tenant:' . $user->tenant_id);
+    $record = IndexableRecordFactory::convert($user, $cluster);
+    $this->indexer->refresh($record);
+}
+```
+
+---
+
+## Rechercher
+
+### Comment fonctionne la recherche ?
+
+1. Le terme est normalisé (minuscules, accents supprimés)
+2. Le système génère tous les n-grammes possibles du terme
+3. Il recherche les tokens LEXICAL correspondants
+4. Si aucun résultat, il recherche les tokens METAPHONE (phonétique)
+5. Retourne les documents trouvés
+
+**Exemple :**
+- Indexé : "john" → tokens : ["joh", "ohn", "john"]
+- Recherche "joh" → trouve "john" car "joh" est un token
+- Recherche "jon" → trouve "john" via métaphone (JN → jn)
+
+### Recherche simple
 
 ```php
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
 
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('laptop=name,description'),
-    limit: 20
-);
-
-$results = $indexer->search($query);
-
-foreach ($results as $result) {
-    echo $result->item->data['name'] . "\n";
-    echo "Matché dans: " . $result->field . "\n";
-    echo "Token: " . $result->gram_value . "\n";
-    echo "Type: " . $result->gram_type->value . "\n";
-}
-```
-
----
-
-## Indexation des entités
-
-### Indexation simple
-
-```php
-$record = IndexableRecordFactory::convert($entity, $cluster);
-$indexer->index($record);
-```
-
-### Indexation en masse
-
-```php
-use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
-
-$records = new IndexableRecordCollection();
-
-foreach ($products as $product) {
-    $records->add(IndexableRecordFactory::convert($product, $cluster));
-}
-
-$indexer->indexMany($records);
-```
-
-### Indexation avec données imbriquées
-
-```php
-$record = new IndexableRecord(
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
-    cluster: new ClusterVO('model:User'),
-    data: StrictAssociative::from([
-        'name' => 'John Doe',
-        'profile' => [
-            'bio' => 'Software Developer',
-            'social' => [
-                'twitter' => '@johndoe',
-                'github' => 'johndoe'
-            ]
-        ],
-        'tags' => ['php', 'laravel', 'mysql']
-    ])
-);
-
-$indexer->index($record);
-// Les tokens seront générés pour :
-// - name
-// - profile.bio
-// - profile.social.twitter
-// - profile.social.github
-// - tags (concaténé en 'php; laravel; mysql')
-```
-
-### Rafraîchissement (update)
-
-```php
-// Met à jour un document existant (delete + index)
-$indexer->refresh($record);
-
-// Met à jour plusieurs documents
-$indexer->refreshMany($records);
-```
-
-### Exemple complet d'indexation en masse
-
-```php
-<?php
-
-use AndyDefer\LaravelIndexer\Services\IndexerService;
-use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
-use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
-
-class ProductIndexer
+public function searchUsers(string $query): array
 {
-    private IndexerService $indexer;
-    private ClusterVO $cluster;
+    // Recherche "john" dans name, email, bio
+    $searchQuery = new SearchQueryRecord(
+        query: new SearchQueryVO($query . '=name,email,bio')
+    );
 
-    public function __construct()
-    {
-        $this->indexer = app(IndexerService::class);
-        $this->cluster = new ClusterVO('model:Product|tenant:my_tenant|env:production');
-    }
-
-    public function indexAll(): void
-    {
-        $products = Product::where('is_active', true)->get();
-        $records = new IndexableRecordCollection();
-
-        foreach ($products as $product) {
-            $records->add(IndexableRecordFactory::convert($product, $this->cluster));
-        }
-
-        $this->indexer->indexMany($records);
-        echo "Indexé " . $records->count() . " produits\n";
-    }
-
-    public function reindex(Product $product): void
-    {
-        $record = IndexableRecordFactory::convert($product, $this->cluster);
-        $this->indexer->refresh($record);
-    }
-
-    public function delete(Product $product): void
-    {
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.Product|' . $product->id);
-        $this->indexer->delete($fingerPrint);
-    }
+    $results = $this->indexer->search($searchQuery);
+    
+    // Récupérer les IDs
+    $userIds = $results->getItems()->getIdValues()->toArray();
+    
+    return User::whereIn('id', $userIds)->get();
 }
 ```
 
----
-
-## Recherche
-
-### Recherche simple
+### Recherche multi-termes (AND)
 
 ```php
+// "john" dans name ET "developer" dans bio
 $query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name')
+    query: new SearchQueryVO('john=name|developer=bio')
 );
-$results = $indexer->search($query);
 ```
 
 ### Recherche multi-champs (OR)
 
 ```php
-// "john" dans "name" OU "description" OU "email"
+// "john" dans name OU email OU bio
 $query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name,description,email')
+    query: new SearchQueryVO('john=name,email,bio')
 );
 ```
 
-### Recherche multi-n-grams (AND)
-
-```php
-// "john" dans "name" ET "developer" dans "description"
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name|developer=description')
-);
-```
-
-### Recherche avec cluster
+### Recherche avec limite
 
 ```php
 $query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name'),
-    cluster: new ClusterVO('tenant:company_abc|env:production')
+    query: new SearchQueryVO('john=name,email'),
+    limit: 20
 );
 ```
 
-### Recherche avec fingerprint
+### Filtrer par tenant (cluster)
 
 ```php
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name'),
-    finger_print: new IndexableFingerPrintVO('App.Models.User|123')
-);
-```
-
-### Recherche avec limite personnalisée
-
-```php
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name'),
-    limit: 50,
-    min_size: 3,
-    max_size: 5
-);
-```
-
-### Recherche phonétique (métaphone)
-
-```php
-// "jon" est une faute d'orthographe de "john"
-// Le métaphone de "jon" et "john" est identique ("JN")
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('jon=name')
-);
-
-$results = $indexer->search($query);
-// Retourne les documents contenant "john" car "jon" est phonétiquement identique
-```
-
-### Exemple complet de recherche
-
-```php
-<?php
-
-use AndyDefer\LaravelIndexer\Services\IndexerService;
-use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 
-class ProductSearch
-{
-    private IndexerService $indexer;
+$query = new SearchQueryRecord(
+    query: new SearchQueryVO('john=name,email'),
+    cluster: new ClusterVO('tenant:company_abc')
+);
+```
 
-    public function __construct()
-    {
-        $this->indexer = app(IndexerService::class);
-    }
+### Vérifier l'existence d'un document
 
-    public function searchProducts(string $query, string $tenant = null): array
-    {
-        $searchQuery = new SearchQueryVO($query . '=name,reference,description');
+```php
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
-        $record = new SearchQueryRecord(
-            query: $searchQuery,
-            cluster: $tenant ? new ClusterVO('tenant:' . $tenant) : null,
-            limit: 50
-        );
-
-        $results = $this->indexer->search($record);
-
-        $products = [];
-        foreach ($results as $result) {
-            $products[] = [
-                'id' => $result->item->finger_print->getId(),
-                'name' => $result->item->data['name'],
-                'reference' => $result->item->data['reference'],
-                'matched_field' => $result->field,
-                'matched_term' => $result->gram_value,
-                'match_type' => $result->gram_type->value,
-            ];
-        }
-
-        return $products;
-    }
-
-    public function autocomplete(string $prefix): array
-    {
-        $query = new SearchQueryRecord(
-            query: new SearchQueryVO($prefix . '=name'),
-            limit: 10,
-            min_size: 2,
-            max_size: 3
-        );
-
-        $results = $this->indexer->search($query);
-
-        return $results->map(fn($r) => $r->item->data['name'])->toArray();
-    }
-}
+$fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
+$exists = $this->indexer->exists($fingerPrint);
 ```
 
 ---
 
-## Suppression et nettoyage
+## Les clusters
 
-### Suppression d'un document
+Le cluster est un **filtre contextuel**. Il permet de filtrer les recherches par contexte (tenant, environnement, etc.).
+
+### Créer un cluster
 
 ```php
-$fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-$indexer->delete($fingerPrint);
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+
+// Simple
+$cluster = new ClusterVO('tenant:company_abc');
+
+// Multiple
+$cluster = new ClusterVO('tenant:company_abc|env:production|region:europe');
+
+// Valeurs multiples
+$cluster = new ClusterVO('tenant:company_abc,company_xyz|category:electronics,music');
 ```
 
-### Suppression en masse
+### Lire un cluster
+
+```php
+$cluster = new ClusterVO('tenant:company_abc,company_xyz|env:production');
+
+$cluster->get('tenant');     // ['company_abc', 'company_xyz']
+$cluster->get('env');        // ['production']
+$cluster->has('tenant');     // true
+$cluster->has('unknown');    // false
+$cluster->contains('tenant', 'company_abc');  // true
+$cluster->all();
+// ['tenant' => ['company_abc', 'company_xyz'], 'env' => ['production']]
+```
+
+### Manipuler un cluster
+
+```php
+$cluster = new ClusterVO('tenant:company_abc');
+
+// Ajouter
+$new = $cluster->with('env', 'production');
+$new = $cluster->withMany('category', ['electronics', 'music']);
+
+// Supprimer
+$new = $cluster->without('tenant', 'company_abc');
+$new = $cluster->without('env');
+
+// Chaînage
+$new = $cluster
+    ->with('env', 'production')
+    ->with('region', 'europe');
+```
+
+---
+
+## Autocomplétion
+
+```php
+use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
+
+class AutocompleteService
+{
+    public function __construct(
+        private IndexedTokenRepository $tokenRepository
+    ) {}
+
+    public function suggest(string $prefix): array
+    {
+        $tokens = $this->tokenRepository->autocomplete($prefix, 10);
+        return $tokens->pluck('token')->toArray();
+    }
+}
+```
+
+### Autocomplétion par champ
+
+```php
+$tokens = $this->tokenRepository->getModel()
+    ->newQuery()
+    ->where('token', 'LIKE', $prefix . '%')
+    ->where('field', 'name')
+    ->select('token')
+    ->distinct()
+    ->limit(10)
+    ->get();
+```
+
+### Autocomplétion avec tenant
+
+```php
+$tokens = $this->tokenRepository->getModel()
+    ->newQuery()
+    ->where('token', 'LIKE', $prefix . '%')
+    ->whereHas('document', function ($q) use ($tenantId) {
+        $q->where('cluster', 'LIKE', '%tenant:' . $tenantId . '%');
+    })
+    ->select('token')
+    ->distinct()
+    ->limit(10)
+    ->get();
+```
+
+---
+
+## Supprimer
+
+### Supprimer un document
+
+```php
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+
+$fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
+$this->indexer->delete($fingerPrint);
+```
+
+### Supprimer plusieurs
 
 ```php
 use AndyDefer\LaravelIndexer\Collections\IndexableFingerPrintVOCollection;
 
-$collection = new IndexableFingerPrintVOCollection();
+$collection = new IndexableFingerPrintVOCollection;
 $collection->add(new IndexableFingerPrintVO('App.Models.User|123'));
 $collection->add(new IndexableFingerPrintVO('App.Models.User|456'));
-$collection->add(new IndexableFingerPrintVO('App.Models.Product|789'));
-
-$indexer->deleteMany($collection);
+$this->indexer->deleteMany($collection);
 ```
 
-### Suppression par namespace
+### Supprimer par namespace
 
 ```php
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 
-$documentRepo = new IndexedDocumentRepository();
-$deleted = $documentRepo->deleteByNamespace('App.Models.User');
-echo "Supprimé $deleted documents\n";
+$repository = app(IndexedDocumentRepository::class);
+$repository->deleteByNamespace('App.Models.User');
 ```
 
-### Suppression par cluster
+### Supprimer par cluster
 
 ```php
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+$cluster = new ClusterVO('tenant:company_abc');
+$repository->deleteByCluster($cluster);
 
-$cluster = new ClusterVO('tenant:company_xyz');
-$documentRepo = new IndexedDocumentRepository();
-$deleted = $documentRepo->deleteByCluster($cluster);
-echo "Supprimé $deleted documents\n";
+$repository->deleteByClusterKeyValue('tenant', 'company_abc');
 ```
 
-### Nettoyage complet
+### Vider l'index
 
 ```php
-$indexer->clear(); // Supprime TOUS les documents et tokens
+$this->indexer->clear();
 ```
 
 ---
 
-## Bonnes pratiques
+## Repositories
 
-### 1. Indexation en masse
+### IndexedDocumentRepository
 
 ```php
-// ❌ À éviter : indexation un par un
-foreach ($products as $product) {
-    $indexer->index(IndexableRecordFactory::convert($product, $cluster));
-}
+use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 
-// ✅ Recommandé : indexation en masse
-$records = new IndexableRecordCollection();
-foreach ($products as $product) {
-    $records->add(IndexableRecordFactory::convert($product, $cluster));
-}
-$indexer->indexMany($records);
+$repository = app(IndexedDocumentRepository::class);
+
+// Trouver
+$doc = $repository->findByFingerPrint($fingerPrint);
+$doc = $repository->findByFingerprintString('App.Models.User|123');
+$docs = $repository->findByNamespace('App.Models.User');
+$docs = $repository->findByCluster($cluster);
+$docs = $repository->findByClusterKeyValue('tenant', 'company_abc');
+$docs = $repository->findByIds(['uuid1', 'uuid2']);
+
+// Compter
+$count = $repository->countByNamespace('App.Models.User');
+$count = $repository->countByCluster($cluster);
+
+// Distinct
+$namespaces = $repository->getDistinctNamespaces();
+$keys = $repository->getDistinctClusterKeys();
+$values = $repository->getDistinctClusterValues('tenant');
+
+// Vérifier
+$exists = $repository->existsByFingerPrint($fingerPrint);
+$exists = $repository->existsByNamespace('App.Models.User');
+$exists = $repository->existsByCluster($cluster);
+
+// Supprimer
+$repository->deleteByFingerPrint($fingerPrint);
+$repository->deleteByFingerprintString('App.Models.User|123');
+$repository->deleteByNamespace('App.Models.User');
+$repository->deleteByCluster($cluster);
+$repository->deleteByClusterKeyValue('tenant', 'company_abc');
+
+// Tout avec tokens
+$docs = $repository->findAllWithTokens();
 ```
 
-### 2. Utilisation des clusters
+### IndexedTokenRepository
 
 ```php
-// ❌ À éviter : clusters trop génériques
-$cluster = new ClusterVO('type:product');
+use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
+use AndyDefer\LaravelIndexer\Enums\GramType;
 
-// ✅ Recommandé : clusters précis et structurés
-$cluster = new ClusterVO('model:Product|tenant:company_abc|env:production|category:electronics');
-```
+$repository = app(IndexedTokenRepository::class);
 
-### 3. Filtrage par champ
+// Trouver
+$tokens = $repository->findByToken('john');
+$tokens = $repository->findByType(GramType::LEXICAL);
+$tokens = $repository->findByField('name');
+$tokens = $repository->findByDocumentId('uuid');
+$tokens = $repository->findByDocumentFingerPrint($fingerPrint);
+$tokens = $repository->findByNamespace('App.Models.User');
+$tokens = $repository->findByCluster($cluster);
+$tokens = $repository->findByClusterKeyValue('tenant', 'company_abc');
 
-```php
-// ❌ À éviter : rechercher dans tous les champs (lent)
-$query = new SearchQueryVO('john=');
+// Token + critères
+$tokens = $repository->findByTokenAndField('john', 'name');
+$tokens = $repository->findByTokenAndType('john', GramType::LEXICAL);
+$tokens = $repository->findByTokenAndNamespace('john', 'App.Models.User');
+$tokens = $repository->findByTokenAndCluster('john', $cluster);
+$tokens = $repository->findByTokenFieldAndNamespace('john', 'name', 'App.Models.User');
 
-// ✅ Recommandé : spécifier les champs pertinents
-$query = new SearchQueryVO('john=name,description');
-```
+// Document IDs par token
+$ids = $repository->getDocumentIdsForToken('john');
+$ids = $repository->getDocumentIdsForTokenAndField('john', 'name');
+$ids = $repository->getDocumentIdsForTokenAndCluster('john', $cluster);
+$ids = $repository->getDocumentIdsForTokenFieldAndCluster('john', 'name', $cluster);
 
-### 4. Taille des n-grammes
+// Compter
+$count = $repository->countDistinctTokens();
+$count = $repository->countByType(GramType::LEXICAL);
+$count = $repository->countByField('name');
+$count = $repository->countByNamespace('App.Models.User');
 
-```php
-// ❌ À éviter : min_size trop petit (2) → trop de tokens
-'min_size' => 2,
+// Supprimer
+$repository->deleteByDocumentId('uuid');
+$repository->deleteByDocumentFingerPrint($fingerPrint);
+$repository->deleteByNamespace('App.Models.User');
+$repository->deleteByCluster($cluster);
+$repository->deleteByClusterKeyValue('tenant', 'company_abc');
+$repository->deleteByToken('john');
+$repository->deleteByTokenAndField('john', 'name');
 
-// ❌ À éviter : max_size trop grand (10) → trop de tokens
-'max_size' => 10,
-
-// ✅ Recommandé : plage équilibrée
-'min_size' => 3,
-'max_size' => 5,
-```
-
-### 5. Nettoyage régulier
-
-```php
-// ✅ Recommandé : nettoyer les documents inactifs
-$inactiveProducts = Product::where('is_active', false)->get();
-$fingerPrints = new IndexableFingerPrintVOCollection();
-foreach ($inactiveProducts as $product) {
-    $fingerPrints->add(new IndexableFingerPrintVO('App.Models.Product|' . $product->id));
-}
-$indexer->deleteMany($fingerPrints);
-```
-
-### 6. Utilisation des transactions
-
-```php
-// ✅ Recommandé : regrouper les opérations dans une transaction
-DB::transaction(function () use ($products, $cluster, $indexer) {
-    $records = new IndexableRecordCollection();
-    foreach ($products as $product) {
-        $records->add(IndexableRecordFactory::convert($product, $cluster));
-    }
-    $indexer->indexMany($records);
-});
+// Autres
+$tokens = $repository->getDistinctTokens();
+$fields = $repository->getDistinctFields();
+$token = $repository->findByTokenFieldAndDocument('john', 'name', 'uuid', GramType::LEXICAL);
+$frequency = $repository->incrementFrequency('token-id');
 ```
 
 ---
 
-## Dépannage
+## Collections
 
-### Erreur : `Prepared statement contains too many placeholders`
-
-**Cause :** Trop de tokens dans une seule requête INSERT (limite MySQL = 65535).
-
-**Solution :** Réduire `insertChunkSize` dans `IndexWriter` :
+### IndexableSearchResultCollection
 
 ```php
-private int $insertChunkSize = 500; // Au lieu de 1000
+$results = $this->indexer->search($query);
+
+// Itération
+foreach ($results as $result) {
+    $item = $result->item;
+    $fingerprint = $item->finger_print->getValue();
+    $field = $result->field;
+    $gram = $result->gram_value;
+    $type = $result->gram_type->value; // 'lexical' ou 'metaphone'
+}
+
+// Filtrage
+$byField = $results->filterByField('name');
+$byNamespace = $results->filterByNamespace('App.Models.User');
+
+// Extraction
+$ids = $results->getIds();
+$items = $results->getItems();
+$fingerPrints = $results->getFingerPrints();
+
+// Groupement
+$byField = $results->groupByField();
+$byNamespace = $results->groupByNamespace();
 ```
 
-### Erreur : `Array to string conversion`
-
-**Cause :** Les données contiennent des tableaux non encodés en JSON.
-
-**Solution :** Utiliser `StrictAssociative` pour les données :
+### IndexableRecordCollection
 
 ```php
-$data = StrictAssociative::from([
-    'name' => 'John Doe',
-    'tags' => ['php', 'laravel'], // → sera encodé en JSON
-]);
+$records = new IndexableRecordCollection;
+
+// Ajout
+$records->add($record);
+
+// Découpage
+$chunks = $records->chunk(100);
+
+// Filtrage
+$users = $records->filterByNamespace('App.Models.User');
+$withTenant = $records->filterByCluster('tenant', 'company_abc');
+
+// Extraction
+$fingerPrints = $records->getFingerPrints();
+$ids = $records->getIdValues();
+
+// Recherche
+$record = $records->findById('123');
+$record = $records->findByIdAndNamespace('123', 'App.Models.User');
+
+// Vérification
+$hasId = $records->containsId('123');
+$hasNamespace = $records->containsNamespace('App.Models.User');
+
+// Indexation
+$this->indexer->indexMany($records);
 ```
 
-### Erreur : `Cluster cannot be empty`
-
-**Cause :** Le cluster est vide ou mal formé.
-
-**Solution :** Vérifier le format du cluster :
+### IndexableFingerPrintVOCollection
 
 ```php
-// ❌ Mauvais
-$cluster = new ClusterVO(''); // Exception
+$fingerPrints = new IndexableFingerPrintVOCollection;
 
-// ✅ Bon
-$cluster = new ClusterVO('model:User|tenant:company_abc');
+// Filtrage
+$users = $fingerPrints->filterByNamespace('App.Models.User');
+
+// Extraction
+$ids = $fingerPrints->getIds();
+$namespaces = $fingerPrints->getNamespaces();
+
+// Vérification
+$hasId = $fingerPrints->containsId('123');
+$hasNamespace = $fingerPrints->containsNamespace('App.Models.User');
+
+// Recherche
+$fp = $fingerPrints->findByValue('App.Models.User|123');
+$fp = $fingerPrints->findByIdAndNamespace('123', 'App.Models.User');
+
+// Groupement
+$grouped = $fingerPrints->groupByNamespace();
 ```
 
-### Erreur : `Invalid cluster format`
-
-**Cause :** Format incorrect (utilise `-` au lieu de `:`).
-
-**Solution :** Utiliser le format `clé:valeur` :
+### ClusterVOCollection
 
 ```php
-// ❌ Mauvais
-$cluster = new ClusterVO('model-User');
+$clusters = new ClusterVOCollection;
 
-// ✅ Bon
-$cluster = new ClusterVO('model:User');
-```
+// Filtrage
+$withTenant = $clusters->filterByKey('tenant');
+$withSpecific = $clusters->filterByPair('tenant', 'company_abc');
 
-### Recherche lente
+// Extraction
+$values = $clusters->getValuesForKey('tenant');
+$keys = $clusters->getUniqueKeys();
 
-**Cause :** Manque d'index SQL ou requêtes non optimisées.
+// Groupement
+$grouped = $clusters->groupByKey('tenant');
 
-**Solution :**
-1. Vérifier les index dans la table `indexed_tokens`
-2. Réduire `min_size` et `max_size` pour moins de tokens
-3. Utiliser des clusters pour filtrer avant la recherche
+// Vérification
+$hasKey = $clusters->hasKey('tenant');
+$hasPair = $clusters->hasPair('tenant', 'company_abc');
 
----
-
-## Tests
-
-### Exécuter les tests unitaires
-
-```bash
-./vendor/bin/phpunit
-```
-
-### Exécuter les tests d'intégration
-
-```bash
-./vendor/bin/phpunit --testsuite Integration
-```
-
-### Exécuter les benchmarks
-
-```bash
-./vendor/bin/phpunit --testsuite Benchmark
-```
-
-### Exécuter un test spécifique
-
-```bash
-./vendor/bin/phpunit --filter test_index_creates_document_and_tokens
+// Fusion
+$merged = $clusters->mergeAll();
 ```
 
 ---
 
 ## License
 
-MIT © [Andy Kani](https://github.com/andydefer)
+MIT © [Andy Defer](https://github.com/andydefer)
