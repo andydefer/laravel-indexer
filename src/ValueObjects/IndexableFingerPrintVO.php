@@ -63,11 +63,15 @@ final class IndexableFingerPrintVO extends AbstractValueObject
             throw new InvalidArgumentException('Namespace cannot be empty');
         }
 
+        // ✅ RIGUEUR : Le namespace doit être en format "App.Models.User"
         if (str_contains($namespace, '\\')) {
             throw new InvalidArgumentException(
-                sprintf('Namespace cannot contain "\\". Got "%s"', $namespace)
+                sprintf('Namespace cannot contain "\\". Got "%s". Use "." instead (e.g., "App.Models.User")', $namespace)
             );
         }
+
+        $this->namespace = $namespace;
+        $this->id = $id;
     }
 
     private function parse(string $value): void
@@ -103,5 +107,13 @@ final class IndexableFingerPrintVO extends AbstractValueObject
     public function getOriginalNamespace(): string
     {
         return str_replace('.', '\\', $this->namespace);
+    }
+
+    public static function fromParts(string $namespace, string $id): self
+    {
+        // ✅ Conversion automatique pour simplifier la création
+        $normalized = str_replace('\\', '.', $namespace);
+
+        return new self($normalized.self::SEPARATOR.$id);
     }
 }
