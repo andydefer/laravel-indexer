@@ -7,21 +7,25 @@ namespace AndyDefer\LaravelIndexer\Contracts;
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 
 /**
- * Interface pour les entités indexables.
+ * Interface for entities that can be indexed.
  *
- * Une entité est indexable si elle peut fournir ses données à indexer.
+ * An entity is indexable if it can provide structured data for indexing,
+ * including the data itself, a unique identifier, and a type identifier.
  */
 interface Indexable
 {
     /**
-     * Détermine si l'entité doit être indexée.
+     * Determines whether the entity should be indexed.
+     *
+     * @return bool True if the entity is eligible for indexing, false otherwise
      */
     public function shouldBeIndexed(): bool;
 
     /**
-     * Retourne les données à indexer sous forme de StrictAssociative.
+     * Returns the data to be indexed as a StrictAssociative array.
      *
-     * Clé = nom du champ, Valeur = contenu à indexer
+     * The array keys represent field names, and values represent the content
+     * to be indexed for each field.
      *
      * @example
      * return StrictAssociative::from([
@@ -29,16 +33,24 @@ interface Indexable
      *     'email' => $this->user->email,
      *     'description' => $this->description,
      * ]);
+     *
+     * @return StrictAssociative<string, mixed> The indexable data
      */
     public function getIndexableData(): StrictAssociative;
 
     /**
-     * Retourne l'ID de l'entité.
+     * Returns the unique identifier of the entity.
+     *
+     * @return int|string The entity's primary key or unique identifier
      */
-    public function getKey();
+    public function getKey(): int|string;
 
     /**
-     * Retourne le type de l'entité (morph class / namespace).
+     * Returns the entity's type identifier (morph class / namespace).
+     *
+     * This is used to group and filter indexed documents by entity type.
+     *
+     * @return string The fully qualified class name or type identifier
      */
-    public function getMorphClass();
+    public function getMorphClass(): string;
 }

@@ -46,6 +46,8 @@ final class IndexSearcherTest extends IntegrationTestCase
 
         $this->indexWriter = $this->app->make(IndexWriter::class);
         $this->indexSearcher = $this->app->make(IndexSearcher::class);
+        $this->documentRepository = $this->app->make(IndexedDocumentRepository::class);
+        $this->tokenRepository = $this->app->make(IndexedTokenRepository::class);
     }
 
     private function createAndIndexDocument(
@@ -115,7 +117,6 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
-        // Utiliser un terme qui n'existe pas du tout
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('xyz=name')
         );
@@ -153,26 +154,22 @@ final class IndexSearcherTest extends IntegrationTestCase
 
     public function test_search_with_multiple_ngrams_returns_intersection(): void
     {
-        // Document 123 contient "john" et "developer"
         $this->createAndIndexDocument('App.Models.User|123', [
             'name' => 'John Doe',
             'description' => 'Senior Developer',
         ]);
 
-        // Document 456 contient "pierre" et "developer" (metaphone différent de "john")
         $this->createAndIndexDocument('App.Models.User|456', [
             'name' => 'Pierre Smith',
             'description' => 'Junior Developer',
         ]);
 
-        // Chercher les documents qui contiennent "john" ET "developer"
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('john=name|developer=description')
         );
 
         $results = $this->indexSearcher->search($query);
 
-        // Seul le document 123 contient "john" ET "developer"
         $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
         $this->assertCount(1, $results);
 
@@ -263,7 +260,6 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
-        // "jon" a le même metaphone que "john" (JN)
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('jon=name')
         );
@@ -337,9 +333,8 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
-        // "jo" est un n-gramme de "john"
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('jo=name')
+            query: new SearchQueryVO('joh=name')
         );
 
         $results = $this->indexSearcher->search($query);
@@ -349,7 +344,7 @@ final class IndexSearcherTest extends IntegrationTestCase
 
         $result = $results->first();
         $this->assertEquals('App.Models.User|123', $result->item->finger_print->getValue());
-        $this->assertEquals('jo', $result->gram_value);
+        $this->assertEquals('joh', $result->gram_value);
     }
 
     // ==================== TESTS SEARCH CASE INSENSITIVE ====================
@@ -382,13 +377,147 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'Jean-Pierre',
         ]);
 
-        // "jean" est un n-gramme de "Jean-Pierre"
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('jean=name')
         );
 
         $results = $this->indexSearcher->search($query);
 
+        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
+        $this->assertCount(1, $results);
+    }
+
+    // ==================== TESTS POUR min_size ET max_size ====================
+
+    public function test_search_with_custom_min_size_clamped_to_config(): void
+    {
+        $this->createAndIndexDocument('App.Models.User|123', [
+            'name' => 'John Doe',
+        ]);
+
+        // min_size=2 est clampé à 3 (config), donc ne change rien
+        // "jo" n'existe pas car min_size=3
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('jo=name'),
+            min_size: 2,
+            max_size: 3,
+        );
+
+        $results = $this->indexSearcher->search($query);
+
+        // "jo" n'est pas indexé car min_size=3 → résultat vide
+        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
+        $this->assertCount(0, $results);
+    }
+
+    public function test_search_with_custom_max_size_clamped_to_config(): void
+    {
+        $this->createAndIndexDocument('App.Models.User|123', [
+            'name' => 'Programming',
+        ]);
+
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('programming=name'),
+            min_size: 3,
+            max_size: 6,
+        );
+
+        $results = $this->indexSearcher->search($query);
+
+        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
+        $this->assertCount(1, $results);
+    }
+
+    public function test_search_without_min_max_uses_config_defaults(): void
+    {
+        $this->createAndIndexDocument('App.Models.User|123', [
+            'name' => 'John Doe',
+        ]);
+
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('john=name')
+        );
+
+        $results = $this->indexSearcher->search($query);
+
+        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
+        $this->assertCount(1, $results);
+    }
+
+    public function test_search_with_max_size_lower_than_min_size_uses_config(): void
+    {
+        $this->createAndIndexDocument('App.Models.User|123', [
+            'name' => 'John Doe',
+        ]);
+
+        // min_size > max_size → on utilise la config
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('john=name'),
+            min_size: 5,
+            max_size: 3,
+        );
+
+        $results = $this->indexSearcher->search($query);
+
+        // La config est utilisée: min=3, max=5 → "john" est trouvé
+        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
+        $this->assertCount(1, $results);
+    }
+
+    public function test_search_with_min_size_equal_to_max_size(): void
+    {
+        $this->createAndIndexDocument('App.Models.User|123', [
+            'name' => 'Programming',
+        ]);
+
+        // min=4, max=4 → seulement les n-grammes de taille 4
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('programming=name'),
+            min_size: 4,
+            max_size: 4,
+        );
+
+        $results = $this->indexSearcher->search($query);
+
+        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
+        $this->assertCount(1, $results);
+    }
+
+    public function test_search_with_min_size_equals_term_length(): void
+    {
+        $this->createAndIndexDocument('App.Models.User|123', [
+            'name' => 'John',
+        ]);
+
+        // min=4, max=4 → "john" est exactement la taille du terme
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('john=name'),
+            min_size: 4,
+            max_size: 4,
+        );
+
+        $results = $this->indexSearcher->search($query);
+
+        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
+        $this->assertCount(1, $results);
+    }
+
+    public function test_search_with_min_size_greater_than_config_uses_config(): void
+    {
+        $this->createAndIndexDocument('App.Models.User|123', [
+            'name' => 'John Doe',
+        ]);
+
+        // min_size demandé > config, on utilise min_config = 3
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('john=name'),
+            min_size: 8,
+            max_size: 10,
+        );
+
+        $results = $this->indexSearcher->search($query);
+
+        // min_size est clampé à 3 (config) car 8 > max_config 5
         $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
         $this->assertCount(1, $results);
     }

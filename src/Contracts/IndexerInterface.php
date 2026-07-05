@@ -12,52 +12,76 @@ use AndyDefer\LaravelIndexer\Records\IndexableSearchResultRecord;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
+/**
+ * Main interface for the indexing service.
+ *
+ * Defines the contract for indexing, searching, deleting, and refreshing
+ * indexable documents.
+ */
 interface IndexerInterface
 {
     /**
-     * Indexe une entité.
+     * Indexes a single entity.
+     *
+     * @param  IndexableRecord  $entity  The record to index
      */
     public function index(IndexableRecord $entity): void;
 
     /**
-     * Indexe plusieurs entités.
+     * Indexes multiple entities.
+     *
+     * @param  IndexableRecordCollection  $records  Collection of records to index
      */
     public function indexMany(IndexableRecordCollection $records): void;
 
     /**
-     * Supprime un document de l'index.
+     * Deletes a document from the index.
+     *
+     * @param  IndexableFingerPrintVO  $finger_print  The fingerprint of the document to delete
      */
     public function delete(IndexableFingerPrintVO $finger_print): void;
 
     /**
-     * Supprime plusieurs documents.
+     * Deletes multiple documents from the index.
+     *
+     * @param  IndexableFingerPrintVOCollection  $finger_prints  Collection of fingerprints to delete
      */
     public function deleteMany(IndexableFingerPrintVOCollection $finger_prints): void;
 
     /**
-     * Vide l'index.
+     * Clears the entire index.
+     *
+     * Removes all documents and tokens from the index.
      */
     public function clear(): void;
 
     /**
-     * Vérifie si un document existe.
+     * Checks if a document exists in the index.
+     *
+     * @param  IndexableFingerPrintVO  $finger_print  The fingerprint to check
+     * @return bool True if the document exists, false otherwise
      */
     public function exists(IndexableFingerPrintVO $finger_print): bool;
 
     /**
-     * Recherche dans l'index.
+     * Searches the index using the provided query.
      *
-     * @return IndexableSearchResultCollection<IndexableSearchResultRecord>
+     * @param  SearchQueryRecord  $query  The search query
+     * @return IndexableSearchResultCollection<IndexableSearchResultRecord> Collection of search results
      */
     public function search(SearchQueryRecord $query): IndexableSearchResultCollection;
 
     /**
-     * Rafraîchit un document dans l'index (delete + index).
+     * Refreshes a document in the index (delete + re-index).
+     *
+     * @param  IndexableRecord  $entity  The record to refresh
      */
     public function refresh(IndexableRecord $entity): void;
 
     /**
-     * Rafraîchit plusieurs documents dans l'index (delete + index).
+     * Refreshes multiple documents in the index (delete + re-index).
+     *
+     * @param  IndexableRecordCollection  $records  Collection of records to refresh
      */
     public function refreshMany(IndexableRecordCollection $records): void;
 }

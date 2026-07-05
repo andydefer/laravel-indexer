@@ -10,187 +10,244 @@ use AndyDefer\LaravelIndexer\Records\IndexedTokenRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Repository\AbstractRepositoryInterface;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
 /**
+ * Repository interface for indexed token operations.
+ *
  * @extends AbstractRepositoryInterface<IndexedToken, IndexedTokenRecord>
  */
 interface IndexedTokenRepositoryInterface extends AbstractRepositoryInterface
 {
     /**
-     * Trouve les tokens par valeur.
+     * Finds tokens by their value.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByToken(string $token): Collection;
 
     /**
-     * Trouve les tokens par type.
+     * Finds tokens by their type.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByType(GramType $type): Collection;
 
     /**
-     * Trouve les tokens par champ.
+     * Finds tokens by their field name.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByField(string $field): Collection;
 
     /**
-     * Trouve les tokens par document.
+     * Finds tokens belonging to a document.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByDocumentId(string $documentId): Collection;
 
     /**
-     * Trouve les tokens par document fingerprint.
+     * Finds tokens belonging to a document identified by fingerprint.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByDocumentFingerPrint(IndexableFingerPrintVO $fingerPrint): Collection;
 
     /**
-     * Trouve les tokens par namespace.
+     * Finds tokens belonging to a namespace.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByNamespace(string $namespace): Collection;
 
     /**
-     * Trouve les tokens par cluster.
+     * Finds tokens matching a cluster.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByCluster(ClusterVO $cluster): Collection;
 
     /**
-     * Trouve les tokens par cluster clé/valeur.
+     * Finds tokens matching a cluster key-value pair.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByClusterKeyValue(string $key, string $value): Collection;
 
     /**
-     * Trouve les tokens par token et champ.
+     * Finds tokens by both token value and field.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByTokenAndField(string $token, string $field): Collection;
 
     /**
-     * Trouve les tokens par token et type.
+     * Finds tokens by both token value and type.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByTokenAndType(string $token, GramType $type): Collection;
 
     /**
-     * Trouve les tokens par token et namespace.
+     * Finds tokens by token value and namespace.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByTokenAndNamespace(string $token, string $namespace): Collection;
 
     /**
-     * Trouve les tokens par token et cluster.
+     * Finds tokens by token value and cluster.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByTokenAndCluster(string $token, ClusterVO $cluster): Collection;
 
     /**
-     * Trouve les tokens par token, champ et namespace.
+     * Finds tokens by token value, field, and namespace.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function findByTokenFieldAndNamespace(string $token, string $field, string $namespace): Collection;
 
     /**
-     * Recherche en autocomplétion.
+     * Performs autocomplete suggestions based on a token prefix.
+     *
+     * @return Collection<int, IndexedToken> Collection of distinct token suggestions
      */
     public function autocomplete(string $prefix, ?int $limit = 10): Collection;
 
     /**
-     * Recherche les tokens commençant par une lettre.
+     * Finds tokens starting with a specific letter.
+     *
+     * @return Collection<int, IndexedToken> Collection of tokens
      */
     public function startingWith(string $letter, ?int $limit = null): Collection;
 
     /**
-     * Récupère les IDs des documents pour un token.
+     * Retrieves document IDs for a given token.
      *
-     * @return Collection<int, string>
+     * @return Collection<int, string> Collection of document UUIDs
      */
     public function getDocumentIdsForToken(string $token): Collection;
 
     /**
-     * Récupère les IDs des documents pour un token et champ.
+     * Retrieves document IDs for a given token and field.
      *
-     * @return Collection<int, string>
+     * @return Collection<int, string> Collection of document UUIDs
      */
     public function getDocumentIdsForTokenAndField(string $token, string $field): Collection;
 
     /**
-     * Récupère les IDs des documents pour un token et cluster.
+     * Retrieves document IDs for a given token and cluster.
      *
-     * @return Collection<int, string>
+     * @return Collection<int, string> Collection of document UUIDs
      */
     public function getDocumentIdsForTokenAndCluster(string $token, ClusterVO $cluster): Collection;
 
     /**
-     * Récupère les IDs des documents pour un token, champ et cluster.
+     * Retrieves document IDs for a given token, field, and cluster.
      *
-     * @return Collection<int, string>
+     * @return Collection<int, string> Collection of document UUIDs
      */
     public function getDocumentIdsForTokenFieldAndCluster(string $token, string $field, ClusterVO $cluster): Collection;
 
     /**
-     * Compte les tokens distincts.
+     * Counts the total number of distinct token values.
+     *
+     * @return int Number of distinct tokens
      */
     public function countDistinctTokens(): int;
 
     /**
-     * Compte les tokens par type.
+     * Counts tokens by type.
+     *
+     * @return int Number of tokens
      */
     public function countByType(GramType $type): int;
 
     /**
-     * Compte les tokens par champ.
+     * Counts tokens by field.
+     *
+     * @return int Number of tokens
      */
     public function countByField(string $field): int;
 
     /**
-     * Compte les tokens par namespace.
+     * Counts tokens by namespace.
+     *
+     * @return int Number of tokens
      */
     public function countByNamespace(string $namespace): int;
 
     /**
-     * Supprime les tokens d'un document.
+     * Deletes all tokens belonging to a document.
+     *
+     * @return int Number of deleted tokens
      */
     public function deleteByDocumentId(string $documentId): int;
 
     /**
-     * Supprime les tokens par fingerprint.
+     * Deletes tokens belonging to a document identified by fingerprint.
+     *
+     * @return int Number of deleted tokens
      */
     public function deleteByDocumentFingerPrint(IndexableFingerPrintVO $fingerPrint): int;
 
     /**
-     * Supprime les tokens par namespace.
+     * Deletes tokens belonging to a namespace.
+     *
+     * @return int Number of deleted tokens
      */
     public function deleteByNamespace(string $namespace): int;
 
     /**
-     * Supprime les tokens par cluster.
+     * Deletes tokens matching a cluster.
+     *
+     * @return int Number of deleted tokens
      */
     public function deleteByCluster(ClusterVO $cluster): int;
 
     /**
-     * Supprime les tokens par cluster clé/valeur.
+     * Deletes tokens matching a cluster key-value pair.
+     *
+     * @return int Number of deleted tokens
      */
     public function deleteByClusterKeyValue(string $key, string $value): int;
 
     /**
-     * Supprime les tokens par token.
+     * Deletes tokens by their value.
+     *
+     * @return int Number of deleted tokens
      */
     public function deleteByToken(string $token): int;
 
     /**
-     * Supprime les tokens par token et champ.
+     * Deletes tokens by their value and field.
+     *
+     * @return int Number of deleted tokens
      */
     public function deleteByTokenAndField(string $token, string $field): int;
 
     /**
-     * Récupère tous les tokens distincts.
+     * Returns all distinct token values.
      *
-     * @return Collection<int, string>
+     * @return Collection<int, string> List of unique token values
      */
     public function getDistinctTokens(): Collection;
 
     /**
-     * Récupère tous les champs distincts.
+     * Returns all distinct field names.
      *
-     * @return Collection<int, string>
+     * @return Collection<int, string> List of unique field names
      */
     public function getDistinctFields(): Collection;
 
     /**
-     * Trouve un token par token, champ, document et type.
+     * Finds a token by its token value, field, document, and type.
+     *
+     * @return IndexedToken|null The found token, or null if not found
      */
     public function findByTokenFieldAndDocument(
         string $token,
@@ -200,7 +257,16 @@ interface IndexedTokenRepositoryInterface extends AbstractRepositoryInterface
     ): ?IndexedToken;
 
     /**
-     * Incrémente la fréquence d'un token.
+     * Increments the frequency counter of a token by its ID.
+     *
+     * @return int The new frequency value
      */
     public function incrementFrequency(string $id): int;
+
+    /**
+     * Returns the underlying Eloquent model instance.
+     *
+     * @return Model The Eloquent model
+     */
+    public function getModel(): Model;
 }

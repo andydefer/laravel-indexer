@@ -22,7 +22,7 @@
         <env name="BENCHMARK_DB_PORT" value="3306"/>
         <env name="BENCHMARK_DB_DATABASE" value="indexer_benchmark"/>
         <env name="BENCHMARK_DB_USERNAME" value="root"/>
-        <env name="BENCHMARK_DB_PASSWORD" value=""/>
+        <env name="BENCHMARK_DB_PASSWORD" value="Hello@0405"/>
     </php>
     <source>
         <include>

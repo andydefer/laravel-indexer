@@ -65,6 +65,11 @@ final class IndexWriterTest extends IntegrationTestCase
         $this->assertNotNull($johnToken);
         $this->assertEquals('John', $johnToken->original_text);
         $this->assertEquals(1, $johnToken->frequency);
+
+        $joToken = $tokens->first(function ($token) {
+            return $token->token === 'jo' && $token->field === 'name';
+        });
+        $this->assertNull($joToken);
     }
 
     public function test_index_increments_frequency_on_existing_token(): void
@@ -145,17 +150,27 @@ final class IndexWriterTest extends IntegrationTestCase
         $this->assertContains('profile.social.twitter', $fields);
         $this->assertContains('profile.social.github', $fields);
 
-        $devToken = $tokens->first(function ($token) {
+        $soToken = $tokens->first(function ($token) {
+            return $token->field === 'profile.bio' && $token->token === 'so';
+        });
+        $this->assertNull($soToken);
+
+        $sofToken = $tokens->first(function ($token) {
+            return $token->field === 'profile.bio' && $token->token === 'sof';
+        });
+        $this->assertNotNull($sofToken);
+        $this->assertEquals('Software', $sofToken->original_text);
+
+        $deToken = $tokens->first(function ($token) {
             return $token->field === 'profile.bio' && $token->token === 'de';
+        });
+        $this->assertNull($deToken);
+
+        $devToken = $tokens->first(function ($token) {
+            return $token->field === 'profile.bio' && $token->token === 'dev';
         });
         $this->assertNotNull($devToken);
         $this->assertEquals('Developer', $devToken->original_text);
-
-        $velToken = $tokens->first(function ($token) {
-            return $token->field === 'profile.bio' && $token->token === 'vel';
-        });
-        $this->assertNotNull($velToken);
-        $this->assertEquals('Developer', $velToken->original_text);
     }
 
     public function test_index_handles_array_values(): void
@@ -258,9 +273,10 @@ final class IndexWriterTest extends IntegrationTestCase
 
         $tokensList = $lexicalTokens->pluck('token')->toArray();
 
-        $this->assertContains('jo', $tokensList);
-        $this->assertContains('oh', $tokensList);
-        $this->assertContains('hn', $tokensList);
+        $this->assertNotContains('jo', $tokensList);
+        $this->assertNotContains('oh', $tokensList);
+        $this->assertNotContains('hn', $tokensList);
+
         $this->assertContains('joh', $tokensList);
         $this->assertContains('ohn', $tokensList);
         $this->assertContains('john', $tokensList);
@@ -302,5 +318,195 @@ final class IndexWriterTest extends IntegrationTestCase
 
         $this->assertNotEmpty($tokens1);
         $this->assertNotEmpty($tokens2);
+    }
+
+    // ==================== NOUVEAUX TESTS POUR LE CHUNKING ====================
+
+    public function test_index_handles_long_text_with_chunking(): void
+    {
+        $longText = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.';
+
+        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|999');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $data = StrictAssociative::from([
+            'name' => 'John Doe',
+            'description' => $longText,
+        ]);
+
+        $record = new IndexableRecord(
+            finger_print: $fingerPrint,
+            data: $data,
+            cluster: $cluster,
+        );
+
+        $this->indexWriter->index($record);
+
+        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $tokens = $this->tokenRepository->findByDocumentId($document->id);
+
+        $descriptionTokens = $tokens->filter(function ($token) {
+            return $token->field === 'description';
+        });
+
+        $this->assertNotEmpty($descriptionTokens);
+
+        $loremToken = $descriptionTokens->first(function ($token) {
+            return $token->token === 'lorem';
+        });
+        $this->assertNotNull($loremToken, 'Token "lorem" devrait être indexé');
+        $this->assertEquals('Lorem', $loremToken->original_text);
+
+        $ipsumToken = $descriptionTokens->first(function ($token) {
+            return $token->token === 'ipsum';
+        });
+        $this->assertNotNull($ipsumToken, 'Token "ipsum" devrait être indexé');
+        $this->assertEquals('ipsum', $ipsumToken->original_text);
+
+        $dolorToken = $descriptionTokens->first(function ($token) {
+            return $token->token === 'dolor';
+        });
+        $this->assertNotNull($dolorToken, 'Token "dolor" devrait être indexé');
+        $this->assertEquals('dolor', $dolorToken->original_text);
+    }
+
+    public function test_index_handles_very_long_single_word(): void
+    {
+        $longWord = 'Supercalifragilisticexpialidocious';
+
+        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|888');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $data = StrictAssociative::from([
+            'name' => $longWord,
+        ]);
+
+        $record = new IndexableRecord(
+            finger_print: $fingerPrint,
+            data: $data,
+            cluster: $cluster,
+        );
+
+        $this->indexWriter->index($record);
+
+        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $tokens = $this->tokenRepository->findByDocumentId($document->id);
+
+        $nameTokens = $tokens->filter(function ($token) {
+            return $token->field === 'name';
+        });
+
+        $this->assertNotEmpty($nameTokens);
+
+        $superToken = $nameTokens->first(function ($token) {
+            return str_contains($token->token, 'super');
+        });
+        $this->assertNotNull($superToken, 'Des n-grammes de "Supercalifragilisticexpialidocious" devraient être indexés');
+    }
+
+    public function test_index_handles_mixed_short_and_long_texts(): void
+    {
+        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|777');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $data = StrictAssociative::from([
+            'short' => 'Hello World',
+            'medium' => 'This is a medium text',
+            'long' => 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+        ]);
+
+        $record = new IndexableRecord(
+            finger_print: $fingerPrint,
+            data: $data,
+            cluster: $cluster,
+        );
+
+        $this->indexWriter->index($record);
+
+        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $tokens = $this->tokenRepository->findByDocumentId($document->id);
+
+        $fields = $tokens->pluck('field')->unique()->toArray();
+        $this->assertContains('short', $fields);
+        $this->assertContains('medium', $fields);
+        $this->assertContains('long', $fields);
+
+        $shortTokens = $tokens->filter(function ($token) {
+            return $token->field === 'short';
+        });
+        $helloToken = $shortTokens->first(function ($token) {
+            return $token->token === 'hello';
+        });
+        $this->assertNotNull($helloToken);
+        $this->assertEquals('Hello', $helloToken->original_text);
+
+        $longTokens = $tokens->filter(function ($token) {
+            return $token->field === 'long';
+        });
+        $loremToken = $longTokens->first(function ($token) {
+            return $token->token === 'lorem';
+        });
+        $this->assertNotNull($loremToken);
+        $this->assertEquals('Lorem', $loremToken->original_text);
+    }
+
+    public function test_index_handles_text_with_special_characters(): void
+    {
+        $textWithSpecialChars = "L'utilisateur Jean-Pierre a acheté 2 produits à 100€ !";
+
+        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|666');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $data = StrictAssociative::from([
+            'description' => $textWithSpecialChars,
+        ]);
+
+        $record = new IndexableRecord(
+            finger_print: $fingerPrint,
+            data: $data,
+            cluster: $cluster,
+        );
+
+        $this->indexWriter->index($record);
+
+        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $tokens = $this->tokenRepository->findByDocumentId($document->id);
+
+        $descTokens = $tokens->filter(function ($token) {
+            return $token->field === 'description';
+        });
+
+        $this->assertNotEmpty($descTokens);
+
+        // Vérifier qu'un n-gramme de 'utilisateur' existe (taille 4)
+        $utilToken = $descTokens->first(function ($token) {
+            return $token->token === 'util' && $token->original_text === "L'utilisateur";
+        });
+        $this->assertNotNull($utilToken, "Le n-gramme 'util' de 'L'utilisateur' devrait être indexé");
+        $this->assertEquals("L'utilisateur", $utilToken->original_text);
+
+        // Vérifier qu'un n-gramme de 'Jean' existe (taille 4)
+        $jeanToken = $descTokens->first(function ($token) {
+            return $token->token === 'jean' && $token->original_text === 'Jean';
+        });
+        $this->assertNotNull($jeanToken, "Le n-gramme 'jean' de 'Jean' devrait être indexé");
+        $this->assertEquals('Jean', $jeanToken->original_text);
+
+        // Vérifier qu'un n-gramme de 'Pierre' existe (taille 4)
+        $pierreToken = $descTokens->first(function ($token) {
+            return $token->token === 'pier' && $token->original_text === 'Pierre';
+        });
+        $this->assertNotNull($pierreToken, "Le n-gramme 'pier' de 'Pierre' devrait être indexé");
+        $this->assertEquals('Pierre', $pierreToken->original_text);
+
+        // Vérifier qu'un n-gramme de 'acheté' existe
+        $acheteToken = $descTokens->first(function ($token) {
+            return $token->token === 'ache' && $token->original_text === 'acheté';
+        });
+        $this->assertNotNull($acheteToken, "Le n-gramme 'ache' de 'acheté' devrait être indexé");
+        $this->assertEquals('acheté', $acheteToken->original_text);
+
+        // Vérifier qu'un n-gramme de 'produits' existe
+        $produitToken = $descTokens->first(function ($token) {
+            return $token->token === 'produ' && $token->original_text === 'produits';
+        });
+        $this->assertNotNull($produitToken, "Le n-gramme 'produ' de 'produits' devrait être indexé");
+        $this->assertEquals('produits', $produitToken->original_text);
     }
 }

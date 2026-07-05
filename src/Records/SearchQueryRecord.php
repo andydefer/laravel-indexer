@@ -18,6 +18,8 @@ use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
  *     finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
  *     cluster: new ClusterVO('model-User|tenant-company_abc|env-production'),
  *     limit: 100,
+ *     min_size: 2,
+ *     max_size: 4,
  * );
  */
 final class SearchQueryRecord extends AbstractRecord
@@ -27,5 +29,7 @@ final class SearchQueryRecord extends AbstractRecord
         public readonly ?IndexableFingerPrintVO $finger_print = null,
         public readonly ?ClusterVO $cluster = null,
         public readonly ?int $limit = null,
+        public readonly ?int $min_size = null,
+        public readonly ?int $max_size = null,
     ) {}
 }

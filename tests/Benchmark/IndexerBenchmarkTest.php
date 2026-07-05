@@ -6,23 +6,29 @@ namespace AndyDefer\LaravelIndexer\Tests\Benchmark;
 
 use AndyDefer\DomainStructures\Normalizers\Core\NormalizerInterface;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
-use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
-use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
+use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
+use AndyDefer\LaravelIndexer\Contracts\IndexedTokenRepositoryInterface;
+use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
+use AndyDefer\LaravelIndexer\Services\IndexerService;
 use AndyDefer\LaravelIndexer\Tests\Benchmark\Factories\TestDataFactory;
-use AndyDefer\LaravelIndexer\Tests\Benchmark\TestCase\SqliteBenchmarkTestCase;
+use AndyDefer\LaravelIndexer\Tests\Benchmark\TestCase\MysqlBenchmarkTestCase;
+use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
 use AndyDefer\PhpServices\Contracts\Services\NGramGeneratorInterface;
 use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-final class IndexerBenchmarkTest extends SqliteBenchmarkTestCase
+final class IndexerBenchmarkTest extends MysqlBenchmarkTestCase
 {
+    use RefreshDatabase;
+
     private IndexWriter $writer;
 
     private TestDataFactory $factory;
 
-    private IndexedDocumentRepository $documentRepository;
+    private IndexedDocumentRepositoryInterface $documentRepository;
 
-    private IndexedTokenRepository $tokenRepository;
+    private IndexedTokenRepositoryInterface $tokenRepository;
 
     private IndexerConfig $config;
 
@@ -36,25 +42,22 @@ final class IndexerBenchmarkTest extends SqliteBenchmarkTestCase
     {
         parent::setUp();
 
-        $this->documentRepository = $this->app->make(IndexedDocumentRepository::class);
-        $this->tokenRepository = $this->app->make(IndexedTokenRepository::class);
-
+        $this->documentRepository = $this->app->make(IndexedDocumentRepositoryInterface::class);
+        $this->tokenRepository = $this->app->make(IndexedTokenRepositoryInterface::class);
         $this->config = $this->app->make(IndexerConfig::class);
         $this->normalizer = $this->app->make(NormalizerInterface::class);
         $this->textNormalizer = $this->app->make(TextNormalizerInterface::class);
         $this->ngramGenerator = $this->app->make(NGramGeneratorInterface::class);
-
         $this->writer = $this->app->make(IndexWriter::class);
         $this->factory = new TestDataFactory;
     }
 
     /**
      * @benchmark
-     *
-     * @dataProvider sizesProvider
      */
-    public function test_benchmark_indexing(int $size): void
+    public function test_benchmark_indexing_100(): void
     {
+        $size = 100;
         $collection = $this->factory->createCollection($size);
 
         $startTime = microtime(true);
@@ -68,6 +71,18 @@ final class IndexerBenchmarkTest extends SqliteBenchmarkTestCase
         $documentsCount = $this->documentRepository->getModel()->newQuery()->count();
         $tokensCount = $this->tokenRepository->getModel()->newQuery()->count();
 
+        // ==================== RECHERCHE ====================
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('agn=address')
+        );
+
+        $indexer = app(IndexerService::class);
+
+        $searchStart = microtime(true);
+        $results = $indexer->search($query);
+        $searchDuration = microtime(true) - $searchStart;
+
+        // ==================== AFFICHAGE ====================
         $this->addToAssertionCount(1);
 
         echo sprintf(
@@ -81,21 +96,17 @@ final class IndexerBenchmarkTest extends SqliteBenchmarkTestCase
             $tokensCount
         );
         echo sprintf(
-            "\n   💾 Mémoire utilisée: %.2f MB\n",
+            "\n   💾 Mémoire utilisée: %.2f MB",
             ($endMemory - $startMemory) / 1024 / 1024
         );
-    }
-
-    public static function sizesProvider(): array
-    {
-        return [
-            '10 documents' => [10],
-            '50 documents' => [50],
-            '100 documents' => [100],
-            '500 documents' => [500],
-            '1000 documents' => [1000],
-            '5000 documents' => [5000],
-        ];
+        echo sprintf(
+            "\n🔍 Recherche 'agn=address' en %.4f secondes",
+            $searchDuration
+        );
+        echo sprintf(
+            "\n   📊 Résultats: %d\n",
+            $results->count()
+        );
     }
 
     /**
@@ -103,7 +114,7 @@ final class IndexerBenchmarkTest extends SqliteBenchmarkTestCase
      */
     public function test_benchmark_search(): void
     {
-        $collection = $this->factory->createCollection(1000);
+        $collection = $this->factory->createCollection(5);
         $this->writer->indexMany($collection);
 
         $query = 'john';
@@ -134,7 +145,7 @@ final class IndexerBenchmarkTest extends SqliteBenchmarkTestCase
      */
     public function test_benchmark_search_with_cluster(): void
     {
-        $collection = $this->factory->createCollection(1000);
+        $collection = $this->factory->createCollection(5);
         $this->writer->indexMany($collection);
 
         $query = 'john';

@@ -9,6 +9,11 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
+/**
+ * Service for deleting indexed documents and their associated tokens.
+ *
+ * Provides methods for single, bulk, and full index clearing operations.
+ */
 final class IndexDeleter
 {
     public function __construct(
@@ -16,23 +21,31 @@ final class IndexDeleter
         private readonly IndexedTokenRepository $tokenRepository,
     ) {}
 
-    public function delete(IndexableFingerPrintVO $finger_print): void
+    /**
+     * Deletes a single document by its fingerprint.
+     *
+     * The associated tokens are automatically deleted via database cascade.
+     */
+    public function delete(IndexableFingerPrintVO $fingerPrint): void
     {
-        // Supprimer le document et ses tokens (cascade via la base de données)
-        $this->documentRepository->deleteByFingerPrint($finger_print);
+        $this->documentRepository->deleteByFingerPrint($fingerPrint);
     }
 
-    public function deleteMany(IndexableFingerPrintVOCollection $finger_prints): void
+    /**
+     * Deletes multiple documents by their fingerprints.
+     */
+    public function deleteMany(IndexableFingerPrintVOCollection $fingerPrints): void
     {
-        foreach ($finger_prints as $finger_print) {
-            $this->documentRepository->deleteByFingerPrint($finger_print);
+        foreach ($fingerPrints as $fingerPrint) {
+            $this->documentRepository->deleteByFingerPrint($fingerPrint);
         }
     }
 
+    /**
+     * Clears the entire index by removing all documents and tokens.
+     */
     public function clear(): void
     {
-        // Supprimer tous les tokens puis tous les documents
-        // Ou simplement tronquer les tables
         $this->tokenRepository->getModel()->newQuery()->delete();
         $this->documentRepository->getModel()->newQuery()->delete();
     }

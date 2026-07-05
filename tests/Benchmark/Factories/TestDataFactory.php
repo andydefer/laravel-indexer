@@ -45,7 +45,7 @@ final class TestDataFactory
             'description' => $this->faker->text(200),
             'bio' => $this->faker->text(500),
             'skills' => $this->faker->words(5),
-            'languages' => $this->faker->randomElements(['French', 'English', 'Spanish', 'German'], 3),
+            'languages' => $this->faker->randomElements(['French', 'English', 'Spanish', 'German']),
             'is_active' => $this->faker->boolean(80),
             'age' => $this->faker->numberBetween(18, 80),
             'salary' => $this->faker->numberBetween(30000, 150000),

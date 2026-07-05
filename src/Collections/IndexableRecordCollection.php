@@ -31,6 +31,36 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
+     * Découpe la collection en chunks de taille donnée.
+     *
+     * @return array<int, self>
+     */
+    public function chunk(int $size): array
+    {
+        if ($size <= 0) {
+            return [];
+        }
+
+        $chunks = [];
+        $chunk = new self;
+
+        foreach ($this->items as $item) {
+            $chunk->add($item);
+
+            if ($chunk->count() >= $size) {
+                $chunks[] = $chunk;
+                $chunk = new self;
+            }
+        }
+
+        if ($chunk->isNotEmpty()) {
+            $chunks[] = $chunk;
+        }
+
+        return $chunks;
+    }
+
+    /**
      * Filtre par namespace
      */
     public function filterByNamespace(string $namespace): self

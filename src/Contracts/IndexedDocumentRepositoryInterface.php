@@ -9,118 +9,161 @@ use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Repository\AbstractRepositoryInterface;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
 /**
+ * Repository interface for indexed document operations.
+ *
  * @extends AbstractRepositoryInterface<IndexedDocument, IndexedDocumentRecord>
  */
 interface IndexedDocumentRepositoryInterface extends AbstractRepositoryInterface
 {
     /**
-     * Trouve un document par son fingerprint.
+     * Finds a document by its fingerprint value object.
+     *
+     * @return IndexedDocument|null The found document, or null if not found
      */
     public function findByFingerPrint(IndexableFingerPrintVO $fingerPrint): ?IndexedDocument;
 
     /**
-     * Trouve un document par sa valeur de fingerprint brute.
+     * Finds a document by its raw fingerprint string.
+     *
+     * @return IndexedDocument|null The found document, or null if not found
      */
     public function findByFingerprintString(string $fingerprint): ?IndexedDocument;
 
     /**
-     * Trouve tous les documents d'un namespace.
+     * Finds all documents belonging to a namespace.
+     *
+     * @return Collection<int, IndexedDocument> Collection of documents
      */
     public function findByNamespace(string $namespace): Collection;
 
     /**
-     * Trouve tous les documents d'un cluster.
+     * Finds all documents matching a cluster.
+     *
+     * @return Collection<int, IndexedDocument> Collection of documents
      */
     public function findByCluster(ClusterVO $cluster): Collection;
 
     /**
-     * Trouve tous les documents d'une paire cluster clé/valeur.
+     * Finds all documents matching a cluster key-value pair.
+     *
+     * @return Collection<int, IndexedDocument> Collection of documents
      */
     public function findByClusterKeyValue(string $key, string $value): Collection;
 
     /**
-     * Trouve tous les documents par leurs IDs.
+     * Finds documents by their IDs.
      *
-     * @param  array<string>  $ids
+     * @param  array<string>  $ids  List of document UUIDs
+     * @return Collection<int, IndexedDocument> Collection of documents
      */
     public function findByIds(array $ids): Collection;
 
     /**
-     * Supprime un document par son fingerprint.
+     * Deletes a document by its fingerprint.
+     *
+     * @return int Number of deleted records (0 or 1)
      */
     public function deleteByFingerPrint(IndexableFingerPrintVO $fingerPrint): int;
 
     /**
-     * Supprime un document par sa valeur de fingerprint brute.
+     * Deletes a document by its raw fingerprint string.
+     *
+     * @return int Number of deleted records (0 or 1)
      */
     public function deleteByFingerprintString(string $fingerprint): int;
 
     /**
-     * Supprime tous les documents d'un namespace.
+     * Deletes all documents belonging to a namespace.
+     *
+     * @return int Number of deleted records
      */
     public function deleteByNamespace(string $namespace): int;
 
     /**
-     * Supprime tous les documents d'un cluster.
+     * Deletes all documents matching a cluster.
+     *
+     * @return int Number of deleted records
      */
     public function deleteByCluster(ClusterVO $cluster): int;
 
     /**
-     * Supprime tous les documents d'une paire cluster clé/valeur.
+     * Deletes all documents matching a cluster key-value pair.
+     *
+     * @return int Number of deleted records
      */
     public function deleteByClusterKeyValue(string $key, string $value): int;
 
     /**
-     * Compte les documents par namespace.
+     * Counts documents belonging to a namespace.
+     *
+     * @return int Number of documents
      */
     public function countByNamespace(string $namespace): int;
 
     /**
-     * Compte les documents par cluster.
+     * Counts documents matching a cluster.
+     *
+     * @return int Number of documents
      */
     public function countByCluster(ClusterVO $cluster): int;
 
     /**
-     * Récupère tous les namespaces distincts.
+     * Returns all distinct namespaces.
      *
-     * @return Collection<int, string>
+     * @return Collection<int, string> List of unique namespaces
      */
     public function getDistinctNamespaces(): Collection;
 
     /**
-     * Récupère toutes les clés de cluster distinctes.
+     * Returns all distinct cluster keys.
      *
-     * @return Collection<int, string>
+     * @return Collection<int, string> List of unique cluster keys
      */
     public function getDistinctClusterKeys(): Collection;
 
     /**
-     * Récupère toutes les valeurs de cluster pour une clé donnée.
+     * Returns all distinct cluster values for a given key.
      *
-     * @return Collection<int, string>
+     * @return Collection<int, string> List of unique cluster values
      */
     public function getDistinctClusterValues(string $key): Collection;
 
     /**
-     * Vérifie si un document existe par fingerprint.
+     * Checks if a document exists by fingerprint.
+     *
+     * @return bool True if the document exists, false otherwise
      */
     public function existsByFingerPrint(IndexableFingerPrintVO $fingerPrint): bool;
 
     /**
-     * Vérifie si un document existe par namespace.
+     * Checks if any document exists in a namespace.
+     *
+     * @return bool True if at least one document exists, false otherwise
      */
     public function existsByNamespace(string $namespace): bool;
 
     /**
-     * Vérifie si un document existe par cluster.
+     * Checks if any document exists matching a cluster.
+     *
+     * @return bool True if at least one document exists, false otherwise
      */
     public function existsByCluster(ClusterVO $cluster): bool;
 
     /**
-     * Récupère tous les documents avec leurs tokens.
+     * Returns all documents with their related tokens eagerly loaded.
+     *
+     * @return Collection<int, IndexedDocument> Collection of documents with tokens
      */
     public function findAllWithTokens(): Collection;
+
+    /**
+     * Returns the underlying Eloquent model instance.
+     *
+     * @return Model The Eloquent model
+     */
+    public function getModel(): Model;
 }

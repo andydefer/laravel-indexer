@@ -9,13 +9,20 @@ use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
+/**
+ * Factory for creating IndexedDocumentRecord instances from Indexable entities.
+ *
+ * Transforms an indexable entity into a document record that can be persisted
+ * to the indexed documents storage.
+ */
 final class IndexableRecordFactory
 {
     /**
-     * Convertit une entité Indexable en IndexedDocumentRecord.
+     * Converts an Indexable entity into an IndexedDocumentRecord.
      *
-     * @param  Indexable  $entity  L'entité à convertir
-     * @param  ClusterVO  $cluster  Cluster obligatoire
+     * @param  Indexable  $entity  The entity to convert
+     * @param  ClusterVO  $cluster  The cluster configuration for the document
+     * @return IndexedDocumentRecord The converted document record
      */
     public static function convert(Indexable $entity, ClusterVO $cluster): IndexedDocumentRecord
     {

@@ -15,78 +15,101 @@ use AndyDefer\LaravelIndexer\Services\Composants\IndexSearcher;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
+/**
+ * Main service orchestrating all indexing operations.
+ *
+ * Acts as a facade that delegates to specialized components:
+ * - IndexWriter for creating/reindexing documents
+ * - IndexDeleter for removing documents
+ * - IndexSearcher for searching and existence checks
+ *
+ * @implements IndexerInterface
+ */
 final class IndexerService implements IndexerInterface
 {
     public function __construct(
         private readonly IndexWriter $writer,
         private readonly IndexDeleter $deleter,
         private readonly IndexSearcher $searcher,
-    ) {
-        //
-    }
+    ) {}
 
+    /**
+     * {@inheritDoc}
+     */
     public function index(IndexableRecord $entity): void
     {
         $this->writer->index($entity);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function indexMany(IndexableRecordCollection $records): void
     {
         $this->writer->indexMany($records);
     }
 
-    public function delete(IndexableFingerPrintVO $finger_print): void
+    /**
+     * {@inheritDoc}
+     */
+    public function delete(IndexableFingerPrintVO $fingerPrint): void
     {
-        $this->deleter->delete($finger_print);
+        $this->deleter->delete($fingerPrint);
     }
 
-    public function deleteMany(IndexableFingerPrintVOCollection $finger_prints): void
+    /**
+     * {@inheritDoc}
+     */
+    public function deleteMany(IndexableFingerPrintVOCollection $fingerPrints): void
     {
-        $this->deleter->deleteMany($finger_prints);
+        $this->deleter->deleteMany($fingerPrints);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function clear(): void
     {
         $this->deleter->clear();
     }
 
-    public function exists(IndexableFingerPrintVO $finger_print): bool
+    /**
+     * {@inheritDoc}
+     */
+    public function exists(IndexableFingerPrintVO $fingerPrint): bool
     {
-        return $this->searcher->exists($finger_print);
+        return $this->searcher->exists($fingerPrint);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function search(SearchQueryRecord $query): IndexableSearchResultCollection
     {
         return $this->searcher->search($query);
     }
 
     /**
-     * Rafraîchit un document (delete + index).
+     * {@inheritDoc}
      */
     public function refresh(IndexableRecord $entity): void
     {
-        // 1. Supprimer l'ancien document
         $this->deleter->delete($entity->finger_print);
-
-        // 2. Indexer le nouveau
         $this->writer->index($entity);
     }
 
     /**
-     * Rafraîchit plusieurs documents (delete + index).
+     * {@inheritDoc}
      */
     public function refreshMany(IndexableRecordCollection $records): void
     {
-        // 1. Récupérer tous les fingerprints
         $fingerPrints = new IndexableFingerPrintVOCollection;
+
         foreach ($records as $record) {
             $fingerPrints->add($record->finger_print);
         }
 
-        // 2. Supprimer tous les anciens documents
         $this->deleter->deleteMany($fingerPrints);
-
-        // 3. Indexer tous les nouveaux
         $this->writer->indexMany($records);
     }
 }
