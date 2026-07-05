@@ -66,7 +66,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function filterByNamespace(string $namespace): self
     {
         return $this->filter(
-            fn (IndexableRecord $record) => $record->finger_print->belongsTo($namespace)
+            fn (IndexableRecord $record) => $record->fingerprint->belongsTo($namespace)
         );
     }
 
@@ -76,7 +76,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function filterByNamespaces(array $namespaces): self
     {
         return $this->filter(
-            fn (IndexableRecord $record) => $record->finger_print->belongsToAny($namespaces)
+            fn (IndexableRecord $record) => $record->fingerprint->belongsToAny($namespaces)
         );
     }
 
@@ -125,7 +125,7 @@ final class IndexableRecordCollection extends TypedCollection
     {
         $fingerPrints = new IndexableFingerPrintVOCollection;
         foreach ($this->items as $record) {
-            $fingerPrints->add($record->finger_print);
+            $fingerPrints->add($record->fingerprint);
         }
 
         return $fingerPrints;
@@ -151,7 +151,7 @@ final class IndexableRecordCollection extends TypedCollection
     {
         $ids = new StringTypedCollection;
         foreach ($this->items as $record) {
-            $ids->add($record->finger_print->getId());
+            $ids->add($record->fingerprint->getId());
         }
 
         return $ids;
@@ -183,7 +183,7 @@ final class IndexableRecordCollection extends TypedCollection
     {
         $groups = [];
         foreach ($this->items as $record) {
-            $namespace = $record->finger_print->getNamespace();
+            $namespace = $record->fingerprint->getNamespace();
             if (! isset($groups[$namespace])) {
                 $groups[$namespace] = new self;
             }
@@ -302,7 +302,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function containsId(string $id): bool
     {
         foreach ($this->items as $record) {
-            if ($record->finger_print->getId() === $id) {
+            if ($record->fingerprint->getId() === $id) {
                 return true;
             }
         }
@@ -316,7 +316,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function containsNamespace(string $namespace): bool
     {
         foreach ($this->items as $record) {
-            if ($record->finger_print->belongsTo($namespace)) {
+            if ($record->fingerprint->belongsTo($namespace)) {
                 return true;
             }
         }
@@ -330,7 +330,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function findById(string $id): ?IndexableRecord
     {
         foreach ($this->items as $record) {
-            if ($record->finger_print->getId() === $id) {
+            if ($record->fingerprint->getId() === $id) {
                 return $record;
             }
         }
@@ -344,7 +344,7 @@ final class IndexableRecordCollection extends TypedCollection
     public function findByIdAndNamespace(string $id, string $namespace): ?IndexableRecord
     {
         foreach ($this->items as $record) {
-            if ($record->finger_print->getId() === $id && $record->finger_print->belongsTo($namespace)) {
+            if ($record->fingerprint->getId() === $id && $record->fingerprint->belongsTo($namespace)) {
                 return $record;
             }
         }

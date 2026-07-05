@@ -15,7 +15,7 @@ use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
  * @example
  * $query = new SearchQueryRecord(
  *     query: new SearchQueryVO('john=name,description|doe=name'),
- *     finger_print: new IndexableFingerPrintVO('App.Models.User|123'),
+ *     fingerprint: new IndexableFingerPrintVO('App.Models.User|123'),
  *     cluster: new ClusterVO('model-User|tenant-company_abc|env-production'),
  *     limit: 100,
  *     min_size: 2,
@@ -26,7 +26,7 @@ final class SearchQueryRecord extends AbstractRecord
 {
     public function __construct(
         public readonly SearchQueryVO $query,
-        public readonly ?IndexableFingerPrintVO $finger_print = null,
+        public readonly ?IndexableFingerPrintVO $fingerprint = null,
         public readonly ?ClusterVO $cluster = null,
         public readonly ?int $limit = null,
         public readonly ?int $min_size = null,

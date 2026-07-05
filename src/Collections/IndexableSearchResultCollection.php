@@ -68,7 +68,7 @@ final class IndexableSearchResultCollection extends AbstractTypedCollection
     public function filterByNamespace(string $namespace): self
     {
         return $this->filter(
-            fn (IndexableSearchResultRecord $result) => $result->item->finger_print->belongsTo($namespace)
+            fn (IndexableSearchResultRecord $result) => $result->item->fingerprint->belongsTo($namespace)
         );
     }
 
@@ -79,7 +79,7 @@ final class IndexableSearchResultCollection extends AbstractTypedCollection
     {
         $ids = new StringTypedCollection;
         foreach ($this->items as $result) {
-            $ids->add($result->item->finger_print->getId());
+            $ids->add($result->item->fingerprint->getId());
         }
 
         return $ids;
@@ -92,7 +92,7 @@ final class IndexableSearchResultCollection extends AbstractTypedCollection
     {
         $fingerPrints = new IndexableFingerPrintVOCollection;
         foreach ($this->items as $result) {
-            $fingerPrints->add($result->item->finger_print);
+            $fingerPrints->add($result->item->fingerprint);
         }
 
         return $fingerPrints;
@@ -158,7 +158,7 @@ final class IndexableSearchResultCollection extends AbstractTypedCollection
     {
         $groups = [];
         foreach ($this->items as $result) {
-            $namespace = $result->item->finger_print->getNamespace();
+            $namespace = $result->item->fingerprint->getNamespace();
             if (! isset($groups[$namespace])) {
                 $groups[$namespace] = new self;
             }

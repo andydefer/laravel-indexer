@@ -43,7 +43,7 @@ final class IndexDeleterTest extends IntegrationTestCase
         $fingerPrint = new IndexableFingerPrintVO($fingerprint);
         $clusterVO = new ClusterVO($cluster);
         $record = new IndexableRecord(
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
             data: StrictAssociative::from($data),
             cluster: $clusterVO,
         );

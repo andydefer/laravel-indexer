@@ -44,7 +44,7 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexableRecord(
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
         );
@@ -81,7 +81,7 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record1 = new IndexableRecord(
-            finger_print: $fingerPrint1,
+            fingerprint: $fingerPrint1,
             data: $data,
             cluster: $cluster,
         );
@@ -99,7 +99,7 @@ final class IndexWriterTest extends IntegrationTestCase
 
         $fingerPrint2 = new IndexableFingerPrintVO('App.Models.User|789');
         $record2 = new IndexableRecord(
-            finger_print: $fingerPrint2,
+            fingerprint: $fingerPrint2,
             data: StrictAssociative::from([
                 'name' => 'John Doe',
             ]),
@@ -134,7 +134,7 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexableRecord(
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
         );
@@ -187,7 +187,7 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexableRecord(
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
         );
@@ -230,7 +230,7 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexableRecord(
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
         );
@@ -257,7 +257,7 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexableRecord(
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
         );
@@ -292,14 +292,14 @@ final class IndexWriterTest extends IntegrationTestCase
         $records = new IndexableRecordCollection;
 
         $record1 = new IndexableRecord(
-            finger_print: new IndexableFingerPrintVO('App.Models.User|1'),
+            fingerprint: new IndexableFingerPrintVO('App.Models.User|1'),
             data: StrictAssociative::from(['name' => 'User 1']),
             cluster: new ClusterVO('model:User|tenant:company_abc|env:production'),
         );
         $records->add($record1);
 
         $record2 = new IndexableRecord(
-            finger_print: new IndexableFingerPrintVO('App.Models.User|2'),
+            fingerprint: new IndexableFingerPrintVO('App.Models.User|2'),
             data: StrictAssociative::from(['name' => 'User 2']),
             cluster: new ClusterVO('model:User|tenant:company_abc|env:production'),
         );
@@ -334,7 +334,7 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexableRecord(
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
         );
@@ -380,7 +380,7 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexableRecord(
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
         );
@@ -413,7 +413,7 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexableRecord(
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
         );
@@ -458,7 +458,7 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexableRecord(
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
             data: $data,
             cluster: $cluster,
         );

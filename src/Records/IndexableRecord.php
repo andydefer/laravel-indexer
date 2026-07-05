@@ -12,7 +12,7 @@ use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 final class IndexableRecord extends AbstractRecord
 {
     public function __construct(
-        public readonly IndexableFingerPrintVO $finger_print,
+        public readonly IndexableFingerPrintVO $fingerprint,
         public readonly StrictAssociative $data,
         public readonly ?ClusterVO $cluster = null,
     ) {}

@@ -66,7 +66,7 @@ final class IndexWriter
         $this->resetBuffers();
 
         $documentRecord = new IndexedDocumentRecord(
-            fingerprint: $entity->finger_print,
+            fingerprint: $entity->fingerprint,
             cluster: $entity->cluster,
             data: $entity->data
         );
@@ -87,7 +87,7 @@ final class IndexWriter
 
         foreach ($records as $record) {
             $documentRecord = new IndexedDocumentRecord(
-                fingerprint: $record->finger_print,
+                fingerprint: $record->fingerprint,
                 cluster: $record->cluster,
                 data: $record->data
             );

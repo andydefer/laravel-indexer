@@ -58,7 +58,7 @@ final class IndexSearcherTest extends IntegrationTestCase
         $fingerPrint = new IndexableFingerPrintVO($fingerprint);
         $clusterVO = new ClusterVO($cluster);
         $record = new IndexableRecord(
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
             data: StrictAssociative::from($data),
             cluster: $clusterVO,
         );
@@ -105,7 +105,7 @@ final class IndexSearcherTest extends IntegrationTestCase
         $this->assertCount(1, $results);
 
         $result = $results->first();
-        $this->assertEquals('App.Models.User|123', $result->item->finger_print->getValue());
+        $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
         $this->assertEquals('name', $result->field);
         $this->assertEquals('john', $result->gram_value);
         $this->assertEquals(GramType::LEXICAL, $result->gram_type);
@@ -174,7 +174,7 @@ final class IndexSearcherTest extends IntegrationTestCase
         $this->assertCount(1, $results);
 
         $result = $results->first();
-        $this->assertEquals('App.Models.User|123', $result->item->finger_print->getValue());
+        $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
     }
 
     // ==================== TESTS SEARCH WITH FINGERPRINT FILTER ====================
@@ -187,7 +187,7 @@ final class IndexSearcherTest extends IntegrationTestCase
         $fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('john=name'),
-            finger_print: $fingerPrint,
+            fingerprint: $fingerPrint,
         );
 
         $results = $this->indexSearcher->search($query);
@@ -196,7 +196,7 @@ final class IndexSearcherTest extends IntegrationTestCase
         $this->assertCount(1, $results);
 
         $result = $results->first();
-        $this->assertEquals('App.Models.User|123', $result->item->finger_print->getValue());
+        $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
     }
 
     // ==================== TESTS SEARCH WITH CLUSTER FILTER ====================
@@ -227,7 +227,7 @@ final class IndexSearcherTest extends IntegrationTestCase
         $this->assertCount(1, $results);
 
         $result = $results->first();
-        $this->assertEquals('App.Models.User|123', $result->item->finger_print->getValue());
+        $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
     }
 
     // ==================== TESTS SEARCH WITH LIMIT ====================
@@ -270,7 +270,7 @@ final class IndexSearcherTest extends IntegrationTestCase
         $this->assertCount(1, $results);
 
         $result = $results->first();
-        $this->assertEquals('App.Models.User|123', $result->item->finger_print->getValue());
+        $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
         $this->assertEquals('jon', $result->gram_value);
     }
 
@@ -343,7 +343,7 @@ final class IndexSearcherTest extends IntegrationTestCase
         $this->assertCount(1, $results);
 
         $result = $results->first();
-        $this->assertEquals('App.Models.User|123', $result->item->finger_print->getValue());
+        $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
         $this->assertEquals('joh', $result->gram_value);
     }
 
@@ -365,7 +365,7 @@ final class IndexSearcherTest extends IntegrationTestCase
         $this->assertCount(1, $results);
 
         $result = $results->first();
-        $this->assertEquals('App.Models.User|123', $result->item->finger_print->getValue());
+        $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
         $this->assertEquals('JOHN', $result->gram_value);
     }
 

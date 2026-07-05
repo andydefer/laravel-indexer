@@ -61,7 +61,7 @@ final class TestDataFactory
         $clusterString = rtrim($clusterString, '|');
 
         return new IndexableRecord(
-            finger_print: $fingerprint,
+            fingerprint: $fingerprint,
             data: $data,
             cluster: new ClusterVO($clusterString),
         );

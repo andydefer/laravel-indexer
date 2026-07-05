@@ -39,12 +39,12 @@ final class IndexSearcher
     /**
      * Checks whether a document exists by its fingerprint.
      *
-     * @param  IndexableFingerPrintVO  $finger_print  The fingerprint to check
+     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint to check
      * @return bool True if the document exists, false otherwise
      */
-    public function exists(IndexableFingerPrintVO $finger_print): bool
+    public function exists(IndexableFingerPrintVO $fingerprint): bool
     {
-        return $this->documentRepository->existsByFingerPrint($finger_print);
+        return $this->documentRepository->existsByFingerPrint($fingerprint);
     }
 
     /**
@@ -68,7 +68,7 @@ final class IndexSearcher
             $lexicalIds = $this->searchTokens(
                 $normalizedNgram,
                 $fields,
-                $query->finger_print,
+                $query->fingerprint,
                 $query->cluster,
                 GramType::LEXICAL,
                 $minSize,
@@ -78,7 +78,7 @@ final class IndexSearcher
             $metaphoneIds = $this->searchTokens(
                 $normalizedNgram,
                 $fields,
-                $query->finger_print,
+                $query->fingerprint,
                 $query->cluster,
                 GramType::METAPHONE,
                 $minSize,
@@ -160,7 +160,7 @@ final class IndexSearcher
      *
      * @param  string  $ngram  The n-gram to search for
      * @param  array<string>  $fields  The fields to search in
-     * @param  IndexableFingerPrintVO|null  $finger_print  Optional fingerprint filter
+     * @param  IndexableFingerPrintVO|null  $fingerprint  Optional fingerprint filter
      * @param  ClusterVO|null  $cluster  Optional cluster filter
      * @param  GramType  $type  The token type (LEXICAL or METAPHONE)
      * @param  int  $minSize  Minimum n-gram size
@@ -170,7 +170,7 @@ final class IndexSearcher
     private function searchTokens(
         string $ngram,
         array $fields,
-        ?IndexableFingerPrintVO $finger_print,
+        ?IndexableFingerPrintVO $fingerprint,
         ?ClusterVO $cluster,
         GramType $type,
         int $minSize,
@@ -196,9 +196,9 @@ final class IndexSearcher
             $query->whereIn('field', $fields);
         }
 
-        if ($finger_print !== null) {
-            $query->whereHas('document', function ($q) use ($finger_print): void {
-                $q->where('fingerprint', $finger_print->getValue());
+        if ($fingerprint !== null) {
+            $query->whereHas('document', function ($q) use ($fingerprint): void {
+                $q->where('fingerprint', $fingerprint->getValue());
             });
         }
 

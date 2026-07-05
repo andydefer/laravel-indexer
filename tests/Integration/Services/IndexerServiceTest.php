@@ -34,7 +34,7 @@ final class IndexerServiceTest extends IntegrationTestCase
     private function createRecord(string $fingerprint, array $data, string $cluster = 'model:User|tenant:company_abc|env:production'): IndexableRecord
     {
         return new IndexableRecord(
-            finger_print: new IndexableFingerPrintVO($fingerprint),
+            fingerprint: new IndexableFingerPrintVO($fingerprint),
             data: StrictAssociative::from($data),
             cluster: new ClusterVO($cluster),
         );

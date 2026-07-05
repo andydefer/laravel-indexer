@@ -94,7 +94,7 @@ final class IndexerService implements IndexerInterface
      */
     public function refresh(IndexableRecord $entity): void
     {
-        $this->deleter->delete($entity->finger_print);
+        $this->deleter->delete($entity->fingerprint);
         $this->writer->index($entity);
     }
 
@@ -106,7 +106,7 @@ final class IndexerService implements IndexerInterface
         $fingerPrints = new IndexableFingerPrintVOCollection;
 
         foreach ($records as $record) {
-            $fingerPrints->add($record->finger_print);
+            $fingerPrints->add($record->fingerprint);
         }
 
         $this->deleter->deleteMany($fingerPrints);

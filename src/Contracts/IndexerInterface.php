@@ -37,9 +37,9 @@ interface IndexerInterface
     /**
      * Deletes a document from the index.
      *
-     * @param  IndexableFingerPrintVO  $finger_print  The fingerprint of the document to delete
+     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint of the document to delete
      */
-    public function delete(IndexableFingerPrintVO $finger_print): void;
+    public function delete(IndexableFingerPrintVO $fingerprint): void;
 
     /**
      * Deletes multiple documents from the index.
@@ -58,10 +58,10 @@ interface IndexerInterface
     /**
      * Checks if a document exists in the index.
      *
-     * @param  IndexableFingerPrintVO  $finger_print  The fingerprint to check
+     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint to check
      * @return bool True if the document exists, false otherwise
      */
-    public function exists(IndexableFingerPrintVO $finger_print): bool;
+    public function exists(IndexableFingerPrintVO $fingerprint): bool;
 
     /**
      * Searches the index using the provided query.

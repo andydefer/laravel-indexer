@@ -62,7 +62,7 @@ final class IndexedDocument extends Model
     public function toIndexableRecord(): IndexableRecord
     {
         return new IndexableRecord(
-            finger_print: $this->getFingerPrintVO(),
+            fingerprint: $this->getFingerPrintVO(),
             cluster: $this->getClusterVO(),
             data: StrictAssociative::from($this->data),
         );
