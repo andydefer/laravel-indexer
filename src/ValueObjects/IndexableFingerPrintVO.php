@@ -86,7 +86,7 @@ final class IndexableFingerPrintVO extends AbstractValueObject
 
     public function getValue(): string
     {
-        return $this->value;
+        return $this->namespace.self::SEPARATOR.$this->id;
     }
 
     public function belongsTo(string $namespace): bool
