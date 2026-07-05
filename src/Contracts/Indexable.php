@@ -43,7 +43,7 @@ interface Indexable
      *
      * @return int|string The entity's primary key or unique identifier
      */
-    public function getKey(): int|string;
+    public function getKey();
 
     /**
      * Returns the entity's type identifier (morph class / namespace).
@@ -52,5 +52,5 @@ interface Indexable
      *
      * @return string The fully qualified class name or type identifier
      */
-    public function getMorphClass(): string;
+    public function getMorphClass();
 }
