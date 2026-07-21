@@ -31,5 +31,12 @@
         "phpunit/phpunit": "^10.5|^11.0|^12.0",
         "mockery/mockery": "^1.6",
         "laravel/pint": "^1.29"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "AndyDefer\\LaravelIndexer\\Providers\\IndexerServiceProvider"
+            ]
+        }
     }
 }
