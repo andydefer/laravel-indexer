@@ -8,6 +8,7 @@ use AndyDefer\Directive\DirectiveServiceProvider;
 use AndyDefer\JsonlCache\JsonlCacheServiceProvider;
 use AndyDefer\LaravelIndexer\Providers\IndexerServiceProvider;
 use AndyDefer\Logger\LoggerServiceProvider;
+use AndyDefer\Task\TaskServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 abstract class IntegrationTestCase extends Orchestra
@@ -25,6 +26,7 @@ abstract class IntegrationTestCase extends Orchestra
             JsonlCacheServiceProvider::class,
             LoggerServiceProvider::class,
             DirectiveServiceProvider::class,
+            TaskServiceProvider::class,
             IndexerServiceProvider::class,
         ];
     }

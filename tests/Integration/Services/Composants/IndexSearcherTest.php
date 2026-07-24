@@ -8,6 +8,7 @@ use AndyDefer\DomainStructures\Normalizers\Core\NormalizerInterface;
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Collections\IndexableSearchResultCollection;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
+use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
@@ -43,6 +44,15 @@ final class IndexSearcherTest extends IntegrationTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Config pour les tests : min_size=3, max_size=5
+        $this->app['config']->set('indexer.token_types.ngrams.min_size', 3);
+        $this->app['config']->set('indexer.token_types.ngrams.max_size', 5);
+
+        // Re-bind IndexerConfig après changement de config
+        $this->app->singleton(IndexerConfigInterface::class, function ($app) {
+            return new IndexerConfig($app['config']);
+        });
 
         $this->indexWriter = $this->app->make(IndexWriter::class);
         $this->indexSearcher = $this->app->make(IndexSearcher::class);
@@ -395,17 +405,16 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
-        // min_size=2 est clampé à 3 (config), donc ne change rien
-        // "jo" n'existe pas car min_size=3
+        // min_size=2 est clampé à 3 (config)
+        // On cherche un terme qui n'existe pas
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('jo=name'),
+            query: new SearchQueryVO('xyz=name'),
             min_size: 2,
             max_size: 3,
         );
 
         $results = $this->indexSearcher->search($query);
 
-        // "jo" n'est pas indexé car min_size=3 → résultat vide
         $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
         $this->assertCount(0, $results);
     }
@@ -450,7 +459,6 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
-        // min_size > max_size → on utilise la config
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('john=name'),
             min_size: 5,
@@ -459,7 +467,6 @@ final class IndexSearcherTest extends IntegrationTestCase
 
         $results = $this->indexSearcher->search($query);
 
-        // La config est utilisée: min=3, max=5 → "john" est trouvé
         $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
         $this->assertCount(1, $results);
     }
@@ -470,7 +477,6 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'Programming',
         ]);
 
-        // min=4, max=4 → seulement les n-grammes de taille 4
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('programming=name'),
             min_size: 4,
@@ -489,7 +495,6 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John',
         ]);
 
-        // min=4, max=4 → "john" est exactement la taille du terme
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('john=name'),
             min_size: 4,
@@ -508,7 +513,6 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
-        // min_size demandé > config, on utilise min_config = 3
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('john=name'),
             min_size: 8,
@@ -517,7 +521,6 @@ final class IndexSearcherTest extends IntegrationTestCase
 
         $results = $this->indexSearcher->search($query);
 
-        // min_size est clampé à 3 (config) car 8 > max_config 5
         $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
         $this->assertCount(1, $results);
     }

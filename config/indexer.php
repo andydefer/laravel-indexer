@@ -58,4 +58,29 @@ return [
     |
     */
     'cache_ttl' => 3600,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Batch Size
+    |--------------------------------------------------------------------------
+    |
+    | Number of items to process per batch during indexing.
+    |
+    */
+    'batch_size' => env('INDEXER_BATCH_SIZE', 50),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Model Indexables
+    |--------------------------------------------------------------------------
+    |
+    | List of model classes with their cluster configuration.
+    | Key: fully qualified class name of the model
+    | Value: cluster string for indexing
+    |
+    */
+    'model_indexables' => [
+        // App\Models\User::class => 'type:user|role:doctor',
+        // App\Models\Hospital::class => 'type:hospital|status:active',
+    ],
 ];

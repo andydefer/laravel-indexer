@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Services\Composants;
 
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
-use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
+use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
@@ -50,7 +50,7 @@ final class IndexWriter
         private readonly IndexedTokenRepository $tokenRepository,
         private readonly TextNormalizerInterface $textNormalizer,
         private readonly NGramGeneratorInterface $ngramGenerator,
-        private readonly IndexerConfig $config,
+        private readonly IndexerConfigInterface $config,
     ) {}
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Services;
 
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
+use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
 use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
@@ -18,15 +19,28 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 final class GenericIndexerService implements GenericIndexerInterface
 {
+    private int $batchSize;
+
+    private ?int $limit = null;
+
     public function __construct(
         private readonly IndexerInterface $indexer,
         private readonly IndexedDocumentRepositoryInterface $documentRepository,
-        private int $batchSize = 50,
-    ) {}
+        private readonly IndexerConfigInterface $config,
+    ) {
+        $this->batchSize = $this->config->getBatchSize();
+    }
 
     public function setBatchSize(int $batchSize): self
     {
         $this->batchSize = $batchSize;
+
+        return $this;
+    }
+
+    public function setLimit(?int $limit): self
+    {
+        $this->limit = $limit;
 
         return $this;
     }
@@ -64,22 +78,36 @@ final class GenericIndexerService implements GenericIndexerInterface
     public function indexAll(IndexableVO $indexableVO): void
     {
         $modelClass = $indexableVO->getModelClass();
+        $processed = 0;
+        $limit = $this->limit;
 
-        $modelClass::chunk($this->batchSize, function ($models) use ($indexableVO) {
+        $modelClass::chunk($this->batchSize, function ($models) use ($indexableVO, &$processed, $limit) {
             $records = new IndexableRecordCollection;
 
             foreach ($models as $model) {
+                if ($limit !== null && $processed >= $limit) {
+                    if ($records->isNotEmpty()) {
+                        $this->indexer->indexMany($records);
+                    }
+
+                    return false;
+                }
+
                 if (! $model->shouldBeIndexed()) {
                     continue;
                 }
 
                 $cluster = $this->buildCluster($indexableVO->getCluster());
-                $records->add(IndexableRecordFactory::convert($model, $cluster));
+                $record = IndexableRecordFactory::convert($model, $cluster);
+                $records->add($record);
+                $processed++;
             }
 
             if ($records->isNotEmpty()) {
                 $this->indexer->indexMany($records);
             }
+
+            return true;
         });
     }
 

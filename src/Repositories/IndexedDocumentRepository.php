@@ -17,14 +17,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
-/**
- * Repository for managing indexed documents.
- *
- * Provides CRUD operations and specialized queries for indexed documents,
- * including filtering by fingerprint, namespace, cluster, and bulk operations.
- *
- * @extends AbstractRepository<IndexedDocument, IndexedDocumentRecord>
- */
 final class IndexedDocumentRepository extends AbstractRepository implements IndexedDocumentRepositoryInterface
 {
     public function __construct()
@@ -32,9 +24,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         parent::__construct(IndexedDocument::class, IndexedDocumentRecord::class);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     protected function applyFilters(Builder $query, AbstractRecord $filters): void
     {
         if (! $filters instanceof IndexedDocumentFiltersRecord) {
@@ -49,17 +38,11 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         $this->applyDocumentIdsFilter($query, $filters);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function getModel(): Model
     {
         return $this->model;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function createMany(array $records): array
     {
         if (empty($records)) {
@@ -89,9 +72,11 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->all();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    private function normalizeNamespace(string $namespace): string
+    {
+        return str_replace('\\', '.', $namespace);
+    }
+
     public function findByFingerPrint(IndexableFingerPrintVO $fingerPrint): ?IndexedDocument
     {
         return $this->model->newQuery()
@@ -99,9 +84,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->first();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByFingerprintString(string $fingerprint): ?IndexedDocument
     {
         return $this->model->newQuery()
@@ -109,19 +91,15 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->first();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByNamespace(string $namespace): Collection
     {
+        $normalized = $this->normalizeNamespace($namespace);
+
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $namespace.'|%')
+            ->where('fingerprint', 'LIKE', $normalized.'|%')
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByCluster(ClusterVO $cluster): Collection
     {
         return $this->model->newQuery()
@@ -129,9 +107,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByClusterKeyValue(string $key, string $value): Collection
     {
         $searchPattern = $key.':'.$value;
@@ -141,9 +116,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByIds(array $ids): Collection
     {
         if (empty($ids)) {
@@ -155,9 +127,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function deleteByFingerPrint(IndexableFingerPrintVO $fingerPrint): int
     {
         return $this->model->newQuery()
@@ -165,9 +134,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->delete();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function deleteByFingerprintString(string $fingerprint): int
     {
         return $this->model->newQuery()
@@ -175,19 +141,15 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->delete();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function deleteByNamespace(string $namespace): int
     {
+        $normalized = $this->normalizeNamespace($namespace);
+
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $namespace.'|%')
+            ->where('fingerprint', 'LIKE', $normalized.'|%')
             ->delete();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function deleteByCluster(ClusterVO $cluster): int
     {
         return $this->model->newQuery()
@@ -195,9 +157,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->delete();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function deleteByClusterKeyValue(string $key, string $value): int
     {
         $searchPattern = $key.':'.$value;
@@ -207,19 +166,15 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->delete();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function countByNamespace(string $namespace): int
     {
+        $normalized = $this->normalizeNamespace($namespace);
+
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $namespace.'|%')
+            ->where('fingerprint', 'LIKE', $normalized.'|%')
             ->count();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function countByCluster(ClusterVO $cluster): int
     {
         return $this->model->newQuery()
@@ -227,9 +182,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->count();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function getDistinctNamespaces(): Collection
     {
         $documents = $this->model->newQuery()
@@ -249,9 +201,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         return $namespaces;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function getDistinctClusterKeys(): Collection
     {
         $clusterValues = $this->model->newQuery()
@@ -274,9 +223,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         return $keys;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function getDistinctClusterValues(string $key): Collection
     {
         $clusterValues = $this->model->newQuery()
@@ -301,9 +247,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         return $values;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function existsByFingerPrint(IndexableFingerPrintVO $fingerPrint): bool
     {
         return $this->model->newQuery()
@@ -311,19 +254,15 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->exists();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function existsByNamespace(string $namespace): bool
     {
+        $normalized = $this->normalizeNamespace($namespace);
+
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $namespace.'|%')
+            ->where('fingerprint', 'LIKE', $normalized.'|%')
             ->exists();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function existsByCluster(ClusterVO $cluster): bool
     {
         return $this->model->newQuery()
@@ -331,19 +270,12 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->exists();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findAllWithTokens(): Collection
     {
         return $this->model->newQuery()
             ->with('tokens')
             ->get();
     }
-
-    // ============================================================
-    // Private Helpers for Filter Application
-    // ============================================================
 
     private function applyIdFilter(Builder $query, IndexedDocumentFiltersRecord $filters): void
     {
@@ -362,7 +294,8 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
     private function applyNamespaceFilter(Builder $query, IndexedDocumentFiltersRecord $filters): void
     {
         if ($filters->namespace !== null) {
-            $query->where('fingerprint', 'LIKE', $filters->namespace.'|%');
+            $normalized = $this->normalizeNamespace($filters->namespace);
+            $query->where('fingerprint', 'LIKE', $normalized.'|%');
         }
     }
 

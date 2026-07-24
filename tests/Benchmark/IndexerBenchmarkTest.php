@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Benchmark;
 
 use AndyDefer\DomainStructures\Normalizers\Core\NormalizerInterface;
-use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
+use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexedTokenRepositoryInterface;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
@@ -30,7 +30,7 @@ final class IndexerBenchmarkTest extends MysqlBenchmarkTestCase
 
     private IndexedTokenRepositoryInterface $tokenRepository;
 
-    private IndexerConfig $config;
+    private IndexerConfigInterface $config;
 
     private TextNormalizerInterface $textNormalizer;
 
@@ -44,7 +44,7 @@ final class IndexerBenchmarkTest extends MysqlBenchmarkTestCase
 
         $this->documentRepository = $this->app->make(IndexedDocumentRepositoryInterface::class);
         $this->tokenRepository = $this->app->make(IndexedTokenRepositoryInterface::class);
-        $this->config = $this->app->make(IndexerConfig::class);
+        $this->config = $this->app->make(IndexerConfigInterface::class);
         $this->normalizer = $this->app->make(NormalizerInterface::class);
         $this->textNormalizer = $this->app->make(TextNormalizerInterface::class);
         $this->ngramGenerator = $this->app->make(NGramGeneratorInterface::class);

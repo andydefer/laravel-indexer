@@ -11,6 +11,9 @@
 - [Préparer votre modèle](#préparer-votre-modèle)
 - [Indexer des données](#indexer-des-données)
 - [GenericIndexerService](#genericindexerservice)
+- [GenericIndexModelsDirective](#genericindexmodelsdirective)
+- [GenericOrchestratorRecurringTask](#genericorchestratorrecurringtask)
+- [GenericIndexBatchUniqueTask](#genericindexbatchuniquetask)
 - [Rechercher](#rechercher)
 - [Les clusters](#les-clusters)
 - [Autocomplétion](#autocomplétion)
@@ -18,6 +21,7 @@
 - [Repositories](#repositories)
 - [Collections](#collections)
 
+---
 
 ## Installation
 
@@ -49,6 +53,11 @@ return [
         'metaphone' => true,
     ],
     'default_limit' => 100,
+    'batch_size' => 50,
+    'model_indexables' => [
+        // App\Models\User::class => 'type:user|status:active',
+        // App\Models\Hospital::class => 'type:hospital|status:active',
+    ],
 ];
 ```
 
@@ -161,7 +170,7 @@ public function updateUser(User $user): void
 
 ## GenericIndexerService
 
-Service générique d'indexation qui fonctionne avec n'importe quel modèle Eloquent implémentant `Indexable`. Il gère automatiquement le chunking et les opérations CRUD sur l'index.
+Service générique d'indexation qui fonctionne avec n'importe quel modèle Eloquent implémentant `Indexable`. Il gère automatiquement le chunking, le batch processing, la limitation et les opérations CRUD sur l'index.
 
 ### Injection du service
 
@@ -197,14 +206,24 @@ $this->genericIndexer->index($indexableVO, $userId);
 $cluster = new ClusterVO('type:user|role:doctor');
 $indexableVO = new IndexableVO(User::class, $cluster);
 
-// Indexe tous les utilisateurs actifs par lots
 $this->genericIndexer->indexAll($indexableVO);
+```
+
+### Indexer avec batch et limite
+
+```php
+$cluster = new ClusterVO('type:doctor|status:active');
+$indexableVO = new IndexableVO(Doctor::class, $cluster);
+
+$this->genericIndexer
+    ->setBatchSize(50)
+    ->setLimit(1000)
+    ->indexAll($indexableVO);
 ```
 
 ### Reconstruire tout l'index
 
 ```php
-// Supprime puis réindexe tous les utilisateurs
 $this->genericIndexer->reindexAll($indexableVO);
 ```
 
@@ -223,7 +242,6 @@ $this->genericIndexer->deleteAll($indexableVO);
 ### Rafraîchir un document
 
 ```php
-// Met à jour le document dans l'index
 $this->genericIndexer->refresh($indexableVO, $userId);
 ```
 
@@ -239,12 +257,6 @@ $count = $this->genericIndexer->countIndexed($indexableVO);
 if ($this->genericIndexer->exists($indexableVO, $userId)) {
     // L'utilisateur est indexé
 }
-```
-
-### Configurer la taille des lots
-
-```php
-$this->genericIndexer->setBatchSize(100)->indexAll($indexableVO);
 ```
 
 ### Exemple complet
@@ -277,7 +289,10 @@ class DoctorIndexer
         $cluster = new ClusterVO('type:doctor|status:active');
         $indexableVO = new IndexableVO(Doctor::class, $cluster);
         
-        $this->genericIndexer->setBatchSize(50)->reindexAll($indexableVO);
+        $this->genericIndexer
+            ->setBatchSize(50)
+            ->setLimit(10000)
+            ->reindexAll($indexableVO);
     }
 
     public function getIndexedDoctorCount(): int
@@ -287,7 +302,148 @@ class DoctorIndexer
         
         return $this->genericIndexer->countIndexed($indexableVO);
     }
+
+    public function cleanupDoctorIndex(): void
+    {
+        $cluster = new ClusterVO('type:doctor');
+        $indexableVO = new IndexableVO(Doctor::class, $cluster);
+        
+        $this->genericIndexer->deleteAll($indexableVO);
+    }
 }
+```
+
+---
+
+## GenericIndexModelsDirective
+
+Directive CLI pour indexer les modèles configurés dans `indexer.model_indexables`.
+
+### Signature
+
+```bash
+index:models {batch=50} {limit=?} {models*} {--reindex} {--count} {--delete}
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `batch` | Taille des lots pour le chunking (défaut: 50) |
+| `limit` | Nombre maximum d'éléments à indexer (optionnel) |
+| `models*` | Liste des modèles à indexer (notation pointée: `App.Models.User`) |
+| `--reindex` | Supprime puis réindexe tous les modèles |
+| `--count` | Compte les documents indexés |
+| `--delete` | Supprime tous les documents de l'index |
+
+### Exemples
+
+```bash
+# Indexer tous les modèles configurés
+./bin/directive index:models [App.Models.User,App.Models.Hospital]
+
+# Indexer avec batch=10 et limit=5
+./bin/directive index:models 10 5 [App.Models.User]
+
+# Compter les documents indexés
+./bin/directive index:models [App.Models.User] --count
+
+# Supprimer tout l'index des modèles
+./bin/directive index:models [App.Models.User] --delete
+
+# Réindexer avec batch et limit
+./bin/directive index:models 20 10 [App.Models.User] --reindex
+
+# Ignorer le batch (valeur par défaut) et appliquer une limite
+./bin/directive index:models _ 20 [App.Models.User]
+```
+
+### Intégration avec la config
+
+```php
+// config/indexer.php
+'model_indexables' => [
+    App\Models\User::class => 'type:user|status:active',
+    App\Models\Hospital::class => 'type:hospital|status:active',
+    App\Models\Specialty::class => 'type:specialty|status:active',
+],
+```
+
+---
+
+## GenericOrchestratorRecurringTask
+
+Tâche récurrente qui orchestre l'indexation de tous les modèles configurés. Elle récupère la liste des modèles depuis `model_indexables` et dispatch des tâches batch pour chaque lot.
+
+### Configuration
+
+```php
+// config/indexer.php
+'batch_size' => 50,
+'model_indexables' => [
+    App\Models\User::class => 'type:user|status:active',
+    App\Models\Hospital::class => 'type:hospital|status:active',
+],
+```
+
+### Fonctionnement
+
+1. Récupère les modèles configurables depuis `model_indexables`
+2. Pour chaque modèle, récupère les IDs éligibles (`shouldBeIndexed()`)
+3. Découpe les IDs par lots (`batch_size`)
+4. Enregistre une tâche `GenericIndexBatchUniqueTask` pour chaque lot
+
+### Enregistrement
+
+```php
+use AndyDefer\LaravelIndexer\Tasks\RecurringTasks\GenericOrchestratorRecurringTask;
+
+// La tâche est automatiquement enregistrée par le provider
+// Ou manuellement via le système de tâches
+```
+
+---
+
+## GenericIndexBatchUniqueTask
+
+Tâche unique qui indexe un lot d'éléments pour un modèle spécifique.
+
+### Payload
+
+```json
+{
+    "indexable": {
+        "modelClass": "App\\Models\\User",
+        "cluster": "type:user|status:active"
+    },
+    "ids": [1, 2, 3, 4, 5]
+}
+```
+
+### Fonctionnement
+
+1. Reçoit un `IndexableVO` et une liste d'IDs
+2. Récupère chaque modèle par son ID
+3. Vérifie si le modèle est éligible (`shouldBeIndexed()`)
+4. Supprime le document s'il existe déjà (re-indexation)
+5. Indexe le modèle avec le cluster configuré
+
+### Utilisation manuelle
+
+```php
+use AndyDefer\LaravelIndexer\Tasks\UniqueTasks\GenericIndexBatchUniqueTask;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+
+$indexableVO = new IndexableVO(
+    modelClass: User::class,
+    cluster: new ClusterVO('type:user|status:active')
+);
+
+$payload = StrictDataObject::from([
+    'indexable' => $indexableVO,
+    'ids' => [1, 2, 3, 4, 5],
+]);
 ```
 
 ---
@@ -734,7 +890,6 @@ $hasPair = $clusters->hasPair('tenant', 'company_abc');
 // Fusion
 $merged = $clusters->mergeAll();
 ```
-
 ---
 
 ## License

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Services\Composants;
 
 use AndyDefer\LaravelIndexer\Collections\IndexableSearchResultCollection;
-use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
+use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
 use AndyDefer\LaravelIndexer\Records\IndexableSearchResultRecord;
@@ -33,7 +33,7 @@ final class IndexSearcher
         private readonly IndexedDocumentRepository $documentRepository,
         private readonly IndexedTokenRepository $tokenRepository,
         private readonly TextNormalizerInterface $textNormalizer,
-        private readonly IndexerConfig $config,
+        private readonly IndexerConfigInterface $config,
     ) {}
 
     /**

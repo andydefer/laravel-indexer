@@ -10,6 +10,8 @@ interface GenericIndexerInterface
 {
     public function setBatchSize(int $batchSize): self;
 
+    public function setLimit(?int $limit): self;
+
     public function index(IndexableVO $indexableVO, int $id): void;
 
     public function indexAll(IndexableVO $indexableVO): void;

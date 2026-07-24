@@ -7,6 +7,7 @@ namespace AndyDefer\LaravelIndexer\Providers;
 use AndyDefer\DomainStructures\Normalizers\Core\NormalizerInterface;
 use AndyDefer\DomainStructures\Normalizers\NormalizerChain;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
+use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexedTokenRepositoryInterface;
@@ -40,7 +41,7 @@ final class IndexerServiceProvider extends ServiceProvider
         // CONFIGS
         // ============================================================
 
-        $this->app->singleton(IndexerConfig::class, function ($app) {
+        $this->app->singleton(IndexerConfigInterface::class, function ($app) {
             return new IndexerConfig($app->make(ConfigRepository::class));
         });
 
@@ -106,7 +107,7 @@ final class IndexerServiceProvider extends ServiceProvider
                 tokenRepository: $app->make(IndexedTokenRepositoryInterface::class),
                 textNormalizer: $app->make(TextNormalizerInterface::class),
                 ngramGenerator: $app->make(NGramGeneratorInterface::class),
-                config: $app->make(IndexerConfig::class),
+                config: $app->make(IndexerConfigInterface::class),
             );
         });
 
@@ -122,7 +123,7 @@ final class IndexerServiceProvider extends ServiceProvider
                 documentRepository: $app->make(IndexedDocumentRepositoryInterface::class),
                 tokenRepository: $app->make(IndexedTokenRepositoryInterface::class),
                 textNormalizer: $app->make(TextNormalizerInterface::class),
-                config: $app->make(IndexerConfig::class),
+                config: $app->make(IndexerConfigInterface::class),
             );
         });
 
@@ -150,7 +151,7 @@ final class IndexerServiceProvider extends ServiceProvider
             return new GenericIndexerService(
                 indexer: $app->make(IndexerInterface::class),
                 documentRepository: $app->make(IndexedDocumentRepositoryInterface::class),
-                batchSize: 50,
+                config: $app->make(IndexerConfigInterface::class),
             );
         });
 
@@ -170,6 +171,7 @@ final class IndexerServiceProvider extends ServiceProvider
         $this->app->alias(IndexSearcher::class, 'indexer.searcher');
         $this->app->alias(GenericIndexerInterface::class, 'indexer.generic');
         $this->app->alias(GenericIndexerService::class, 'indexer.generic.service');
+        $this->app->alias(IndexerConfigInterface::class, 'indexer.config');
     }
 
     public function boot(): void

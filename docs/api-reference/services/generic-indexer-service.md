@@ -2,7 +2,7 @@
 
 ## Description
 
-Service générique d'indexation pour les modèles Eloquent implémentant l'interface `Indexable`. Orchestre l'indexation, la suppression, le rafraîchissement et le comptage de documents indexés.
+Service générique d'indexation pour les modèles Eloquent implémentant l'interface `Indexable`. Orchestre l'indexation, la suppression, le rafraîchissement et le comptage de documents indexés avec support du batch processing et de la limitation.
 
 ## Hiérarchie
 
@@ -13,19 +13,30 @@ GenericIndexerInterface
 
 ## Rôle principal
 
-Fournit une interface unifiée pour l'indexation de n'importe quel modèle Eloquent qui implémente `Indexable`. Gère le chunking automatique des données, la construction des clusters et les opérations CRUD sur l'index.
+Fournit une interface unifiée pour l'indexation de n'importe quel modèle Eloquent qui implémente `Indexable`. Gère le chunking automatique des données, la construction des clusters, les opérations CRUD sur l'index, avec un contrôle fin via le batch size et la limite.
 
 ## API
 
-### `__construct(IndexerInterface $indexer, IndexedDocumentRepositoryInterface $documentRepository, int $batchSize = 50)`
+### `__construct(IndexerInterface $indexer, IndexedDocumentRepositoryInterface $documentRepository, IndexerConfigInterface $config)`
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$indexer` | `IndexerInterface` | Service principal d'indexation |
 | `$documentRepository` | `IndexedDocumentRepositoryInterface` | Repository des documents indexés |
-| `$batchSize` | `int` | Nombre d'éléments par lot (défaut: 50) |
+| `$config` | `IndexerConfigInterface` | Configuration du package |
+
+**Exemple :**
+```php
+$service = new GenericIndexerService(
+    $indexer,
+    $documentRepository,
+    $config
+);
+```
 
 ### `setBatchSize(int $batchSize): self`
+
+Définit la taille des lots pour le chunking.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -38,7 +49,24 @@ Fournit une interface unifiée pour l'indexation de n'importe quel modèle Eloqu
 $genericIndexer->setBatchSize(100)->indexAll($indexableVO);
 ```
 
+### `setLimit(?int $limit): self`
+
+Définit le nombre maximum d'éléments à indexer.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$limit` | `?int` | Nombre maximum d'éléments (null = illimité) |
+
+**Retourne :** `self` - Instance courante pour chaînage
+
+**Exemple :**
+```php
+$genericIndexer->setLimit(50)->indexAll($indexableVO);
+```
+
 ### `index(IndexableVO $indexableVO, int $id): void`
+
+Indexe un document spécifique par son ID.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -52,11 +80,13 @@ $genericIndexer->setBatchSize(100)->indexAll($indexableVO);
 **Exemple :**
 ```php
 $cluster = new ClusterVO('type:doctor|specialty:cardiology');
-$indexableVO = new IndexableVO(TestDoctor::class, $cluster);
+$indexableVO = new IndexableVO(Doctor::class, $cluster);
 $genericIndexer->index($indexableVO, 42);
 ```
 
 ### `indexAll(IndexableVO $indexableVO): void`
+
+Indexe tous les modèles éligibles par lots.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -66,10 +96,12 @@ $genericIndexer->index($indexableVO, 42);
 
 **Exemple :**
 ```php
-$genericIndexer->indexAll($indexableVO);
+$genericIndexer->setBatchSize(100)->setLimit(500)->indexAll($indexableVO);
 ```
 
 ### `reindexAll(IndexableVO $indexableVO): void`
+
+Supprime puis réindexe tous les modèles éligibles.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -83,6 +115,8 @@ $genericIndexer->reindexAll($indexableVO);
 ```
 
 ### `delete(IndexableVO $indexableVO, int $id): void`
+
+Supprime un document spécifique de l'index.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -100,6 +134,8 @@ $genericIndexer->delete($indexableVO, 42);
 
 ### `deleteAll(IndexableVO $indexableVO): void`
 
+Supprime tous les documents d'un type de l'index.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$indexableVO` | `IndexableVO` | Configuration du modèle |
@@ -112,6 +148,8 @@ $genericIndexer->deleteAll($indexableVO);
 ```
 
 ### `refresh(IndexableVO $indexableVO, int $id): void`
+
+Rafraîchit un document existant dans l'index (supprime puis réindexe).
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -129,6 +167,8 @@ $genericIndexer->refresh($indexableVO, 42);
 
 ### `countIndexed(IndexableVO $indexableVO): int`
 
+Retourne le nombre de documents indexés pour un type de modèle.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$indexableVO` | `IndexableVO` | Configuration du modèle |
@@ -141,6 +181,8 @@ $count = $genericIndexer->countIndexed($indexableVO);
 ```
 
 ### `exists(IndexableVO $indexableVO, int $id): bool`
+
+Vérifie si un document est indexé.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
@@ -158,50 +200,50 @@ if ($genericIndexer->exists($indexableVO, 42)) {
 
 ## Cas d'utilisation
 
-### Cas 1 : Indexer un modèle spécifique avec cluster multiple
+### Cas 1 : Indexation avec batch et limite
 
 ```php
-$cluster = new ClusterVO('type:doctor|specialty:cardiology|status:active');
+$cluster = new ClusterVO('type:doctor|status:active');
 $indexableVO = new IndexableVO(Doctor::class, $cluster);
 
-$genericIndexer->index($indexableVO, 42);
+$genericIndexer
+    ->setBatchSize(50)
+    ->setLimit(1000)
+    ->indexAll($indexableVO);
 ```
 
-### Cas 2 : Indexer tous les modèles actifs par lots
+### Cas 2 : Réindexation complète en lots
 
 ```php
 $cluster = new ClusterVO('type:user|role:doctor');
 $indexableVO = new IndexableVO(User::class, $cluster);
 
-$genericIndexer->setBatchSize(100)->indexAll($indexableVO);
+$genericIndexer->setBatchSize(200)->reindexAll($indexableVO);
 ```
 
-### Cas 3 : Reconstruire l'index complet
+### Cas 3 : Indexation avec limite uniquement
 
 ```php
-$cluster = new ClusterVO('type:hospital|status:active');
-$indexableVO = new IndexableVO(Hospital::class, $cluster);
+$cluster = new ClusterVO('type:product|status:published');
+$indexableVO = new IndexableVO(Product::class, $cluster);
 
-// Supprime puis réindexe tous les hôpitaux
-$genericIndexer->reindexAll($indexableVO);
+$genericIndexer->setLimit(100)->indexAll($indexableVO);
 ```
 
-### Cas 4 : Mettre à jour un document après modification
+### Cas 4 : Mise à jour d'un document spécifique
 
 ```php
-// Après avoir modifié le docteur
 $doctor->specialty = 'Neurology';
 $doctor->save();
 
-// Rafraîchir l'index
 $genericIndexer->refresh($indexableVO, $doctor->id);
 ```
 
-### Cas 5 : Vérifier l'existence avant indexation
+### Cas 5 : Vérification et indexation conditionnelle
 
 ```php
-if (!$genericIndexer->exists($indexableVO, $doctorId)) {
-    $genericIndexer->index($indexableVO, $doctorId);
+if (!$genericIndexer->exists($indexableVO, $userId)) {
+    $genericIndexer->index($indexableVO, $userId);
 }
 ```
 
@@ -218,6 +260,7 @@ Le service s'intègre avec :
 
 - **`IndexerInterface`** - Service d'indexation principal
 - **`IndexedDocumentRepositoryInterface`** - Persistance des documents
+- **`IndexerConfigInterface`** - Configuration (batch size par défaut)
 - **`IndexableVO`** - Configuration du modèle et du cluster
 - **`ClusterVO`** - Définition des tags de regroupement
 
@@ -225,6 +268,7 @@ Le service s'intègre avec :
 
 - **Batch processing** : Traitement par lots via `chunk()` pour éviter les problèmes de mémoire
 - **Batch size configurable** : Ajustable via `setBatchSize()`
+- **Limitation** : Contrôle du nombre d'éléments via `setLimit()`
 - **Skip automatique** : Les modèles non éligibles (`shouldBeIndexed() = false`) sont ignorés
 
 ## Compatibilité
@@ -245,34 +289,45 @@ use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
 
-class UserIndexer
+class DoctorIndexer
 {
     public function __construct(
         private readonly GenericIndexerInterface $genericIndexer,
     ) {}
 
-    public function indexUser(int $userId): void
+    public function indexDoctor(int $doctorId): void
     {
-        $cluster = new ClusterVO('type:user|role:doctor|status:active');
-        $indexableVO = new IndexableVO(User::class, $cluster);
+        $cluster = new ClusterVO('type:doctor|role:specialist|status:active');
+        $indexableVO = new IndexableVO(Doctor::class, $cluster);
 
-        $this->genericIndexer->index($indexableVO, $userId);
+        $this->genericIndexer->index($indexableVO, $doctorId);
     }
 
-    public function reindexAllDoctors(): void
+    public function reindexActiveDoctors(): void
     {
-        $cluster = new ClusterVO('type:user|role:doctor');
-        $indexableVO = new IndexableVO(User::class, $cluster);
+        $cluster = new ClusterVO('type:doctor|status:active');
+        $indexableVO = new IndexableVO(Doctor::class, $cluster);
 
-        $this->genericIndexer->setBatchSize(50)->reindexAll($indexableVO);
+        $this->genericIndexer
+            ->setBatchSize(50)
+            ->setLimit(10000)
+            ->reindexAll($indexableVO);
     }
 
-    public function getIndexedUserCount(): int
+    public function getIndexedDoctorCount(): int
     {
-        $cluster = new ClusterVO('type:user');
-        $indexableVO = new IndexableVO(User::class, $cluster);
+        $cluster = new ClusterVO('type:doctor');
+        $indexableVO = new IndexableVO(Doctor::class, $cluster);
 
         return $this->genericIndexer->countIndexed($indexableVO);
+    }
+
+    public function cleanupDoctorIndex(): void
+    {
+        $cluster = new ClusterVO('type:doctor');
+        $indexableVO = new IndexableVO(Doctor::class, $cluster);
+
+        $this->genericIndexer->deleteAll($indexableVO);
     }
 }
 ```
@@ -283,3 +338,4 @@ class UserIndexer
 - `IndexableVO` - Value Object de configuration
 - `ClusterVO` - Value Object pour les tags de regroupement
 - `IndexerInterface` - Service d'indexation principal
+- `IndexerConfigInterface` - Configuration du package
