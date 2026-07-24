@@ -117,6 +117,7 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
         $this->assertStringContainsString('All '.TestDoctor::class.' indexed successfully', $response->output);
         $this->assertStringContainsString('All '.TestPharmacy::class.' indexed successfully', $response->output);
         $this->assertStringContainsString('All '.TestProduct::class.' indexed successfully', $response->output);
+        $this->assertStringContainsString('new items indexed', $response->output);
     }
 
     public function test_index_only_doctors(): void
@@ -170,7 +171,7 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
         $response = $this->service->run('index:models 10 ['.TestDoctor::class.']');
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
-        $this->assertStringContainsString('batch: 10', $response->output);
+        $this->assertStringContainsString('Batch size: 10', $response->output);
 
         $genericIndexer = $this->app->make(GenericIndexerInterface::class);
         $cluster = new ClusterVO('type:doctor|status:active');
@@ -188,7 +189,7 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
         $response = $this->service->run('index:models _ 10 ['.TestDoctor::class.']');
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
-        $this->assertStringContainsString('limit: 10', $response->output);
+        $this->assertStringContainsString('Limit: 10', $response->output);
 
         $genericIndexer = $this->app->make(GenericIndexerInterface::class);
         $cluster = new ClusterVO('type:doctor|status:active');
@@ -206,8 +207,8 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
         $response = $this->service->run('index:models 5 15 ['.TestDoctor::class.']');
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
-        $this->assertStringContainsString('batch: 5', $response->output);
-        $this->assertStringContainsString('limit: 15', $response->output);
+        $this->assertStringContainsString('Batch size: 5', $response->output);
+        $this->assertStringContainsString('Limit: 15', $response->output);
 
         $genericIndexer = $this->app->make(GenericIndexerInterface::class);
         $cluster = new ClusterVO('type:doctor|status:active');
@@ -222,14 +223,17 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
             $this->createDoctor();
         }
 
+        $genericIndexer = $this->app->make(GenericIndexerInterface::class);
+        $cluster = new ClusterVO('type:doctor|status:active');
+        $indexableVO = new IndexableVO(TestDoctor::class, $cluster);
+        $genericIndexer->indexAll($indexableVO);
+
         $response = $this->service->run('index:models 5 10 ['.TestDoctor::class.'] --reindex');
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
         $this->assertStringContainsString('All '.TestDoctor::class.' reindexed successfully', $response->output);
+        $this->assertStringContainsString('items indexed', $response->output);
 
-        $genericIndexer = $this->app->make(GenericIndexerInterface::class);
-        $cluster = new ClusterVO('type:doctor|status:active');
-        $indexableVO = new IndexableVO(TestDoctor::class, $cluster);
         $count = $genericIndexer->countIndexed($indexableVO);
         $this->assertEquals(10, $count);
     }
@@ -288,6 +292,7 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
         $this->assertStringContainsString('Indexed '.TestDoctor::class.': 1', $response->output);
         $this->assertStringContainsString('Indexed '.TestPharmacy::class.': 1', $response->output);
         $this->assertStringContainsString('Indexed '.TestProduct::class.': 1', $response->output);
+        $this->assertStringContainsString('Total indexed', $response->output);
     }
 
     public function test_delete_all_models(): void
@@ -316,6 +321,7 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
         $this->assertStringContainsString('All '.TestDoctor::class.' deleted from index', $response->output);
         $this->assertStringContainsString('All '.TestPharmacy::class.' deleted from index', $response->output);
         $this->assertStringContainsString('All '.TestProduct::class.' deleted from index', $response->output);
+        $this->assertStringContainsString('Total models cleared', $response->output);
 
         $doctorIndexable = new IndexableVO(TestDoctor::class, new ClusterVO('type:doctor'));
         $count = $genericIndexer->countIndexed($doctorIndexable);
@@ -380,11 +386,27 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
         $response = $this->service->run('index:models _ 00 ['.TestDoctor::class.']');
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
+        $this->assertStringContainsString('Limit: 0', $response->output);
 
         $genericIndexer = $this->app->make(GenericIndexerInterface::class);
         $cluster = new ClusterVO('type:doctor|status:active');
         $indexableVO = new IndexableVO(TestDoctor::class, $cluster);
         $count = $genericIndexer->countIndexed($indexableVO);
         $this->assertEquals(0, $count);
+    }
+
+    public function test_index_already_indexed_models(): void
+    {
+        $this->createDoctor();
+        $this->createPharmacy();
+
+        $response1 = $this->service->run('index:models ['.TestDoctor::class.','.TestPharmacy::class.']');
+        $this->assertSame(ExitCode::SUCCESS, $response1->exit_code);
+
+        $response2 = $this->service->run('index:models ['.TestDoctor::class.','.TestPharmacy::class.']');
+
+        $this->assertSame(ExitCode::SUCCESS, $response2->exit_code);
+        $this->assertStringContainsString('already indexed', $response2->output);
+        $this->assertStringContainsString('All items were already indexed', $response2->output);
     }
 }

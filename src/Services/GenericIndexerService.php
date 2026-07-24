@@ -72,7 +72,14 @@ final class GenericIndexerService implements GenericIndexerInterface
 
         $cluster = $this->buildCluster($indexableVO->getCluster());
         $record = IndexableRecordFactory::convert($model, $cluster);
-        $this->indexer->index($record);
+
+        // Vérifier si le document existe déjà
+        $fingerPrint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
+        if ($this->documentRepository->existsByFingerPrint($fingerPrint)) {
+            $this->indexer->refresh($record);
+        } else {
+            $this->indexer->index($record);
+        }
     }
 
     public function indexAll(IndexableVO $indexableVO): void
@@ -95,6 +102,13 @@ final class GenericIndexerService implements GenericIndexerInterface
 
                 if (! $model->shouldBeIndexed()) {
                     continue;
+                }
+
+                $fingerPrint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
+
+                // Supprimer le document s'il existe déjà (refresh)
+                if ($this->documentRepository->existsByFingerPrint($fingerPrint)) {
+                    $this->documentRepository->deleteByFingerPrint($fingerPrint);
                 }
 
                 $cluster = $this->buildCluster($indexableVO->getCluster());
