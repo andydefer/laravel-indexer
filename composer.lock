@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4665fa68b2861dac54c1adfe742690b4",
+    "content-hash": "131820aa90d5c91262d9f28b00890feb",
     "packages": [
         {
             "name": "andydefer/algo-kit",
