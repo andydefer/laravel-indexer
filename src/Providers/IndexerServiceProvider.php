@@ -7,6 +7,7 @@ namespace AndyDefer\LaravelIndexer\Providers;
 use AndyDefer\DomainStructures\Normalizers\Core\NormalizerInterface;
 use AndyDefer\DomainStructures\Normalizers\NormalizerChain;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
+use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexedTokenRepositoryInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
@@ -15,6 +16,7 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexDeleter;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexSearcher;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
+use AndyDefer\LaravelIndexer\Services\GenericIndexerService;
 use AndyDefer\LaravelIndexer\Services\IndexerService;
 use AndyDefer\PhpServices\Configs\TextNormalizerConfig;
 use AndyDefer\PhpServices\Contracts\Services\NGramGeneratorInterface;
@@ -141,6 +143,22 @@ final class IndexerServiceProvider extends ServiceProvider
         });
 
         // ============================================================
+        // GENERIC INDEXER SERVICE
+        // ============================================================
+
+        $this->app->singleton(GenericIndexerInterface::class, function ($app) {
+            return new GenericIndexerService(
+                indexer: $app->make(IndexerInterface::class),
+                documentRepository: $app->make(IndexedDocumentRepositoryInterface::class),
+                batchSize: 50,
+            );
+        });
+
+        $this->app->singleton(GenericIndexerService::class, function ($app) {
+            return $app->make(GenericIndexerInterface::class);
+        });
+
+        // ============================================================
         // ALIAS
         // ============================================================
 
@@ -150,6 +168,8 @@ final class IndexerServiceProvider extends ServiceProvider
         $this->app->alias(IndexWriter::class, 'indexer.writer');
         $this->app->alias(IndexDeleter::class, 'indexer.deleter');
         $this->app->alias(IndexSearcher::class, 'indexer.searcher');
+        $this->app->alias(GenericIndexerInterface::class, 'indexer.generic');
+        $this->app->alias(GenericIndexerService::class, 'indexer.generic.service');
     }
 
     public function boot(): void

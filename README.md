@@ -5,13 +5,12 @@
 [![Laravel Version](https://img.shields.io/badge/Laravel-10%2F11%2F12%2F13%2F14%2F15-ff2d20.svg)](https://laravel.com)
 [![License](https://img.shields.io/packagist/l/andydefer/laravel-indexer.svg)](https://packagist.org/packages/andydefer/laravel-indexer)
 
----
-
 ## Table des matières
 
 - [Installation](#installation)
 - [Préparer votre modèle](#préparer-votre-modèle)
 - [Indexer des données](#indexer-des-données)
+- [GenericIndexerService](#genericindexerservice)
 - [Rechercher](#rechercher)
 - [Les clusters](#les-clusters)
 - [Autocomplétion](#autocomplétion)
@@ -19,7 +18,6 @@
 - [Repositories](#repositories)
 - [Collections](#collections)
 
----
 
 ## Installation
 
@@ -156,6 +154,139 @@ public function updateUser(User $user): void
     $cluster = new ClusterVO('tenant:' . $user->tenant_id);
     $record = IndexableRecordFactory::convert($user, $cluster);
     $this->indexer->refresh($record);
+}
+```
+
+---
+
+## GenericIndexerService
+
+Service générique d'indexation qui fonctionne avec n'importe quel modèle Eloquent implémentant `Indexable`. Il gère automatiquement le chunking et les opérations CRUD sur l'index.
+
+### Injection du service
+
+```php
+use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
+
+class UserIndexer
+{
+    public function __construct(
+        private readonly GenericIndexerInterface $genericIndexer,
+    ) {}
+}
+```
+
+### Indexer un document spécifique
+
+```php
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
+
+$cluster = new ClusterVO('type:user|role:doctor|status:active');
+$indexableVO = new IndexableVO(
+    modelClass: User::class,
+    cluster: $cluster
+);
+
+$this->genericIndexer->index($indexableVO, $userId);
+```
+
+### Indexer tous les documents
+
+```php
+$cluster = new ClusterVO('type:user|role:doctor');
+$indexableVO = new IndexableVO(User::class, $cluster);
+
+// Indexe tous les utilisateurs actifs par lots
+$this->genericIndexer->indexAll($indexableVO);
+```
+
+### Reconstruire tout l'index
+
+```php
+// Supprime puis réindexe tous les utilisateurs
+$this->genericIndexer->reindexAll($indexableVO);
+```
+
+### Supprimer un document de l'index
+
+```php
+$this->genericIndexer->delete($indexableVO, $userId);
+```
+
+### Supprimer tous les documents d'un type
+
+```php
+$this->genericIndexer->deleteAll($indexableVO);
+```
+
+### Rafraîchir un document
+
+```php
+// Met à jour le document dans l'index
+$this->genericIndexer->refresh($indexableVO, $userId);
+```
+
+### Compter les documents indexés
+
+```php
+$count = $this->genericIndexer->countIndexed($indexableVO);
+```
+
+### Vérifier l'existence
+
+```php
+if ($this->genericIndexer->exists($indexableVO, $userId)) {
+    // L'utilisateur est indexé
+}
+```
+
+### Configurer la taille des lots
+
+```php
+$this->genericIndexer->setBatchSize(100)->indexAll($indexableVO);
+```
+
+### Exemple complet
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
+
+class DoctorIndexer
+{
+    public function __construct(
+        private readonly GenericIndexerInterface $genericIndexer,
+    ) {}
+
+    public function indexDoctor(int $doctorId): void
+    {
+        $cluster = new ClusterVO('type:doctor|specialty:cardiology|status:active');
+        $indexableVO = new IndexableVO(Doctor::class, $cluster);
+        
+        $this->genericIndexer->index($indexableVO, $doctorId);
+    }
+
+    public function reindexAllDoctors(): void
+    {
+        $cluster = new ClusterVO('type:doctor|status:active');
+        $indexableVO = new IndexableVO(Doctor::class, $cluster);
+        
+        $this->genericIndexer->setBatchSize(50)->reindexAll($indexableVO);
+    }
+
+    public function getIndexedDoctorCount(): int
+    {
+        $cluster = new ClusterVO('type:doctor');
+        $indexableVO = new IndexableVO(Doctor::class, $cluster);
+        
+        return $this->genericIndexer->countIndexed($indexableVO);
+    }
 }
 ```
 
