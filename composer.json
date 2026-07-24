@@ -22,7 +22,7 @@
         "laravel/framework": "^12.0|^13.0|^14.0|^15.0",
         "andydefer/jsonl-cache": "^0.3.14",
         "andydefer/laravel-logger": "^3.9.6",
-        "andydefer/laravel-task": "^4.10"
+        "andydefer/laravel-task": "^4.10.4"
     },
     "require-dev": {
         "orchestra/testbench": "^9.0|^10.0",
