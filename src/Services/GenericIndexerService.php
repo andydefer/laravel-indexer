@@ -65,23 +65,22 @@ final class GenericIndexerService implements GenericIndexerInterface
     {
         $modelClass = $indexableVO->getModelClass();
 
-        $modelClass::where('is_active', true)
-            ->chunk($this->batchSize, function ($models) use ($indexableVO) {
-                $records = new IndexableRecordCollection;
+        $modelClass::chunk($this->batchSize, function ($models) use ($indexableVO) {
+            $records = new IndexableRecordCollection;
 
-                foreach ($models as $model) {
-                    if (! $model->shouldBeIndexed()) {
-                        continue;
-                    }
-
-                    $cluster = $this->buildCluster($indexableVO->getCluster());
-                    $records->add(IndexableRecordFactory::convert($model, $cluster));
+            foreach ($models as $model) {
+                if (! $model->shouldBeIndexed()) {
+                    continue;
                 }
 
-                if ($records->isNotEmpty()) {
-                    $this->indexer->indexMany($records);
-                }
-            });
+                $cluster = $this->buildCluster($indexableVO->getCluster());
+                $records->add(IndexableRecordFactory::convert($model, $cluster));
+            }
+
+            if ($records->isNotEmpty()) {
+                $this->indexer->indexMany($records);
+            }
+        });
     }
 
     public function reindexAll(IndexableVO $indexableVO): void
