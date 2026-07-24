@@ -17,7 +17,13 @@ final class GenericIndexModelsDirective extends AbstractDirective
 {
     public function getSignature(): string
     {
-        return 'index:models {batch=50} {limit=?} {models*} {--reindex} {--count} {--delete}';
+        return 'index:models 
+                {batch=50}#"Batch size for chunking (default: 50)" 
+                {limit=?}#"Maximum number of items to index (unlimited if omitted)" 
+                {models*}#"List of models to index (dot notation: App.Models.User)" 
+                {--reindex}#"Delete then reindex all models" 
+                {--count}#"Count indexed documents" 
+                {--delete}#"Delete all indexed documents"';
     }
 
     public function getDescription(): string
