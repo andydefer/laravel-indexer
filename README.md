@@ -9,13 +9,22 @@
 
 - [Installation](#installation)
 - [Préparer votre modèle](#préparer-votre-modèle)
+- [Les Clusters](#les-clusters)
+  - [Créer un Cluster](#créer-un-cluster)
+  - [Lire un Cluster](#lire-un-cluster)
+  - [Ajouter des valeurs](#ajouter-des-valeurs)
+  - [Méthodes conditionnelles](#méthodes-conditionnelles)
+  - [Supprimer des valeurs](#supprimer-des-valeurs)
+  - [Vérification](#vérification)
+  - [Méthodes statiques](#méthodes-statiques)
+  - [Conversion](#conversion)
+  - [Exemples avancés](#exemples-avancés)
 - [Indexer des données](#indexer-des-données)
 - [GenericIndexerService](#genericindexerservice)
 - [GenericIndexModelsDirective](#genericindexmodelsdirective)
 - [GenericOrchestratorRecurringTask](#genericorchestratorrecurringtask)
 - [GenericIndexBatchUniqueTask](#genericindexbatchuniquetask)
 - [Rechercher](#rechercher)
-- [Les clusters](#les-clusters)
 - [Autocomplétion](#autocomplétion)
 - [Supprimer](#supprimer)
 - [Repositories](#repositories)
@@ -36,7 +45,7 @@ php artisan vendor:publish --tag=indexer-migrations
 php artisan migrate
 ```
 
-### Configuration (optionnel)
+### Configuration
 
 ```bash
 php artisan vendor:publish --tag=indexer-config
@@ -55,8 +64,9 @@ return [
     'default_limit' => 100,
     'batch_size' => 50,
     'model_indexables' => [
-        // App\Models\User::class => 'type:user|status:active',
-        // App\Models\Hospital::class => 'type:hospital|status:active',
+        App\Models\User::class,
+        App\Models\Hospital::class,
+        App\Models\Specialty::class,
     ],
 ];
 ```
@@ -74,15 +84,22 @@ namespace App\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 
 class User extends Model implements Indexable
 {
+    /**
+     * Détermine si le modèle doit être indexé.
+     */
     public function shouldBeIndexed(): bool
     {
         return $this->is_active;
     }
 
+    /**
+     * Retourne les données à indexer.
+     */
     public function getIndexableData(): StrictAssociative
     {
         return StrictAssociative::from([
@@ -90,6 +107,7 @@ class User extends Model implements Indexable
             'email' => $this->email,
             'bio' => $this->bio,
             'skills' => $this->skills,
+            'role' => $this->role,
             'profile' => [
                 'twitter' => $this->twitter,
                 'github' => $this->github,
@@ -97,16 +115,540 @@ class User extends Model implements Indexable
         ]);
     }
 
+    /**
+     * Retourne l'identifiant unique du modèle.
+     */
     public function getKey()
     {
         return $this->id;
     }
 
+    /**
+     * Retourne le nom de la classe morph.
+     */
     public function getMorphClass()
     {
         return self::class;
     }
+
+    /**
+     * Génère le cluster dynamique du modèle.
+     * 
+     * Le cluster permet de filtrer les recherches par contexte
+     * (tenant, environnement, rôle, statut, etc.).
+     */
+    public function getIndexableCluster(): ClusterVO
+    {
+        return ClusterVO::make('type', 'user')
+            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
+            ->whenNotEmpty('role', $this->role)
+            ->whenKeyExists('tenant', $this->metadata ?? [], 'tenant')
+            ->whenBool('verified', $this->email_verified_at !== null);
+    }
 }
+```
+
+---
+
+## Les Clusters
+
+Le cluster est un **filtre contextuel** permettant de filtrer les recherches par contexte (tenant, environnement, rôle, statut, etc.). C'est un élément clé de l'indexation qui permet une recherche multi-contextes.
+
+### Format du cluster
+
+```
+key1:value1|key2:value2,value3|key3:value4,value5,value6
+```
+
+| Élément | Description |
+|---------|-------------|
+| `key:value` | Paire clé-valeur |
+| `key:value1,value2` | Plusieurs valeurs pour une même clé |
+| `|` | Séparateur de groupes |
+| `,` | Séparateur de valeurs multiples |
+
+### Créer un Cluster
+
+#### Constructeur classique
+
+```php
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+
+// Cluster simple
+$cluster = new ClusterVO('tenant:company_abc');
+
+// Cluster multi-attributs
+$cluster = new ClusterVO('tenant:company_abc|env:production|region:europe');
+
+// Cluster avec valeurs multiples
+$cluster = new ClusterVO('tenant:company_abc,company_xyz|category:electronics,music');
+```
+
+#### Méthode `make()` - Builder fluent
+
+La méthode `make()` permet une construction fluide et lisible :
+
+```php
+$cluster = ClusterVO::make('type', 'user')
+    ->with('role', 'doctor')
+    ->with('status', 'active');
+// Résultat: type:user|role:doctor|status:active
+```
+
+#### Méthode `fromPairs()`
+
+```php
+$cluster = ClusterVO::fromPairs([
+    'type' => 'user',
+    'role' => 'doctor',
+    'status' => 'active',
+]);
+// Résultat: type:user|role:doctor|status:active
+
+// Avec valeurs multiples
+$cluster = ClusterVO::fromPairs([
+    'type' => 'user',
+    'role' => ['doctor', 'admin'],
+    'status' => 'active',
+]);
+// Résultat: type:user|role:doctor,admin|status:active
+```
+
+---
+
+### Lire un Cluster
+
+#### `get(string $key): array`
+
+Retourne toutes les valeurs pour une clé donnée.
+
+```php
+$cluster = new ClusterVO('tenant:company_abc,company_xyz|env:production');
+
+$cluster->get('tenant');  // ['company_abc', 'company_xyz']
+$cluster->get('env');     // ['production']
+$cluster->get('unknown'); // []
+```
+
+#### `getFirst(string $key): ?string`
+
+Retourne la première valeur pour une clé.
+
+```php
+$cluster = new ClusterVO('role:doctor,admin');
+
+$cluster->getFirst('role'); // 'doctor'
+$cluster->getFirst('unknown'); // null
+```
+
+#### `has(string $key): bool`
+
+Vérifie si une clé existe.
+
+```php
+$cluster = new ClusterVO('tenant:company_abc|env:production');
+
+$cluster->has('tenant');  // true
+$cluster->has('unknown'); // false
+```
+
+#### `contains(string $key, string $value): bool`
+
+Vérifie si une clé contient une valeur spécifique.
+
+```php
+$cluster = new ClusterVO('role:doctor,admin');
+
+$cluster->contains('role', 'doctor');  // true
+$cluster->contains('role', 'admin');   // true
+$cluster->contains('role', 'unknown'); // false
+```
+
+#### `all(): array`
+
+Retourne toutes les paires clé-valeur.
+
+```php
+$cluster = new ClusterVO('type:user|role:doctor,admin|status:active');
+
+$cluster->all();
+// [
+//     'type' => ['user'],
+//     'role' => ['doctor', 'admin'],
+//     'status' => ['active'],
+// ]
+```
+
+---
+
+### Ajouter des valeurs
+
+#### `with(string $key, string $value): self`
+
+Ajoute une valeur à une clé (ou crée la clé).
+
+```php
+$cluster = ClusterVO::make('type', 'user')
+    ->with('role', 'doctor')
+    ->with('status', 'active');
+// type:user|role:doctor|status:active
+
+// Ajout à une clé existante (les valeurs ne sont pas dupliquées)
+$cluster = ClusterVO::make('type', 'user')
+    ->with('role', 'doctor')
+    ->with('role', 'admin');
+// type:user|role:doctor,admin
+```
+
+#### `withIf(bool $condition, string $key, string $value): self`
+
+Ajoute une valeur uniquement si la condition est vraie.
+
+```php
+$cluster = ClusterVO::make('type', 'user')
+    ->withIf($isAdmin, 'role', 'admin')
+    ->withIf($isActive, 'status', 'active');
+```
+
+#### `withMany(string $key, array $values): self`
+
+Ajoute plusieurs valeurs à une clé.
+
+```php
+$cluster = ClusterVO::make('type', 'user')
+    ->withMany('role', ['doctor', 'admin', 'manager']);
+// type:user|role:doctor,admin,manager
+```
+
+#### `withManyIf(bool $condition, string $key, array $values): self`
+
+Ajoute plusieurs valeurs uniquement si la condition est vraie.
+
+```php
+$cluster = ClusterVO::make('type', 'user')
+    ->withManyIf($hasMultipleRoles, 'role', ['doctor', 'admin']);
+```
+
+#### `withDefault(string $key, mixed $value, string $default): self`
+
+Ajoute une valeur avec une valeur par défaut si la valeur est nulle ou vide.
+
+```php
+// Avec une valeur
+$cluster = ClusterVO::make('type', 'user')
+    ->withDefault('status', 'active', 'pending');
+// type:user|status:active
+
+// Avec une valeur par défaut
+$cluster = ClusterVO::make('type', 'user')
+    ->withDefault('status', null, 'pending');
+// type:user|status:pending
+
+// false est considéré comme une valeur valide
+$cluster = ClusterVO::make('type', 'user')
+    ->withDefault('active', false, 'true');
+// type:user|active:false
+
+// 0 est considéré comme une valeur valide
+$cluster = ClusterVO::make('type', 'user')
+    ->withDefault('count', 0, '1');
+// type:user|count:0
+```
+
+#### `withTernary(string $key, bool $condition, string $trueValue, string $falseValue): self`
+
+Ajoute une paire clé-valeur en fonction d'un booléen.
+
+```php
+$cluster = ClusterVO::make('type', 'user')
+    ->withTernary('status', $isActive, 'active', 'inactive')
+    ->withTernary('verified', $isVerified, 'true', 'false');
+// status:active|verified:true (si les conditions sont vraies)
+```
+
+---
+
+### Méthodes conditionnelles
+
+Ces méthodes ajoutent des paires uniquement si certaines conditions sont remplies.
+
+#### `whenNotEmpty(string $key, mixed $value): self`
+
+Ajoute une valeur si elle n'est pas vide.
+
+```php
+$cluster = ClusterVO::make('type', 'user')
+    ->whenNotEmpty('city', $user->city)
+    ->whenNotEmpty('country', $user->country)
+    ->whenNotEmpty('role', $user->role);
+// type:user|city:Paris|country:France|role:doctor
+
+// false est considéré comme une valeur valide
+$cluster = ClusterVO::make('type', 'user')
+    ->whenNotEmpty('active', false);
+// type:user|active:false
+
+// 0 est considéré comme une valeur valide
+$cluster = ClusterVO::make('type', 'user')
+    ->whenNotEmpty('count', 0);
+// type:user|count:0
+```
+
+#### `whenNotNull(string $key, mixed $value): self`
+
+Ajoute une valeur si elle n'est pas nulle.
+
+```php
+$cluster = ClusterVO::make('type', 'user')
+    ->whenNotNull('role', $user->role)
+    ->whenNotNull('tenant', $user->tenant_id);
+// type:user|role:doctor|tenant:company_abc
+```
+
+#### `whenKeyExists(string $key, array $array, string $arrayKey): self`
+
+Ajoute une valeur si une clé existe dans un tableau et n'est pas vide.
+
+```php
+$metadata = ['role' => 'doctor', 'tenant' => 'company_abc'];
+
+$cluster = ClusterVO::make('type', 'user')
+    ->whenKeyExists('role', $metadata, 'role')     // ✅ 'doctor'
+    ->whenKeyExists('tenant', $metadata, 'tenant') // ✅ 'company_abc'
+    ->whenKeyExists('unknown', $metadata, 'unknown'); // ❌ Ignoré
+// type:user|role:doctor|tenant:company_abc
+```
+
+#### `whenArrayNotEmpty(string $key, array $values, string $separator = ','): self`
+
+Ajoute une valeur si le tableau n'est pas vide.
+
+```php
+$tags = ['php', 'laravel', 'react'];
+
+$cluster = ClusterVO::make('type', 'user')
+    ->whenArrayNotEmpty('tags', $tags);
+// type:user|tags:php,laravel,react
+
+// Avec séparateur personnalisé
+$cluster = ClusterVO::make('type', 'user')
+    ->whenArrayNotEmpty('tags', $tags, ';');
+// type:user|tags:php;laravel;react
+```
+
+#### `whenNumeric(string $key, mixed $value): self`
+
+Ajoute une valeur si elle est numérique.
+
+```php
+$cluster = ClusterVO::make('type', 'user')
+    ->whenNumeric('age', 25)           // ✅ 25
+    ->whenNumeric('age', '30')         // ✅ '30'
+    ->whenNumeric('score', null)       // ❌ null
+    ->whenNumeric('rating', 'not a number'); // ❌ Non numérique
+// type:user|age:25|age:30
+```
+
+#### `whenBool(string $key, mixed $value): self`
+
+Ajoute une valeur si elle est booléenne.
+
+```php
+$cluster = ClusterVO::make('type', 'user')
+    ->whenBool('verified', true)   // ✅ true → 'true'
+    ->whenBool('active', false)    // ✅ false → 'false'
+    ->whenBool('role', 'doctor');  // ❌ Non booléen
+// type:user|verified:true|active:false
+```
+
+---
+
+### Supprimer des valeurs
+
+#### `without(string $key, ?string $value = null): self`
+
+Supprime une valeur ou toute une clé.
+
+```php
+$cluster = new ClusterVO('type:user|role:doctor,admin|status:active');
+
+// Supprime une valeur spécifique
+$new = $cluster->without('role', 'admin');
+// type:user|role:doctor|status:active
+
+// Supprime toute la clé
+$new = $cluster->without('role');
+// type:user|status:active
+
+// Si la clé n'existe pas, retourne l'instance inchangée
+$new = $cluster->without('unknown');
+// type:user|role:doctor,admin|status:active (inchangé)
+```
+
+---
+
+### Vérification
+
+#### `hasAll(array $keys): bool`
+
+Vérifie si toutes les clés existent.
+
+```php
+$cluster = new ClusterVO('type:user|role:doctor|status:active');
+
+$cluster->hasAll(['type', 'role']);       // true
+$cluster->hasAll(['type', 'role', 'status']); // true
+$cluster->hasAll(['type', 'unknown']);     // false
+```
+
+#### `hasAny(array $keys): bool`
+
+Vérifie si au moins une des clés existe.
+
+```php
+$cluster = new ClusterVO('type:user|role:doctor');
+
+$cluster->hasAny(['type', 'unknown']);  // true
+$cluster->hasAny(['unknown', 'type']);  // true
+$cluster->hasAny(['unknown1', 'unknown2']); // false
+```
+
+---
+
+### Méthodes statiques
+
+#### `make(string $key, string $value): self`
+
+Crée un cluster avec une paire clé-valeur initiale.
+
+```php
+$cluster = ClusterVO::make('type', 'user')
+    ->with('role', 'doctor')
+    ->with('status', 'active');
+```
+
+#### `fromPairs(array $pairs): self`
+
+Crée un cluster à partir d'un tableau de paires.
+
+```php
+$cluster = ClusterVO::fromPairs([
+    'type' => 'user',
+    'role' => ['doctor', 'admin'],
+    'status' => 'active',
+]);
+// type:user|role:doctor,admin|status:active
+```
+
+---
+
+### Conversion
+
+#### `getValue(): string`
+
+Retourne la chaîne brute du cluster.
+
+```php
+$cluster = new ClusterVO('type:user|role:doctor');
+$cluster->getValue(); // 'type:user|role:doctor'
+```
+
+#### `__toString(): string`
+
+Alias de `getValue()`.
+
+```php
+$cluster = new ClusterVO('type:user|role:doctor');
+echo $cluster; // 'type:user|role:doctor'
+```
+
+#### `toArray(): array`
+
+Retourne le cluster sous forme de tableau.
+
+```php
+$cluster = new ClusterVO('type:user|role:doctor,admin');
+$cluster->toArray();
+// ['type' => ['user'], 'role' => ['doctor', 'admin']]
+```
+
+---
+
+### Exemples avancés
+
+#### Exemple 1: Modèle avec métadonnées
+
+```php
+public function getIndexableCluster(): ClusterVO
+{
+    return ClusterVO::make('type', 'user')
+        ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
+        ->withTernary('verified', (bool) $this->email_verified_at, 'true', 'false')
+        ->whenNotEmpty('role', $this->role)
+        ->whenKeyExists('tenant', $this->metadata ?? [], 'tenant')
+        ->whenKeyExists('region', $this->metadata ?? [], 'region')
+        ->whenArrayNotEmpty('tags', $this->tags ?? []);
+}
+// type:user|status:active|verified:true|role:admin|tenant:company_abc|tags:php,laravel
+```
+
+#### Exemple 2: Modèle multi-tenant
+
+```php
+public function getIndexableCluster(): ClusterVO
+{
+    $cluster = ClusterVO::make('type', 'doctor')
+        ->with('tenant', $this->tenant_id)
+        ->withTernary('status', $this->is_available, 'available', 'unavailable')
+        ->whenNotEmpty('specialty', $this->specialty)
+        ->whenNotEmpty('city', $this->city)
+        ->whenNumeric('experience', $this->years_of_experience);
+
+    if ($this->is_featured) {
+        $cluster = $cluster->with('featured', 'true');
+    }
+
+    return $cluster;
+}
+// tenant:company_abc|status:available|specialty:cardiology|city:Paris|experience:10|featured:true
+```
+
+#### Exemple 3: Construction dynamique avec validation
+
+```php
+public function getIndexableCluster(): ClusterVO
+{
+    return ClusterVO::make('type', 'hospital')
+        ->withTernary('status', $this->is_active, 'active', 'inactive')
+        ->whenNotEmpty('city', $this->city)
+        ->whenNotEmpty('country', $this->country)
+        ->withIf($this->hasEmergencyService(), 'emergency', 'true')
+        ->withIf($this->hasMaternity(), 'maternity', 'true')
+        ->whenNumeric('capacity', $this->capacity);
+}
+```
+
+#### Exemple 4: Recherche avec cluster multiple
+
+```php
+use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
+
+// Recherche des médecins actifs en cardiologie à Paris
+$cluster = ClusterVO::fromPairs([
+    'type' => 'doctor',
+    'status' => 'active',
+    'specialty' => 'cardiology',
+    'city' => 'Paris',
+]);
+
+$query = new SearchQueryRecord(
+    query: new SearchQueryVO('cardiologue=name,specialty'),
+    cluster: $cluster
+);
+
+$results = $this->indexer->search($query);
 ```
 
 ---
@@ -118,7 +660,6 @@ class User extends Model implements Indexable
 ```php
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 
 class UserService
 {
@@ -128,8 +669,7 @@ class UserService
 
     public function indexUser(User $user): void
     {
-        $cluster = new ClusterVO('tenant:' . $user->tenant_id);
-        $record = IndexableRecordFactory::convert($user, $cluster);
+        $record = IndexableRecordFactory::convert($user);
         $this->indexer->index($record);
     }
 }
@@ -145,8 +685,7 @@ public function indexAllUsers(): void
     $records = new IndexableRecordCollection;
 
     foreach (User::where('is_active', true)->cursor() as $user) {
-        $cluster = new ClusterVO('tenant:' . $user->tenant_id);
-        $records->add(IndexableRecordFactory::convert($user, $cluster));
+        $records->add(IndexableRecordFactory::convert($user));
     }
 
     $this->indexer->indexMany($records);
@@ -159,9 +698,7 @@ public function indexAllUsers(): void
 public function updateUser(User $user): void
 {
     $user->save();
-    
-    $cluster = new ClusterVO('tenant:' . $user->tenant_id);
-    $record = IndexableRecordFactory::convert($user, $cluster);
+    $record = IndexableRecordFactory::convert($user);
     $this->indexer->refresh($record);
 }
 ```
@@ -185,76 +722,83 @@ class UserIndexer
 }
 ```
 
-### Indexer un document spécifique
+### Indexer un document
 
 ```php
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
+// Avec le modèle directement
+$user = User::find($userId);
+$this->genericIndexer->index($user);
 
-$cluster = new ClusterVO('type:user|role:doctor|status:active');
-$indexableVO = new IndexableVO(
-    modelClass: User::class,
-    cluster: $cluster
-);
-
-$this->genericIndexer->index($indexableVO, $userId);
+// Ou avec la classe et l'ID
+$this->genericIndexer->indexById(User::class, $userId);
 ```
 
 ### Indexer tous les documents
 
 ```php
-$cluster = new ClusterVO('type:user|role:doctor');
-$indexableVO = new IndexableVO(User::class, $cluster);
-
-$this->genericIndexer->indexAll($indexableVO);
+$this->genericIndexer->indexAll(User::class);
 ```
 
 ### Indexer avec batch et limite
 
 ```php
-$cluster = new ClusterVO('type:doctor|status:active');
-$indexableVO = new IndexableVO(Doctor::class, $cluster);
-
 $this->genericIndexer
     ->setBatchSize(50)
     ->setLimit(1000)
-    ->indexAll($indexableVO);
+    ->indexAll(Doctor::class);
 ```
 
 ### Reconstruire tout l'index
 
 ```php
-$this->genericIndexer->reindexAll($indexableVO);
+$this->genericIndexer->reindexAll(User::class);
 ```
 
-### Supprimer un document de l'index
+### Supprimer un document
 
 ```php
-$this->genericIndexer->delete($indexableVO, $userId);
+// Avec le modèle directement
+$user = User::find($userId);
+$this->genericIndexer->delete($user);
+
+// Ou avec la classe et l'ID
+$this->genericIndexer->deleteById(User::class, $userId);
 ```
 
 ### Supprimer tous les documents d'un type
 
 ```php
-$this->genericIndexer->deleteAll($indexableVO);
+$this->genericIndexer->deleteAll(User::class);
 ```
 
 ### Rafraîchir un document
 
 ```php
-$this->genericIndexer->refresh($indexableVO, $userId);
+// Avec le modèle directement
+$user = User::find($userId);
+$this->genericIndexer->refresh($user);
+
+// Ou avec la classe et l'ID
+$this->genericIndexer->refreshById(User::class, $userId);
 ```
 
 ### Compter les documents indexés
 
 ```php
-$count = $this->genericIndexer->countIndexed($indexableVO);
+$count = $this->genericIndexer->countIndexed(User::class);
 ```
 
 ### Vérifier l'existence
 
 ```php
-if ($this->genericIndexer->exists($indexableVO, $userId)) {
+// Avec le modèle directement
+$user = User::find($userId);
+if ($this->genericIndexer->exists($user)) {
+    // L'utilisateur est indexé
+}
+
+// Ou avec la classe et l'ID
+if ($this->genericIndexer->existsById(User::class, $userId)) {
     // L'utilisateur est indexé
 }
 ```
@@ -267,8 +811,6 @@ if ($this->genericIndexer->exists($indexableVO, $userId)) {
 declare(strict_types=1);
 
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
 
 class DoctorIndexer
 {
@@ -278,37 +820,28 @@ class DoctorIndexer
 
     public function indexDoctor(int $doctorId): void
     {
-        $cluster = new ClusterVO('type:doctor|specialty:cardiology|status:active');
-        $indexableVO = new IndexableVO(Doctor::class, $cluster);
-        
-        $this->genericIndexer->index($indexableVO, $doctorId);
+        $doctor = Doctor::find($doctorId);
+        if ($doctor) {
+            $this->genericIndexer->index($doctor);
+        }
     }
 
     public function reindexAllDoctors(): void
     {
-        $cluster = new ClusterVO('type:doctor|status:active');
-        $indexableVO = new IndexableVO(Doctor::class, $cluster);
-        
         $this->genericIndexer
             ->setBatchSize(50)
             ->setLimit(10000)
-            ->reindexAll($indexableVO);
+            ->reindexAll(Doctor::class);
     }
 
     public function getIndexedDoctorCount(): int
     {
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(Doctor::class, $cluster);
-        
-        return $this->genericIndexer->countIndexed($indexableVO);
+        return $this->genericIndexer->countIndexed(Doctor::class);
     }
 
     public function cleanupDoctorIndex(): void
     {
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(Doctor::class, $cluster);
-        
-        $this->genericIndexer->deleteAll($indexableVO);
+        $this->genericIndexer->deleteAll(Doctor::class);
     }
 }
 ```
@@ -358,14 +891,14 @@ index:models {batch=50} {limit=?} {models*} {--reindex} {--count} {--delete}
 ./bin/directive index:models _ 20 [App.Models.User]
 ```
 
-### Intégration avec la config
+### Configuration
 
 ```php
 // config/indexer.php
 'model_indexables' => [
-    App\Models\User::class => 'type:user|status:active',
-    App\Models\Hospital::class => 'type:hospital|status:active',
-    App\Models\Specialty::class => 'type:specialty|status:active',
+    App\Models\User::class,
+    App\Models\Hospital::class,
+    App\Models\Specialty::class,
 ],
 ```
 
@@ -381,8 +914,8 @@ Tâche récurrente qui orchestre l'indexation de tous les modèles configurés. 
 // config/indexer.php
 'batch_size' => 50,
 'model_indexables' => [
-    App\Models\User::class => 'type:user|status:active',
-    App\Models\Hospital::class => 'type:hospital|status:active',
+    App\Models\User::class,
+    App\Models\Hospital::class,
 ],
 ```
 
@@ -399,51 +932,68 @@ Tâche récurrente qui orchestre l'indexation de tous les modèles configurés. 
 use AndyDefer\LaravelIndexer\Tasks\RecurringTasks\GenericOrchestratorRecurringTask;
 
 // La tâche est automatiquement enregistrée par le provider
-// Ou manuellement via le système de tâches
 ```
 
 ---
 
 ## GenericIndexBatchUniqueTask
 
-Tâche unique qui indexe un lot d'éléments pour un modèle spécifique.
+Tâche unique qui indexe un lot d'éléments pour plusieurs modèles.
 
 ### Payload
 
 ```json
 {
-    "indexable": {
-        "modelClass": "App\\Models\\User",
-        "cluster": "type:user|status:active"
-    },
-    "ids": [1, 2, 3, 4, 5]
+    "items": [
+        {"modelClass": "App\\Models\\User", "id": 1},
+        {"modelClass": "App\\Models\\User", "id": 2},
+        {"modelClass": "App\\Models\\Hospital", "id": 3}
+    ]
 }
 ```
 
 ### Fonctionnement
 
-1. Reçoit un `IndexableVO` et une liste d'IDs
-2. Récupère chaque modèle par son ID
-3. Vérifie si le modèle est éligible (`shouldBeIndexed()`)
-4. Supprime le document s'il existe déjà (re-indexation)
-5. Indexe le modèle avec le cluster configuré
+1. Reçoit une `IndexableVOCollection` contenant des paires `(modelClass, id)`
+2. Récupère toutes les instances en **UNE SEULE requête par classe**
+3. Pour chaque modèle, vérifie l'éligibilité (`shouldBeIndexed()`)
+4. Supprime le document s'il existe déjà
+5. Indexe le modèle avec son cluster dynamique (`getIndexableCluster()`)
 
 ### Utilisation manuelle
 
 ```php
+use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
 use AndyDefer\LaravelIndexer\Tasks\UniqueTasks\GenericIndexBatchUniqueTask;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+use AndyDefer\Task\Records\UniqueTaskConfigRecord;
+use AndyDefer\Task\ValueObjects\DescriptionVO;
+use AndyDefer\Task\ValueObjects\DurationVO;
+use AndyDefer\Task\ValueObjects\Iso8601DateTimeVO;
+use AndyDefer\Task\ValueObjects\MaxFailedAttemptsVO;
+use AndyDefer\Task\ValueObjects\UniqueTaskFqcnVO;
 
-$indexableVO = new IndexableVO(
-    modelClass: User::class,
-    cluster: new ClusterVO('type:user|status:active')
-);
+$collection = new IndexableVOCollection;
+$collection->add(new IndexableVO(User::class, 1));
+$collection->add(new IndexableVO(User::class, 2));
+$collection->add(new IndexableVO(Hospital::class, 3));
 
 $payload = StrictDataObject::from([
-    'indexable' => $indexableVO,
-    'ids' => [1, 2, 3, 4, 5],
+    'items' => $collection,
 ]);
+
+$config = UniqueTaskConfigRecord::from([
+    'scheduled_at' => new Iso8601DateTimeVO(now()->toIso8601String()),
+    'max_attempts' => new MaxFailedAttemptsVO(3),
+    'grace_period' => new DurationVO(3600),
+    'description' => new DescriptionVO('Batch task for indexing'),
+]);
+
+$uniqueTaskService->register(
+    new UniqueTaskFqcnVO(GenericIndexBatchUniqueTask::class),
+    $payload,
+    $config
+);
 ```
 
 ---
@@ -471,14 +1021,12 @@ use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
 
 public function searchUsers(string $query): array
 {
-    // Recherche "john" dans name, email, bio
     $searchQuery = new SearchQueryRecord(
         query: new SearchQueryVO($query . '=name,email,bio')
     );
 
     $results = $this->indexer->search($searchQuery);
     
-    // Récupérer les IDs
     $userIds = $results->getItems()->getIdValues()->toArray();
     
     return User::whereIn('id', $userIds)->get();
@@ -488,7 +1036,6 @@ public function searchUsers(string $query): array
 ### Recherche multi-termes (AND)
 
 ```php
-// "john" dans name ET "developer" dans bio
 $query = new SearchQueryRecord(
     query: new SearchQueryVO('john=name|developer=bio')
 );
@@ -497,7 +1044,6 @@ $query = new SearchQueryRecord(
 ### Recherche multi-champs (OR)
 
 ```php
-// "john" dans name OU email OU bio
 $query = new SearchQueryRecord(
     query: new SearchQueryVO('john=name,email,bio')
 );
@@ -512,14 +1058,36 @@ $query = new SearchQueryRecord(
 );
 ```
 
-### Filtrer par tenant (cluster)
+### Filtrer par cluster
 
 ```php
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 
+$cluster = ClusterVO::make('tenant', 'company_abc')
+    ->with('type', 'user')
+    ->with('status', 'active');
+
 $query = new SearchQueryRecord(
     query: new SearchQueryVO('john=name,email'),
-    cluster: new ClusterVO('tenant:company_abc')
+    cluster: $cluster
+);
+
+$results = $this->indexer->search($query);
+```
+
+### Filtrer par cluster avec `fromPairs()`
+
+```php
+$cluster = ClusterVO::fromPairs([
+    'tenant' => 'company_abc',
+    'type' => 'user',
+    'status' => ['active', 'pending'],
+    'role' => 'doctor',
+]);
+
+$query = new SearchQueryRecord(
+    query: new SearchQueryVO('john=name,email'),
+    cluster: $cluster
 );
 ```
 
@@ -530,60 +1098,6 @@ use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
 $fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
 $exists = $this->indexer->exists($fingerPrint);
-```
-
----
-
-## Les clusters
-
-Le cluster est un **filtre contextuel**. Il permet de filtrer les recherches par contexte (tenant, environnement, etc.).
-
-### Créer un cluster
-
-```php
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
-
-// Simple
-$cluster = new ClusterVO('tenant:company_abc');
-
-// Multiple
-$cluster = new ClusterVO('tenant:company_abc|env:production|region:europe');
-
-// Valeurs multiples
-$cluster = new ClusterVO('tenant:company_abc,company_xyz|category:electronics,music');
-```
-
-### Lire un cluster
-
-```php
-$cluster = new ClusterVO('tenant:company_abc,company_xyz|env:production');
-
-$cluster->get('tenant');     // ['company_abc', 'company_xyz']
-$cluster->get('env');        // ['production']
-$cluster->has('tenant');     // true
-$cluster->has('unknown');    // false
-$cluster->contains('tenant', 'company_abc');  // true
-$cluster->all();
-// ['tenant' => ['company_abc', 'company_xyz'], 'env' => ['production']]
-```
-
-### Manipuler un cluster
-
-```php
-$cluster = new ClusterVO('tenant:company_abc');
-
-// Ajouter
-$new = $cluster->with('env', 'production');
-$new = $cluster->withMany('category', ['electronics', 'music']);
-
-// Supprimer
-$new = $cluster->without('tenant', 'company_abc');
-$new = $cluster->without('env');
-
-// Chaînage
-$new = $cluster
-    ->with('env', 'production')
-    ->with('region', 'europe');
 ```
 
 ---
@@ -620,14 +1134,16 @@ $tokens = $this->tokenRepository->getModel()
     ->get();
 ```
 
-### Autocomplétion avec tenant
+### Autocomplétion avec cluster
 
 ```php
+$cluster = ClusterVO::make('tenant', 'company_abc');
+
 $tokens = $this->tokenRepository->getModel()
     ->newQuery()
     ->where('token', 'LIKE', $prefix . '%')
-    ->whereHas('document', function ($q) use ($tenantId) {
-        $q->where('cluster', 'LIKE', '%tenant:' . $tenantId . '%');
+    ->whereHas('document', function ($q) use ($cluster) {
+        $q->where('cluster', 'LIKE', '%' . $cluster->getValue() . '%');
     })
     ->select('token')
     ->distinct()
@@ -671,7 +1187,7 @@ $repository->deleteByNamespace('App.Models.User');
 ### Supprimer par cluster
 
 ```php
-$cluster = new ClusterVO('tenant:company_abc');
+$cluster = ClusterVO::make('tenant', 'company_abc');
 $repository->deleteByCluster($cluster);
 
 $repository->deleteByClusterKeyValue('tenant', 'company_abc');
@@ -722,9 +1238,6 @@ $repository->deleteByFingerprintString('App.Models.User|123');
 $repository->deleteByNamespace('App.Models.User');
 $repository->deleteByCluster($cluster);
 $repository->deleteByClusterKeyValue('tenant', 'company_abc');
-
-// Tout avec tokens
-$docs = $repository->findAllWithTokens();
 ```
 
 ### IndexedTokenRepository
@@ -772,12 +1285,6 @@ $repository->deleteByCluster($cluster);
 $repository->deleteByClusterKeyValue('tenant', 'company_abc');
 $repository->deleteByToken('john');
 $repository->deleteByTokenAndField('john', 'name');
-
-// Autres
-$tokens = $repository->getDistinctTokens();
-$fields = $repository->getDistinctFields();
-$token = $repository->findByTokenFieldAndDocument('john', 'name', 'uuid', GramType::LEXICAL);
-$frequency = $repository->incrementFrequency('token-id');
 ```
 
 ---
@@ -789,13 +1296,12 @@ $frequency = $repository->incrementFrequency('token-id');
 ```php
 $results = $this->indexer->search($query);
 
-// Itération
 foreach ($results as $result) {
     $item = $result->item;
     $fingerprint = $item->fingerprint->getValue();
     $field = $result->field;
     $gram = $result->gram_value;
-    $type = $result->gram_type->value; // 'lexical' ou 'metaphone'
+    $type = $result->gram_type->value;
 }
 
 // Filtrage
@@ -817,30 +1323,68 @@ $byNamespace = $results->groupByNamespace();
 ```php
 $records = new IndexableRecordCollection;
 
-// Ajout
 $records->add($record);
-
-// Découpage
 $chunks = $records->chunk(100);
 
-// Filtrage
 $users = $records->filterByNamespace('App.Models.User');
 $withTenant = $records->filterByCluster('tenant', 'company_abc');
 
-// Extraction
 $fingerPrints = $records->getFingerPrints();
 $ids = $records->getIdValues();
 
-// Recherche
 $record = $records->findById('123');
 $record = $records->findByIdAndNamespace('123', 'App.Models.User');
 
-// Vérification
 $hasId = $records->containsId('123');
 $hasNamespace = $records->containsNamespace('App.Models.User');
 
-// Indexation
 $this->indexer->indexMany($records);
+```
+
+### IndexableVOCollection
+
+Collection spécialisée pour manipuler les `IndexableVO`.
+
+```php
+use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
+
+$collection = new IndexableVOCollection;
+$collection->add(new IndexableVO(User::class, 1));
+$collection->add(new IndexableVO(User::class, 2));
+$collection->add(new IndexableVO(Hospital::class, 3));
+
+// Récupérer les IDs
+$ids = $collection->getIds(); // [1, 2, 3]
+
+// Récupérer les classes de modèles
+$classes = $collection->getModelClasses(); // [User::class, User::class, Hospital::class]
+
+// Récupérer les instances en UNE SEULE requête par classe
+$instances = $collection->getModelInstances();
+
+// Filtrer par classe
+$users = $collection->filterByModelClass(User::class);
+
+// Filtrer par plusieurs classes
+$usersAndHospitals = $collection->filterByModelClasses([User::class, Hospital::class]);
+
+// Filtrer par classe et IDs
+$specificUsers = $collection->filterByModelClassAndIds(User::class, [1, 2]);
+
+// Vérification
+$hasId = $collection->containsId(1);
+$hasClass = $collection->containsModelClass(User::class);
+
+// Recherche
+$item = $collection->findById(1);
+
+// Groupement par classe
+$groups = $collection->groupByModelClass();
+// [
+//     User::class => IndexableVOCollection [items: 2],
+//     Hospital::class => IndexableVOCollection [items: 1],
+// ]
 ```
 
 ### IndexableFingerPrintVOCollection
@@ -848,22 +1392,16 @@ $this->indexer->indexMany($records);
 ```php
 $fingerPrints = new IndexableFingerPrintVOCollection;
 
-// Filtrage
 $users = $fingerPrints->filterByNamespace('App.Models.User');
-
-// Extraction
 $ids = $fingerPrints->getIds();
 $namespaces = $fingerPrints->getNamespaces();
 
-// Vérification
 $hasId = $fingerPrints->containsId('123');
 $hasNamespace = $fingerPrints->containsNamespace('App.Models.User');
 
-// Recherche
 $fp = $fingerPrints->findByValue('App.Models.User|123');
 $fp = $fingerPrints->findByIdAndNamespace('123', 'App.Models.User');
 
-// Groupement
 $grouped = $fingerPrints->groupByNamespace();
 ```
 
@@ -872,24 +1410,20 @@ $grouped = $fingerPrints->groupByNamespace();
 ```php
 $clusters = new ClusterVOCollection;
 
-// Filtrage
 $withTenant = $clusters->filterByKey('tenant');
 $withSpecific = $clusters->filterByPair('tenant', 'company_abc');
 
-// Extraction
 $values = $clusters->getValuesForKey('tenant');
 $keys = $clusters->getUniqueKeys();
 
-// Groupement
 $grouped = $clusters->groupByKey('tenant');
 
-// Vérification
 $hasKey = $clusters->hasKey('tenant');
 $hasPair = $clusters->hasPair('tenant', 'company_abc');
 
-// Fusion
 $merged = $clusters->mergeAll();
 ```
+
 ---
 
 ## License
