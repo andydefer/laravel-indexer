@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Contracts\Configs;
 
+use AndyDefer\Task\Directives\TasksProcessDirective;
+
 interface IndexerConfigInterface
 {
     public function getStoragePath(): string;
@@ -24,7 +26,6 @@ interface IndexerConfigInterface
 
     /** @return array<class-string, string> */
     public function getModelIndexables(): array;
-
-    /** @return array<int, class-string> */
-    public function getIndexableModels(): array;
 }
+
+TasksProcessDirective::class;

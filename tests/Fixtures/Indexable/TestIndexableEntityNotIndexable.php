@@ -6,6 +6,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Indexable;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 
 final class TestIndexableEntityNotIndexable implements Indexable
 {
@@ -13,7 +14,7 @@ final class TestIndexableEntityNotIndexable implements Indexable
         private readonly string $key,
         private readonly string $morphClass,
         private readonly array $data,
-        private readonly array $cluster = ['model' => 'default', 'tenant' => 'default'],
+        private readonly string $cluster = 'type:test|status:inactive',
     ) {}
 
     public function shouldBeIndexed(): bool
@@ -31,13 +32,13 @@ final class TestIndexableEntityNotIndexable implements Indexable
         return $this->key;
     }
 
-    public function getMorphClass(): string
+    public function getMorphClass()
     {
         return $this->morphClass;
     }
 
-    public function getIndexableCluster(): array
+    public function getIndexableCluster(): ClusterVO
     {
-        return $this->cluster;
+        return new ClusterVO($this->cluster);
     }
 }

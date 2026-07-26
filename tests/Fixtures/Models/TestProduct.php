@@ -6,6 +6,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 
 class TestProduct extends Model implements Indexable
@@ -49,5 +50,22 @@ class TestProduct extends Model implements Indexable
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ]);
+    }
+
+    public function getMorphClass()
+    {
+        return self::class;
+    }
+
+    public function getKey()
+    {
+        return $this->id;
+    }
+
+    public function getIndexableCluster(): ClusterVO
+    {
+        return ClusterVO::make('type', 'product')
+            ->withTernary('status', (bool) $this->is_published, 'published', 'unpublished')
+            ->whenNotEmpty('reference', $this->reference);
     }
 }

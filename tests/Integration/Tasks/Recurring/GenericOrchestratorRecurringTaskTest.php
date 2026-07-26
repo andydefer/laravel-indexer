@@ -62,22 +62,19 @@ final class GenericOrchestratorRecurringTaskTest extends IntegrationTestCase
 
         Carbon::setTestNow(Carbon::create(2024, 1, 1, 12, 0, 0));
 
-        // Config pour les tests
         $this->app['config']->set('indexer.batch_size', self::TEST_BATCH_SIZE);
         $this->app['config']->set('indexer.token_types.ngrams.min_size', 2);
         $this->app['config']->set('indexer.token_types.ngrams.max_size', 4);
         $this->app['config']->set('indexer.model_indexables', [
-            TestDoctor::class => 'type:doctor|status:active',
-            TestPharmacy::class => 'type:pharmacy|status:active',
-            TestProduct::class => 'type:product|status:published',
+            TestDoctor::class,
+            TestPharmacy::class,
+            TestProduct::class,
         ]);
 
-        // Re-bind IndexerConfig après changement de config
         $this->app->singleton(IndexerConfigInterface::class, function ($app) {
             return new IndexerConfig($app['config']);
         });
 
-        // Re-bind IndexWriter avec la nouvelle config
         $this->app->singleton(IndexWriter::class, function ($app) {
             return new IndexWriter(
                 documentRepository: $app->make(IndexedDocumentRepositoryInterface::class),
@@ -88,7 +85,6 @@ final class GenericOrchestratorRecurringTaskTest extends IntegrationTestCase
             );
         });
 
-        // Re-bind GenericIndexerService avec la nouvelle config
         $this->app->singleton(GenericIndexerInterface::class, function ($app) {
             return new GenericIndexerService(
                 indexer: $app->make(IndexerInterface::class),
@@ -232,7 +228,6 @@ final class GenericOrchestratorRecurringTaskTest extends IntegrationTestCase
     {
         $this->app['config']->set('indexer.model_indexables', []);
 
-        // Re-bind IndexerConfig après changement de config
         $this->app->singleton(IndexerConfigInterface::class, function ($app) {
             return new IndexerConfig($app['config']);
         });
@@ -260,10 +255,9 @@ final class GenericOrchestratorRecurringTaskTest extends IntegrationTestCase
         }
 
         $this->app['config']->set('indexer.model_indexables', [
-            TestDoctor::class => 'type:doctor|status:active',
+            TestDoctor::class,
         ]);
 
-        // Re-bind IndexerConfig après changement de config
         $this->app->singleton(IndexerConfigInterface::class, function ($app) {
             return new IndexerConfig($app['config']);
         });
@@ -306,10 +300,9 @@ final class GenericOrchestratorRecurringTaskTest extends IntegrationTestCase
         }
 
         $this->app['config']->set('indexer.model_indexables', [
-            TestDoctor::class => 'type:doctor|status:active',
+            TestDoctor::class,
         ]);
 
-        // Re-bind IndexerConfig après changement de config
         $this->app->singleton(IndexerConfigInterface::class, function ($app) {
             return new IndexerConfig($app['config']);
         });

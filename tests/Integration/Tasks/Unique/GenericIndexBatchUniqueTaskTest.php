@@ -7,6 +7,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Integration\Tasks\Unique;
 use AndyDefer\Directive\Enums\ExitCode;
 use AndyDefer\Directive\Services\DirectiveTestingService;
 use AndyDefer\DomainStructures\Utils\StrictDataObject;
+use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
@@ -14,7 +15,6 @@ use AndyDefer\LaravelIndexer\Directives\GenericIndexModelsDirective;
 use AndyDefer\LaravelIndexer\Tasks\UniqueTasks\GenericIndexBatchUniqueTask;
 use AndyDefer\LaravelIndexer\Tests\Fixtures\Models\TestDoctor;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
 use AndyDefer\Task\Contracts\Services\UniqueTaskServiceInterface;
 use AndyDefer\Task\Directives\TasksProcessDirective;
@@ -45,12 +45,10 @@ final class GenericIndexBatchUniqueTaskTest extends IntegrationTestCase
 
         Carbon::setTestNow(Carbon::create(2024, 1, 1, 12, 0, 0));
 
-        // Config pour les tests
         $this->app['config']->set('indexer.batch_size', 10);
         $this->app['config']->set('indexer.token_types.ngrams.min_size', 3);
         $this->app['config']->set('indexer.token_types.ngrams.max_size', 5);
 
-        // Re-bind IndexerConfig après changement de config
         $this->app->singleton(IndexerConfigInterface::class, function ($app) {
             return new IndexerConfig($app['config']);
         });
@@ -91,9 +89,14 @@ final class GenericIndexBatchUniqueTaskTest extends IntegrationTestCase
         ], $attributes));
     }
 
-    private function registerBatchTask(IndexableVO $indexableVO, array $ids): void
+    private function registerBatchTask(array $ids): void
     {
         $scheduledAt = Carbon::now()->subSeconds(5)->toIso8601String();
+
+        $collection = new IndexableVOCollection;
+        foreach ($ids as $id) {
+            $collection->add(new IndexableVO(TestDoctor::class, $id));
+        }
 
         $config = UniqueTaskConfigRecord::from([
             'scheduled_at' => new Iso8601DateTimeVO($scheduledAt),
@@ -103,8 +106,7 @@ final class GenericIndexBatchUniqueTaskTest extends IntegrationTestCase
         ]);
 
         $payload = StrictDataObject::from([
-            'indexable' => $indexableVO,
-            'ids' => $ids,
+            'items' => $collection,
         ]);
 
         $this->uniqueTaskService->register(
@@ -112,7 +114,6 @@ final class GenericIndexBatchUniqueTaskTest extends IntegrationTestCase
             $payload,
             $config
         );
-
     }
 
     public function test_batch_task_indexes_doctors_successfully(): void
@@ -123,10 +124,8 @@ final class GenericIndexBatchUniqueTaskTest extends IntegrationTestCase
         }
 
         $ids = array_map(fn ($d) => $d->id, $doctors);
-        $cluster = new ClusterVO('type:doctor|status:active');
-        $indexableVO = new IndexableVO(TestDoctor::class, $cluster);
 
-        $this->registerBatchTask($indexableVO, $ids);
+        $this->registerBatchTask($ids);
 
         $response = $this->service->run('tasks:process');
 
@@ -142,10 +141,7 @@ final class GenericIndexBatchUniqueTaskTest extends IntegrationTestCase
         $doctor2 = $this->createDoctor();
         $doctor3 = $this->createDoctor();
 
-        $cluster = new ClusterVO('type:doctor|status:active');
-        $indexableVO = new IndexableVO(TestDoctor::class, $cluster);
-
-        $this->registerBatchTask($indexableVO, [$doctor1->id, $doctor2->id, $doctor3->id]);
+        $this->registerBatchTask([$doctor1->id, $doctor2->id, $doctor3->id]);
 
         $response = $this->service->run('tasks:process');
 
@@ -160,9 +156,7 @@ final class GenericIndexBatchUniqueTaskTest extends IntegrationTestCase
         $activeDoctor = $this->createDoctor(['is_active' => true]);
         $inactiveDoctor = $this->createDoctor(['is_active' => false]);
 
-        $cluster = new ClusterVO('type:doctor|status:active');
-        $indexableVO = new IndexableVO(TestDoctor::class, $cluster);
-        $this->registerBatchTask($indexableVO, [$activeDoctor->id, $inactiveDoctor->id]);
+        $this->registerBatchTask([$activeDoctor->id, $inactiveDoctor->id]);
 
         $response = $this->service->run('tasks:process');
 
@@ -174,9 +168,7 @@ final class GenericIndexBatchUniqueTaskTest extends IntegrationTestCase
 
     public function test_batch_task_with_empty_ids(): void
     {
-        $cluster = new ClusterVO('type:doctor|status:active');
-        $indexableVO = new IndexableVO(TestDoctor::class, $cluster);
-        $this->registerBatchTask($indexableVO, []);
+        $this->registerBatchTask([]);
 
         $response = $this->service->run('tasks:process');
 
@@ -188,11 +180,9 @@ final class GenericIndexBatchUniqueTaskTest extends IntegrationTestCase
 
     public function test_batch_task_with_item_not_found(): void
     {
-        $cluster = new ClusterVO('type:doctor|status:active');
-        $indexableVO = new IndexableVO(TestDoctor::class, $cluster);
-        $this->registerBatchTask($indexableVO, [99999]);
+        $this->registerBatchTask([99999]);
 
-        $response = $this->service->run('tasks:process');
+        $response = $this->service->run('tasks:process --verbose');
 
         $this->assertSame(ExitCode::SUCCESS, $response->exit_code);
 

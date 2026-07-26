@@ -6,6 +6,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -52,8 +53,25 @@ class TestUser extends Model implements Indexable
         ]);
     }
 
+    public function getMorphClass()
+    {
+        return self::class;
+    }
+
+    public function getKey()
+    {
+        return $this->id;
+    }
+
     public function addresses(): HasMany
     {
         return $this->hasMany(TestAddress::class);
+    }
+
+    public function getIndexableCluster(): ClusterVO
+    {
+        return ClusterVO::make('type', 'user')
+            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
+            ->whenNotEmpty('email', $this->email);
     }
 }

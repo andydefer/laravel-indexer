@@ -6,6 +6,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
@@ -67,13 +68,20 @@ class TestPharmacy extends Model implements Indexable
         ]);
     }
 
-    public function getMorphClass(): string
+    public function getMorphClass()
     {
         return self::class;
     }
 
-    public function getKey(): int|string
+    public function getKey()
     {
         return $this->id;
+    }
+
+    public function getIndexableCluster(): ClusterVO
+    {
+        return ClusterVO::make('type', 'pharmacy')
+            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
+            ->whenNotEmpty('city', $this->city);
     }
 }

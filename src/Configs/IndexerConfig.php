@@ -65,15 +65,13 @@ final class IndexerConfig implements IndexerConfigInterface
         return (int) $this->config->get('indexer.batch_size', self::DEFAULT_BATCH_SIZE);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getModelIndexables(): array
     {
         $models = $this->config->get('indexer.model_indexables', self::DEFAULT_MODEL_INDEXABLES);
 
         return is_array($models) ? $models : self::DEFAULT_MODEL_INDEXABLES;
-    }
-
-    public function getIndexableModels(): array
-    {
-        return array_keys($this->getModelIndexables());
     }
 }

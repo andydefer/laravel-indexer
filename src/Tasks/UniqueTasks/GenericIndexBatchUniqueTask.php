@@ -6,16 +6,13 @@ namespace AndyDefer\LaravelIndexer\Tasks\UniqueTasks;
 
 use AndyDefer\ConsoleWriter\Console\Contracts\ConsoleInterface;
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
-use AndyDefer\LaravelIndexer\Contracts\Indexable;
+use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
 use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
 use AndyDefer\Task\Abstract\AbstractUniqueTask;
 use AndyDefer\Task\ValueObjects\DescriptionVO;
-use Illuminate\Database\Eloquent\Model;
 
 final class GenericIndexBatchUniqueTask extends AbstractUniqueTask
 {
@@ -23,17 +20,22 @@ final class GenericIndexBatchUniqueTask extends AbstractUniqueTask
     {
         $payload = $this->context->getPayload();
 
-        if (! $payload->has('indexable') || ! $payload->has('ids') || empty($payload->ids)) {
-            $this->error(new DescriptionVO('Invalid payload: missing indexable or ids'));
+        if (! $payload->has('items') || empty($payload->items)) {
+            $this->error(new DescriptionVO('Invalid payload: missing items or empty collection'));
 
             return;
         }
 
-        /** @var IndexableVO $indexableVO */
-        $indexableVO = IndexableVO::from($payload->indexable);
-        $ids = $payload->ids;
+        /** @var IndexableVOCollection $items */
+        $items = IndexableVOCollection::from($payload->items);
 
-        $this->info(new DescriptionVO('Processing batch of '.count($ids).' items for '.$indexableVO->getModelClass().'...'));
+        if ($items->isEmpty()) {
+            $this->error(new DescriptionVO('Invalid payload: items collection is empty'));
+
+            return;
+        }
+
+        $this->info(new DescriptionVO('Processing batch of '.$items->count().' items...'));
 
         $app = $this->context->getLaravelApp();
 
@@ -41,16 +43,24 @@ final class GenericIndexBatchUniqueTask extends AbstractUniqueTask
         $documentRepository = $app->make(IndexedDocumentRepositoryInterface::class);
         $console = $app->make(ConsoleInterface::class);
 
-        $modelClass = $indexableVO->getModelClass();
         $records = new IndexableRecordCollection;
         $skipped = 0;
         $indexed = 0;
 
-        foreach ($ids as $id) {
-            /** @var Model&Indexable $model */
-            $model = $modelClass::find($id);
+        // ✅ Récupérer toutes les instances en une seule fois
+        $instances = $items->getModelInstances();
 
-            if (! $model) {
+        // ✅ Créer un index des instances par ID pour un accès rapide
+        $instancesById = [];
+        foreach ($instances as $instance) {
+            $instancesById[$instance->getKey()] = $instance;
+        }
+
+        foreach ($items as $item) {
+            $id = $item->getId();
+            $model = $instancesById[$id] ?? null;
+
+            if ($model === null) {
                 $console->alertWarning("Item {$id} not found, skipping");
                 $skipped++;
 
@@ -71,7 +81,7 @@ final class GenericIndexBatchUniqueTask extends AbstractUniqueTask
                 $documentRepository->deleteByFingerPrint($fingerPrint);
             }
 
-            $cluster = new ClusterVO($indexableVO->getClusterType());
+            $cluster = $model->getIndexableCluster();
             $records->add(IndexableRecordFactory::convert($model, $cluster));
             $indexed++;
         }

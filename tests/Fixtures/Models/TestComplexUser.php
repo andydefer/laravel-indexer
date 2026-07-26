@@ -4,6 +4,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 
 class TestComplexUser extends Model implements Indexable
@@ -61,5 +62,14 @@ class TestComplexUser extends Model implements Indexable
     public function getKey()
     {
         return $this->id;
+    }
+
+    public function getIndexableCluster(): ClusterVO
+    {
+        return ClusterVO::make('type', 'complex_user')
+            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
+            ->whenArrayNotEmpty('tags', $this->tags)
+            ->whenKeyExists('role', $this->metadata, 'role')
+            ->whenKeyExists('tenant', $this->metadata, 'tenant');
     }
 }

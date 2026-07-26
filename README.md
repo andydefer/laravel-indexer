@@ -97,12 +97,12 @@ class User extends Model implements Indexable
         ]);
     }
 
-    public function getKey(): int|string
+    public function getKey()
     {
         return $this->id;
     }
 
-    public function getMorphClass(): string
+    public function getMorphClass()
     {
         return self::class;
     }

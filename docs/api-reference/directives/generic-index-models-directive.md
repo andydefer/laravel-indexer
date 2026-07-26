@@ -2,178 +2,233 @@
 
 ## Description
 
-Directive CLI permettant d'indexer des modèles Eloquent configurés dans le fichier de configuration du package Laravel Indexer.
+Directive CLI pour indexer les modèles configurés avec des clusters dynamiques. Elle orchestre l'indexation des modèles Eloquent implémentant l'interface `Indexable`.
 
-## Hiérarchie
+## Hiérarchie / Implémentations
 
 ```
 AbstractDirective
     └── GenericIndexModelsDirective
 ```
 
+**Interfaces :** `AbstractDirective` (via héritage)
+
+**Lien source :** [GenericIndexModelsDirective.php](https://github.com/andydefer/laravel-indexer/blob/main/src/Directives/GenericIndexModelsDirective.php)
+
 ## Rôle principal
 
-Expose une interface en ligne de commande pour indexer, réindexer, compter ou supprimer des modèles de l'index. Supporte les arguments de batch et de limite pour un contrôle fin des opérations.
+Permet d'indexer en masse des modèles via la ligne de commande. Contrairement à l'approche traditionnelle avec des clusters statiques, cette directive utilise les clusters dynamiques générés par chaque modèle via la méthode `getIndexableCluster()`.
 
-## Signature
-
-```
-index:models {batch=50} {limit=?} {models*} {--reindex} {--count} {--delete}
-```
+---
 
 ## API / Méthodes publiques
 
 ### `getSignature(): string`
 
-Retourne la signature de la directive.
+Retourne la signature de la commande CLI.
 
-**Retourne :** `string` - Signature au format Laravel
+**Retourne :** `string` - La signature de la commande
 
 **Exemple :**
-```php
-$directive = new GenericIndexModelsDirective($kernel, 'index:models batch=100 limit=10 [App.Models.User,App.Models.Hospital]');
-echo $directive->getSignature();
-// index:models {batch=50} {limit=?} {models*} {--reindex} {--count} {--delete}
+```bash
+bin/afya index:models [App.Models.User,App.Models.Hospital] --reindex
 ```
+
+---
 
 ### `getDescription(): string`
 
-Retourne la description de la directive.
+Retourne la description de la commande.
 
-**Retourne :** `string` - Description en français
+**Retourne :** `string` - Description de la commande
 
 **Exemple :**
-```php
-echo $directive->getDescription();
-// Index models from config (App.Models.User, App.Models.Hospital, etc.)
+```bash
+bin/afya index:models --help
+# Affiche : Index models from config (App.Models.User, App.Models.Hospital, etc.) with dynamic clusters
 ```
+
+---
 
 ### `getAliases(): StringTypedCollection`
 
-Retourne les alias de la directive.
+Retourne les alias de la commande.
 
 **Retourne :** `StringTypedCollection` - Collection des alias
 
 **Exemple :**
-```php
-$aliases = $directive->getAliases();
-// ['idx:models', 'indexer:models']
+```bash
+bin/afya idx:models [App.Models.User]
+bin/afya indexer:models [App.Models.User]
 ```
+
+---
 
 ### `execute(): ExitCode`
 
-Exécute la directive selon les arguments et flags passés.
+Point d'entrée de la directive. Parse les arguments et exécute l'action demandée.
 
-**Retourne :** `ExitCode` - Code de sortie (SUCCESS, INVALID_ARGUMENT, FAILURE)
+**Retourne :** `ExitCode` - Code de sortie (`SUCCESS`, `FAILURE`, `INVALID_ARGUMENT`)
 
-**Exceptions :** `Throwable` - Erreurs pendant l'exécution
+**Exceptions :** `Throwable` - Toute exception est capturée et transformée en message d'erreur
 
-**Exemple :**
-```bash
-# Indexer tous les modèles configurés
-./bin/directive index:models [App.Models.User,App.Models.Hospital]
+---
 
-# Indexer avec batch=10 et limit=5
-./bin/directive index:models 10 5 [App.Models.User]
+## Paramètres de la commande
 
-# Compter les documents indexés
-./bin/directive index:models [App.Models.User] --count
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `batch` | `int` | Taille des lots pour le chunking (défaut: 50) |
+| `limit` | `int|null` | Nombre maximum d'éléments à indexer (optionnel) |
+| `models*` | `array` | Liste des modèles à indexer (notation pointée: `App.Models.User`) |
+| `--reindex` | `bool` | Supprime puis réindexe tous les modèles |
+| `--count` | `bool` | Compte les documents indexés |
+| `--delete` | `bool` | Supprime tous les documents de l'index |
 
-# Supprimer tout l'index des modèles
-./bin/directive index:models [App.Models.User] --delete
-
-# Réindexer avec batch et limit
-./bin/directive index:models 20 10 [App.Models.User] --reindex
-```
+---
 
 ## Cas d'utilisation
 
-### Cas 1 : Indexer tous les modèles avec batch personnalisé
+### Cas 1 : Indexer tous les modèles configurés
 
 ```bash
-./bin/directive index:models 100 [App.Models.User,App.Models.Hospital,App.Models.Specialty]
+bin/afya index:models [App.Models.User,App.Models.Hospital,App.Models.Specialty]
 ```
 
-### Cas 2 : Indexer avec limite
+**Résultat :** Tous les modèles configurés sont indexés avec leurs clusters dynamiques respectifs.
+
+---
+
+### Cas 2 : Réindexer avec un batch et une limite
 
 ```bash
-./bin/directive index:models _ 20 [App.Models.User]
+bin/afya index:models 20 100 [App.Models.User] --reindex
 ```
+
+**Résultat :** Les utilisateurs sont réindexés par lots de 20, avec une limite de 100 éléments.
+
+---
 
 ### Cas 3 : Compter les documents indexés
 
 ```bash
-./bin/directive index:models [App.Models.User] --count
+bin/afya index:models [App.Models.User] --count
 ```
 
-### Cas 4 : Réindexer avec batch et limit
+**Résultat :** Affiche le nombre de documents indexés pour le modèle `User`.
+
+**Exemple de sortie :**
+```
+📊 Indexed App\Models\User: 150
+📈 Total indexed: 150
+```
+
+---
+
+### Cas 4 : Supprimer tous les documents d'un modèle
 
 ```bash
-./bin/directive index:models 10 5 [App.Models.User] --reindex
+bin/afya index:models [App.Models.User] --delete
 ```
 
-### Cas 5 : Supprimer tout l'index d'un modèle
+**Résultat :** Tous les documents indexés pour le modèle `User` sont supprimés.
 
-```bash
-./bin/directive index:models [App.Models.User] --delete
+**Exemple de sortie :**
 ```
+🗑️ All App\Models\User deleted from index
+🗑️ Total models cleared: 1
+```
+
+---
 
 ## Gestion des erreurs
 
-| Situation | Code de sortie | Message |
-|-----------|----------------|---------|
-| Aucun modèle spécifié | `ExitCode::INVALID_ARGUMENT` | `No models specified.` |
-| Classe de modèle inexistante | `ExitCode::INVALID_ARGUMENT` | `Class '{class}' does not exist` |
-| Modèle non configuré | `ExitCode::INVALID_ARGUMENT` | `Model '{class}' is not configured in indexer.model_indexables` |
-| Erreur d'exécution | `ExitCode::FAILURE` | Message de l'exception |
+| Situation | Code | Message |
+|-----------|------|---------|
+| Aucun modèle spécifié | `INVALID_ARGUMENT` | `No models specified.` |
+| Classe de modèle inexistante | `INVALID_ARGUMENT` | `Class 'Invalid\Model' does not exist` |
+| Modèle non configuré | `INVALID_ARGUMENT` | `Model 'App\Models\Other' is not configured in indexer.model_indexables` |
+| Erreur d'exécution | `FAILURE` | Message d'erreur de l'exception |
+
+---
 
 ## Intégration
 
-Cette directive s'intègre avec :
+### Avec IndexerConfig
 
-- **`GenericIndexerInterface`** - Service d'indexation générique
-- **`IndexerConfigInterface`** - Configuration du package
-- **`IndexableVO`** - Value Object de configuration d'indexation
-- **`ClusterVO`** - Value Object pour les tags de regroupement
+La directive utilise `IndexerConfigInterface` pour récupérer la liste des modèles indexables :
+
+```php
+$validClasses = $indexerConfig->getModelIndexables();
+```
+
+### Avec GenericIndexerService
+
+La directive délègue toutes les opérations d'indexation à `GenericIndexerInterface` :
+
+```php
+$genericIndexer->indexAll($modelClass);
+$genericIndexer->deleteAll($modelClass);
+$genericIndexer->countIndexed($modelClass);
+```
+
+### Avec les clusters dynamiques
+
+Les clusters sont récupérés dynamiquement par `GenericIndexerService` via la méthode `getIndexableCluster()` de chaque modèle. La directive n'a pas à gérer les clusters.
+
+---
 
 ## Performance
 
-- Utilise le chunking pour éviter les problèmes de mémoire
-- Supporte le batch size pour optimiser les insertions
-- La limite permet de contrôler le nombre d'éléments indexés
-- Les flags `--count` et `--delete` sont O(1) ou O(n) selon l'opération
+- **Batch processing** : Les opérations d'indexation sont traitées par lots (batch) pour optimiser la mémoire
+- **Limitation** : Possibilité de limiter le nombre d'éléments à traiter
+- **Chunking** : Utilisation du chunking d'Eloquent pour éviter de charger tous les modèles en mémoire
+- **Complexité** : O(n) où n est le nombre de modèles à indexer
+
+---
 
 ## Compatibilité
 
-| Version | Support |
-|---------|---------|
+| Version PHP | Support |
+|-------------|---------|
 | PHP 8.1+ | ✅ Complet |
-| Laravel 10+ | ✅ Complet |
+| PHP 8.2+ | ✅ Complet |
+| PHP 8.3+ | ✅ Complet |
+| PHP 8.4+ | ✅ Complet |
+| PHP 8.5+ | ✅ Complet |
+
+---
 
 ## Exemple complet
 
 ```bash
-#!/bin/bash
+# 1. Indexer tous les modèles configurés
+bin/afya index:models [App.Models.User,App.Models.Hospital,App.Models.Specialty]
 
-# Indexer tous les modèles avec configuration par défaut
-./bin/directive index:models [App.Models.User,App.Models.Hospital,App.Models.Specialty]
+# 2. Compter les documents indexés
+bin/afya index:models [App.Models.User] --count
 
-# Indexer avec batch=25 et limit=100
-./bin/directive index:models 25 100 [App.Models.User]
+# 3. Indexer avec batch et limite
+bin/afya index:models 25 500 [App.Models.User,App.Models.Hospital]
 
-# Compter les utilisateurs indexés
-./bin/directive index:models [App.Models.User] --count
+# 4. Réindexer avec reindex
+bin/afya index:models [App.Models.User] --reindex
 
-# Réindexer les hôpitaux en batch de 50
-./bin/directive index:models 50 [App.Models.Hospital] --reindex
+# 5. Supprimer tout l'index d'un modèle
+bin/afya index:models [App.Models.Hospital] --delete
 
-# Supprimer toutes les spécialités de l'index
-./bin/directive index:models [App.Models.Specialty] --delete
+# 6. Utiliser un alias
+bin/afya idx:models [App.Models.User]
+
+# 7. Voir l'aide
+bin/afya index:models --help
 ```
+
+---
 
 ## Voir aussi
 
 - `GenericIndexerService` - Service d'indexation générique
-- `IndexerConfigInterface` - Interface de configuration
-- `IndexableVO` - Value Object d'indexation
-- `ClusterVO` - Value Object de cluster
+- `Indexable` - Interface pour les modèles indexables
+- `ClusterVO` - Value Object pour les clusters dynamiques
+- `IndexerConfig` - Configuration des modèles indexables

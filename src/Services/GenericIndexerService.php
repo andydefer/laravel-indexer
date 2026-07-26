@@ -11,9 +11,7 @@ use AndyDefer\LaravelIndexer\Contracts\Indexable;
 use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
@@ -31,6 +29,10 @@ final class GenericIndexerService implements GenericIndexerInterface
         $this->batchSize = $this->config->getBatchSize();
     }
 
+    // ============================================================
+    // PUBLIC METHODS
+    // ============================================================
+
     public function setBatchSize(int $batchSize): self
     {
         $this->batchSize = $batchSize;
@@ -45,35 +47,18 @@ final class GenericIndexerService implements GenericIndexerInterface
         return $this;
     }
 
-    private function getNamespace(string $modelClass): string
+    /**
+     * {@inheritDoc}
+     */
+    public function index(Model&Indexable $model): void
     {
-        return str_replace('\\', '.', $modelClass);
-    }
-
-    private function buildCluster(ClusterVO $cluster): ClusterVO
-    {
-        return $cluster;
-    }
-
-    public function index(IndexableVO $indexableVO, int $id): void
-    {
-        $modelClass = $indexableVO->getModelClass();
-
-        /** @var Model&Indexable $model */
-        $model = $modelClass::find($id);
-
-        if (! $model) {
-            throw new ModelNotFoundException("Model with ID {$id} not found");
-        }
-
         if (! $model->shouldBeIndexed()) {
             return;
         }
 
-        $cluster = $this->buildCluster($indexableVO->getCluster());
+        $cluster = $model->getIndexableCluster();
         $record = IndexableRecordFactory::convert($model, $cluster);
 
-        // Vérifier si le document existe déjà
         $fingerPrint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
         if ($this->documentRepository->existsByFingerPrint($fingerPrint)) {
             $this->indexer->refresh($record);
@@ -82,13 +67,31 @@ final class GenericIndexerService implements GenericIndexerInterface
         }
     }
 
-    public function indexAll(IndexableVO $indexableVO): void
+    /**
+     * {@inheritDoc}
+     */
+    public function indexById(string $modelClass, int $id): void
     {
-        $modelClass = $indexableVO->getModelClass();
+        /** @var Model&Indexable $model */
+        $model = $modelClass::find($id);
+
+        if (! $model) {
+            throw new ModelNotFoundException("Model with ID {$id} not found");
+        }
+
+        $this->index($model);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function indexAll(string $modelClass): void
+    {
         $processed = 0;
         $limit = $this->limit;
 
-        $modelClass::chunk($this->batchSize, function ($models) use ($indexableVO, &$processed, $limit) {
+        /** @var Model&Indexable $modelClass */
+        $modelClass::chunk($this->batchSize, function ($models) use (&$processed, $limit) {
             $records = new IndexableRecordCollection;
 
             foreach ($models as $model) {
@@ -106,12 +109,12 @@ final class GenericIndexerService implements GenericIndexerInterface
 
                 $fingerPrint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
 
-                // Supprimer le document s'il existe déjà (refresh)
                 if ($this->documentRepository->existsByFingerPrint($fingerPrint)) {
                     $this->documentRepository->deleteByFingerPrint($fingerPrint);
                 }
 
-                $cluster = $this->buildCluster($indexableVO->getCluster());
+                // ✅ Utiliser le cluster dynamique du modèle (OBLIGATOIRE)
+                $cluster = $model->getIndexableCluster();
                 $record = IndexableRecordFactory::convert($model, $cluster);
                 $records->add($record);
                 $processed++;
@@ -125,41 +128,33 @@ final class GenericIndexerService implements GenericIndexerInterface
         });
     }
 
-    public function reindexAll(IndexableVO $indexableVO): void
+    /**
+     * {@inheritDoc}
+     */
+    public function reindexAll(string $modelClass): void
     {
-        $this->deleteAll($indexableVO);
-        $this->indexAll($indexableVO);
+        $this->deleteAll($modelClass);
+        $this->indexAll($modelClass);
     }
 
-    public function delete(IndexableVO $indexableVO, int $id): void
+    /**
+     * {@inheritDoc}
+     */
+    public function delete(Model&Indexable $model): void
     {
-        $modelClass = $indexableVO->getModelClass();
-
-        /** @var Model&Indexable $model */
-        $model = $modelClass::find($id);
-
-        if (! $model) {
-            throw new ModelNotFoundException("Model with ID {$id} not found");
-        }
-
         $fingerPrint = IndexableFingerPrintVO::fromParts(
-            $indexableVO->getModelClass(),
+            $model->getMorphClass(),
             (string) $model->getKey()
         );
 
         $this->indexer->delete($fingerPrint);
     }
 
-    public function deleteAll(IndexableVO $indexableVO): void
+    /**
+     * {@inheritDoc}
+     */
+    public function deleteById(string $modelClass, int $id): void
     {
-        $namespace = $this->getNamespace($indexableVO->getModelClass());
-        $this->documentRepository->deleteByNamespace($namespace);
-    }
-
-    public function refresh(IndexableVO $indexableVO, int $id): void
-    {
-        $modelClass = $indexableVO->getModelClass();
-
         /** @var Model&Indexable $model */
         $model = $modelClass::find($id);
 
@@ -167,34 +162,95 @@ final class GenericIndexerService implements GenericIndexerInterface
             throw new ModelNotFoundException("Model with ID {$id} not found");
         }
 
+        $this->delete($model);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function deleteAll(string $modelClass): void
+    {
+        $namespace = $this->getNamespace($modelClass);
+        $this->documentRepository->deleteByNamespace($namespace);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function refresh(Model&Indexable $model): void
+    {
         $fingerPrint = IndexableFingerPrintVO::fromParts(
-            $indexableVO->getModelClass(),
+            $model->getMorphClass(),
             (string) $model->getKey()
         );
 
         $this->indexer->delete($fingerPrint);
 
         if ($model->shouldBeIndexed()) {
-            $cluster = $this->buildCluster($indexableVO->getCluster());
+            // ✅ Utiliser le cluster dynamique du modèle (OBLIGATOIRE)
+            $cluster = $model->getIndexableCluster();
             $record = IndexableRecordFactory::convert($model, $cluster);
             $this->indexer->refresh($record);
         }
     }
 
-    public function countIndexed(IndexableVO $indexableVO): int
+    /**
+     * {@inheritDoc}
+     */
+    public function refreshById(string $modelClass, int $id): void
     {
-        $namespace = $this->getNamespace($indexableVO->getModelClass());
+        /** @var Model&Indexable $model */
+        $model = $modelClass::find($id);
+
+        if (! $model) {
+            throw new ModelNotFoundException("Model with ID {$id} not found");
+        }
+
+        $this->refresh($model);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function countIndexed(string $modelClass): int
+    {
+        $namespace = $this->getNamespace($modelClass);
 
         return $this->documentRepository->countByNamespace($namespace);
     }
 
-    public function exists(IndexableVO $indexableVO, int $id): bool
+    /**
+     * {@inheritDoc}
+     */
+    public function exists(Model&Indexable $model): bool
     {
         $fingerPrint = IndexableFingerPrintVO::fromParts(
-            $indexableVO->getModelClass(),
+            $model->getMorphClass(),
+            (string) $model->getKey()
+        );
+
+        return $this->documentRepository->existsByFingerPrint($fingerPrint);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function existsById(string $modelClass, int $id): bool
+    {
+        $fingerPrint = IndexableFingerPrintVO::fromParts(
+            $modelClass,
             (string) $id
         );
 
         return $this->documentRepository->existsByFingerPrint($fingerPrint);
+    }
+
+    // ============================================================
+    // PRIVATE METHODS
+    // ============================================================
+
+    private function getNamespace(string $modelClass): string
+    {
+        return str_replace('\\', '.', $modelClass);
     }
 }

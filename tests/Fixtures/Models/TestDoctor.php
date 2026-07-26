@@ -6,6 +6,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 
 class TestDoctor extends Model implements Indexable
@@ -70,13 +71,22 @@ class TestDoctor extends Model implements Indexable
         ]);
     }
 
-    public function getMorphClass(): string
+    public function getMorphClass()
     {
         return self::class;
     }
 
-    public function getKey(): int|string
+    public function getKey()
     {
         return $this->id;
+    }
+
+    public function getIndexableCluster(): ClusterVO
+    {
+        return ClusterVO::make('type', 'doctor')
+            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
+            ->whenNotEmpty('specialty', $this->specialty)
+            ->whenNotEmpty('city', $this->city)
+            ->whenNotEmpty('hospital', $this->hospital);
     }
 }

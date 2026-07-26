@@ -6,6 +6,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 
 class TestAddress extends Model implements Indexable
@@ -88,5 +89,13 @@ class TestAddress extends Model implements Indexable
     public function getKey()
     {
         return $this->id;
+    }
+
+    public function getIndexableCluster(): ClusterVO
+    {
+        return ClusterVO::make('type', 'address')
+            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
+            ->whenNotEmpty('city', $this->city)
+            ->whenNotEmpty('country', $this->country);
     }
 }

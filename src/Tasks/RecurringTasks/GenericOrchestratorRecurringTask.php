@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tasks\RecurringTasks;
 
 use AndyDefer\DomainStructures\Utils\StrictDataObject;
+use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Tasks\UniqueTasks\GenericIndexBatchUniqueTask;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
 use AndyDefer\Task\Abstract\AbstractRecurringTask;
 use AndyDefer\Task\Contracts\Services\UniqueTaskServiceInterface;
@@ -31,22 +31,24 @@ final class GenericOrchestratorRecurringTask extends AbstractRecurringTask
         $uniqueTaskService = $app->make(UniqueTaskServiceInterface::class);
 
         $batchSize = $indexerConfig->getBatchSize();
-        $modelIndexables = $indexerConfig->getModelIndexables();
+        $modelClasses = $indexerConfig->getModelIndexables();
 
         $totalDispatched = 0;
         $totalChunks = 0;
 
-        foreach ($modelIndexables as $modelClass => $clusterType) {
+        foreach ($modelClasses as $modelClass) {
             $this->info(new DescriptionVO("Processing {$modelClass}..."));
 
             $chunks = $this->getModelChunks($modelClass, $batchSize);
 
             foreach ($chunks as $chunk) {
-                $indexableVO = new IndexableVO($modelClass, new ClusterVO($clusterType));
+                $collection = new IndexableVOCollection;
+                foreach ($chunk as $id) {
+                    $collection->add(new IndexableVO($modelClass, $id));
+                }
 
                 $payload = StrictDataObject::from([
-                    'indexable' => $indexableVO,
-                    'ids' => $chunk,
+                    'items' => $collection,
                 ]);
 
                 $config = UniqueTaskConfigRecord::from([
@@ -96,6 +98,7 @@ final class GenericOrchestratorRecurringTask extends AbstractRecurringTask
 
     protected function after(bool $success, ?DescriptionVO $error = null): void
     {
+
         if ($success) {
             $this->info(new DescriptionVO('Generic orchestrator task completed successfully'));
         } else {

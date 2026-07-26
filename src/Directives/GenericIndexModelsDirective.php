@@ -9,8 +9,6 @@ use AndyDefer\Directive\Enums\ExitCode;
 use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
 use Throwable;
 
 final class GenericIndexModelsDirective extends AbstractDirective
@@ -28,7 +26,7 @@ final class GenericIndexModelsDirective extends AbstractDirective
 
     public function getDescription(): string
     {
-        return 'Index models from config (App.Models.User, App.Models.Hospital, etc.)';
+        return 'Index models from config (App.Models.User, App.Models.Hospital, etc.) with dynamic clusters';
     }
 
     public function getAliases(): StringTypedCollection
@@ -75,18 +73,18 @@ final class GenericIndexModelsDirective extends AbstractDirective
             }
 
             if ($count) {
-                return $this->handleCount($genericIndexer, $indexerConfig, $modelClasses);
+                return $this->handleCount($genericIndexer, $modelClasses);
             }
 
             if ($delete) {
-                return $this->handleDelete($genericIndexer, $indexerConfig, $modelClasses);
+                return $this->handleDelete($genericIndexer, $modelClasses);
             }
 
             if ($reindex) {
-                return $this->handleReindex($genericIndexer, $indexerConfig, $modelClasses, $batchSize, $limit);
+                return $this->handleReindex($genericIndexer, $modelClasses, $batchSize, $limit);
             }
 
-            return $this->handleIndex($genericIndexer, $indexerConfig, $modelClasses, $batchSize, $limit);
+            return $this->handleIndex($genericIndexer, $modelClasses, $batchSize, $limit);
 
         } catch (Throwable $e) {
             $this->error('❌ '.$e->getMessage());
@@ -97,8 +95,7 @@ final class GenericIndexModelsDirective extends AbstractDirective
 
     private function resolveModelClasses(array $models, IndexerConfigInterface $indexerConfig): array
     {
-        $modelIndexables = $indexerConfig->getModelIndexables();
-        $validClasses = array_keys($modelIndexables);
+        $validClasses = $indexerConfig->getModelIndexables();
         $resolved = [];
         $hasError = false;
 
@@ -134,16 +131,12 @@ final class GenericIndexModelsDirective extends AbstractDirective
         return $modelClass;
     }
 
-    private function handleCount(GenericIndexerInterface $genericIndexer, IndexerConfigInterface $indexerConfig, array $modelClasses): ExitCode
+    private function handleCount(GenericIndexerInterface $genericIndexer, array $modelClasses): ExitCode
     {
-        $modelIndexables = $indexerConfig->getModelIndexables();
         $total = 0;
 
         foreach ($modelClasses as $modelClass) {
-            $cluster = $modelIndexables[$modelClass];
-            $indexableVO = new IndexableVO($modelClass, new ClusterVO($cluster));
-
-            $count = $genericIndexer->countIndexed($indexableVO);
+            $count = $genericIndexer->countIndexed($modelClass);
             $total += $count;
             $label = $this->getModelLabel($modelClass);
             $this->info("📊 Indexed {$label}: {$count}");
@@ -155,16 +148,12 @@ final class GenericIndexModelsDirective extends AbstractDirective
         return ExitCode::SUCCESS;
     }
 
-    private function handleDelete(GenericIndexerInterface $genericIndexer, IndexerConfigInterface $indexerConfig, array $modelClasses): ExitCode
+    private function handleDelete(GenericIndexerInterface $genericIndexer, array $modelClasses): ExitCode
     {
-        $modelIndexables = $indexerConfig->getModelIndexables();
         $total = 0;
 
         foreach ($modelClasses as $modelClass) {
-            $cluster = $modelIndexables[$modelClass];
-            $indexableVO = new IndexableVO($modelClass, new ClusterVO($cluster));
-
-            $genericIndexer->deleteAll($indexableVO);
+            $genericIndexer->deleteAll($modelClass);
             $label = $this->getModelLabel($modelClass);
             $this->info("🗑️ All {$label} deleted from index");
             $total++;
@@ -176,26 +165,22 @@ final class GenericIndexModelsDirective extends AbstractDirective
         return ExitCode::SUCCESS;
     }
 
-    private function handleReindex(GenericIndexerInterface $genericIndexer, IndexerConfigInterface $indexerConfig, array $modelClasses, int $batchSize, ?int $limit): ExitCode
+    private function handleReindex(GenericIndexerInterface $genericIndexer, array $modelClasses, int $batchSize, ?int $limit): ExitCode
     {
-        $modelIndexables = $indexerConfig->getModelIndexables();
         $totalIndexed = 0;
         $totalSkipped = 0;
 
         foreach ($modelClasses as $modelClass) {
-            $cluster = $modelIndexables[$modelClass];
-            $indexableVO = new IndexableVO($modelClass, new ClusterVO($cluster));
-
             $genericIndexer->setBatchSize($batchSize);
             $genericIndexer->setLimit($limit);
 
             // Compter avant réindexation
-            $beforeCount = $genericIndexer->countIndexed($indexableVO);
+            $beforeCount = $genericIndexer->countIndexed($modelClass);
 
-            $genericIndexer->reindexAll($indexableVO);
+            $genericIndexer->reindexAll($modelClass);
 
             // Compter après réindexation
-            $afterCount = $genericIndexer->countIndexed($indexableVO);
+            $afterCount = $genericIndexer->countIndexed($modelClass);
 
             $indexed = $afterCount;
             $skipped = $beforeCount > 0 ? $beforeCount : 0;
@@ -204,7 +189,7 @@ final class GenericIndexModelsDirective extends AbstractDirective
             $totalSkipped += $skipped;
 
             $label = $this->getModelLabel($modelClass);
-            $this->info("🔄 All {$label} reindexed successfully");
+            $this->info("🔄 All {$label} reindexed successfully with dynamic clusters");
             $this->line("   📊 {$indexed} items indexed, {$skipped} skipped");
             $this->line("   📦 Batch size: {$batchSize}, Limit: ".($limit ?? 'unlimited'));
         }
@@ -215,25 +200,21 @@ final class GenericIndexModelsDirective extends AbstractDirective
         return ExitCode::SUCCESS;
     }
 
-    private function handleIndex(GenericIndexerInterface $genericIndexer, IndexerConfigInterface $indexerConfig, array $modelClasses, int $batchSize, ?int $limit): ExitCode
+    private function handleIndex(GenericIndexerInterface $genericIndexer, array $modelClasses, int $batchSize, ?int $limit): ExitCode
     {
-        $modelIndexables = $indexerConfig->getModelIndexables();
         $totalIndexed = 0;
         $totalSkipped = 0;
 
         foreach ($modelClasses as $modelClass) {
-            $cluster = $modelIndexables[$modelClass];
-            $indexableVO = new IndexableVO($modelClass, new ClusterVO($cluster));
-
             // Compter avant indexation
-            $beforeCount = $genericIndexer->countIndexed($indexableVO);
+            $beforeCount = $genericIndexer->countIndexed($modelClass);
 
             $genericIndexer->setBatchSize($batchSize);
             $genericIndexer->setLimit($limit);
-            $genericIndexer->indexAll($indexableVO);
+            $genericIndexer->indexAll($modelClass);
 
             // Compter après indexation
-            $afterCount = $genericIndexer->countIndexed($indexableVO);
+            $afterCount = $genericIndexer->countIndexed($modelClass);
 
             $indexed = $afterCount - $beforeCount;
             $skipped = $beforeCount;
@@ -244,7 +225,7 @@ final class GenericIndexModelsDirective extends AbstractDirective
             $label = $this->getModelLabel($modelClass);
 
             if ($indexed > 0) {
-                $this->info("✅ All {$label} indexed successfully");
+                $this->info("✅ All {$label} indexed successfully with dynamic clusters");
                 $this->line("   📊 {$indexed} new items indexed, {$skipped} already indexed");
             } elseif ($skipped > 0 && $indexed === 0) {
                 $this->line("   ℹ️ All {$skipped} {$label} were already indexed");
@@ -258,7 +239,7 @@ final class GenericIndexModelsDirective extends AbstractDirective
         $this->newLine();
 
         if ($totalIndexed > 0) {
-            $this->info("📈 Indexing complete: {$totalIndexed} new items indexed");
+            $this->info("📈 Indexing complete: {$totalIndexed} new items indexed with dynamic clusters");
         } elseif ($totalSkipped > 0 && $totalIndexed === 0) {
             $this->info("ℹ️ All items were already indexed ({$totalSkipped} total)");
         } else {

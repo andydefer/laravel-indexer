@@ -17,8 +17,6 @@ use AndyDefer\LaravelIndexer\Services\GenericIndexerService;
 use AndyDefer\LaravelIndexer\Services\IndexerService;
 use AndyDefer\LaravelIndexer\Tests\Fixtures\Models\TestDoctor;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
 use AndyDefer\PhpServices\Contracts\Services\NGramGeneratorInterface;
 use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -113,50 +111,44 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
     {
         $doctor = $this->createDoctor();
 
-        $cluster = new ClusterVO('type:doctor|specialty:cardiology');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
+        $this->genericIndexer->index($doctor);
 
-        $this->genericIndexer->index($indexableVO, $doctor->id);
-
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
 
         $this->assertEquals(1, $count);
-        $this->assertTrue($this->genericIndexer->exists($indexableVO, $doctor->id));
+        $this->assertTrue($this->genericIndexer->exists($doctor));
+    }
+
+    public function test_index_by_id(): void
+    {
+        $doctor = $this->createDoctor();
+
+        $this->genericIndexer->indexById(TestDoctor::class, $doctor->id);
+
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
+
+        $this->assertEquals(1, $count);
+        $this->assertTrue($this->genericIndexer->existsById(TestDoctor::class, $doctor->id));
     }
 
     public function test_index_skips_when_not_should_be_indexed(): void
     {
         $doctor = $this->createDoctor(['is_active' => false]);
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
+        $this->genericIndexer->index($doctor);
 
-        $this->genericIndexer->index($indexableVO, $doctor->id);
-
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
 
         $this->assertEquals(0, $count);
-        $this->assertFalse($this->genericIndexer->exists($indexableVO, $doctor->id));
+        $this->assertFalse($this->genericIndexer->exists($doctor));
     }
 
-    public function test_index_throws_exception_when_not_found(): void
+    public function test_index_by_id_throws_exception_when_not_found(): void
     {
         $this->expectException(ModelNotFoundException::class);
         $this->expectExceptionMessage('Model with ID 99999 not found');
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
-
-        $this->genericIndexer->index($indexableVO, 99999);
+        $this->genericIndexer->indexById(TestDoctor::class, 99999);
     }
 
     public function test_index_all_documents(): void
@@ -165,30 +157,18 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
         $this->createDoctor();
         $this->createDoctor(['is_active' => false]);
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
+        $this->genericIndexer->indexAll(TestDoctor::class);
 
-        $this->genericIndexer->indexAll($indexableVO);
-
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
 
         $this->assertEquals(2, $count);
     }
 
     public function test_index_all_with_empty_dataset(): void
     {
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
+        $this->genericIndexer->indexAll(TestDoctor::class);
 
-        $this->genericIndexer->indexAll($indexableVO);
-
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
 
         $this->assertEquals(0, $count);
     }
@@ -197,34 +177,36 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
     {
         $doctor = $this->createDoctor();
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
+        $this->genericIndexer->index($doctor);
+        $this->assertEquals(1, $this->genericIndexer->countIndexed(TestDoctor::class));
 
-        $this->genericIndexer->index($indexableVO, $doctor->id);
-        $this->assertEquals(1, $this->genericIndexer->countIndexed($indexableVO));
+        $this->genericIndexer->delete($doctor);
 
-        $this->genericIndexer->delete($indexableVO, $doctor->id);
-
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
         $this->assertEquals(0, $count);
-        $this->assertFalse($this->genericIndexer->exists($indexableVO, $doctor->id));
+        $this->assertFalse($this->genericIndexer->exists($doctor));
     }
 
-    public function test_delete_throws_exception_when_not_found(): void
+    public function test_delete_by_id(): void
+    {
+        $doctor = $this->createDoctor();
+
+        $this->genericIndexer->index($doctor);
+        $this->assertEquals(1, $this->genericIndexer->countIndexed(TestDoctor::class));
+
+        $this->genericIndexer->deleteById(TestDoctor::class, $doctor->id);
+
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
+        $this->assertEquals(0, $count);
+        $this->assertFalse($this->genericIndexer->existsById(TestDoctor::class, $doctor->id));
+    }
+
+    public function test_delete_by_id_throws_exception_when_not_found(): void
     {
         $this->expectException(ModelNotFoundException::class);
         $this->expectExceptionMessage('Model with ID 99999 not found');
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
-
-        $this->genericIndexer->delete($indexableVO, 99999);
+        $this->genericIndexer->deleteById(TestDoctor::class, 99999);
     }
 
     public function test_delete_all_documents(): void
@@ -232,18 +214,12 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
         $this->createDoctor();
         $this->createDoctor();
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
+        $this->genericIndexer->indexAll(TestDoctor::class);
+        $this->assertEquals(2, $this->genericIndexer->countIndexed(TestDoctor::class));
 
-        $this->genericIndexer->indexAll($indexableVO);
-        $this->assertEquals(2, $this->genericIndexer->countIndexed($indexableVO));
+        $this->genericIndexer->deleteAll(TestDoctor::class);
 
-        $this->genericIndexer->deleteAll($indexableVO);
-
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
         $this->assertEquals(0, $count);
     }
 
@@ -251,56 +227,52 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
     {
         $doctor = $this->createDoctor();
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
+        $this->genericIndexer->index($doctor);
+        $this->assertEquals(1, $this->genericIndexer->countIndexed(TestDoctor::class));
 
-        $this->genericIndexer->index($indexableVO, $doctor->id);
-        $this->assertEquals(1, $this->genericIndexer->countIndexed($indexableVO));
+        $this->genericIndexer->refresh($doctor);
 
-        $this->genericIndexer->refresh($indexableVO, $doctor->id);
-
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
         $this->assertEquals(1, $count);
-        $this->assertTrue($this->genericIndexer->exists($indexableVO, $doctor->id));
+        $this->assertTrue($this->genericIndexer->exists($doctor));
+    }
+
+    public function test_refresh_by_id(): void
+    {
+        $doctor = $this->createDoctor();
+
+        $this->genericIndexer->index($doctor);
+        $this->assertEquals(1, $this->genericIndexer->countIndexed(TestDoctor::class));
+
+        $this->genericIndexer->refreshById(TestDoctor::class, $doctor->id);
+
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
+        $this->assertEquals(1, $count);
+        $this->assertTrue($this->genericIndexer->existsById(TestDoctor::class, $doctor->id));
     }
 
     public function test_refresh_skips_when_not_should_be_indexed(): void
     {
         $doctor = $this->createDoctor(['is_active' => true]);
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
-
-        $this->genericIndexer->index($indexableVO, $doctor->id);
-        $this->assertEquals(1, $this->genericIndexer->countIndexed($indexableVO));
+        $this->genericIndexer->index($doctor);
+        $this->assertEquals(1, $this->genericIndexer->countIndexed(TestDoctor::class));
 
         $doctor->is_active = false;
         $doctor->save();
 
-        $this->genericIndexer->refresh($indexableVO, $doctor->id);
+        $this->genericIndexer->refresh($doctor);
 
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
         $this->assertEquals(0, $count);
     }
 
-    public function test_refresh_throws_exception_when_not_found(): void
+    public function test_refresh_by_id_throws_exception_when_not_found(): void
     {
         $this->expectException(ModelNotFoundException::class);
         $this->expectExceptionMessage('Model with ID 99999 not found');
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
-
-        $this->genericIndexer->refresh($indexableVO, 99999);
+        $this->genericIndexer->refreshById(TestDoctor::class, 99999);
     }
 
     public function test_reindex_all_documents(): void
@@ -308,18 +280,12 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
         $this->createDoctor();
         $this->createDoctor();
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
+        $this->genericIndexer->indexAll(TestDoctor::class);
+        $this->assertEquals(2, $this->genericIndexer->countIndexed(TestDoctor::class));
 
-        $this->genericIndexer->indexAll($indexableVO);
-        $this->assertEquals(2, $this->genericIndexer->countIndexed($indexableVO));
+        $this->genericIndexer->reindexAll(TestDoctor::class);
 
-        $this->genericIndexer->reindexAll($indexableVO);
-
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
         $this->assertEquals(2, $count);
     }
 
@@ -328,15 +294,9 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
         $this->createDoctor();
         $this->createDoctor();
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
+        $this->genericIndexer->indexAll(TestDoctor::class);
 
-        $this->genericIndexer->indexAll($indexableVO);
-
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
 
         $this->assertEquals(2, $count);
     }
@@ -345,28 +305,18 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
     {
         $doctor = $this->createDoctor();
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
+        $this->genericIndexer->index($doctor);
 
-        $this->genericIndexer->index($indexableVO, $doctor->id);
-
-        $this->assertTrue($this->genericIndexer->exists($indexableVO, $doctor->id));
+        $this->assertTrue($this->genericIndexer->exists($doctor));
+        $this->assertTrue($this->genericIndexer->existsById(TestDoctor::class, $doctor->id));
     }
 
     public function test_exists_returns_false_when_not_indexed(): void
     {
         $doctor = $this->createDoctor(['is_active' => false]);
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
-
-        $this->assertFalse($this->genericIndexer->exists($indexableVO, $doctor->id));
+        $this->assertFalse($this->genericIndexer->exists($doctor));
+        $this->assertFalse($this->genericIndexer->existsById(TestDoctor::class, $doctor->id));
     }
 
     public function test_set_batch_size(): void
@@ -375,16 +325,10 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
             $this->createDoctor();
         }
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
-
         $this->genericIndexer->setBatchSize(10);
-        $this->genericIndexer->indexAll($indexableVO);
+        $this->genericIndexer->indexAll(TestDoctor::class);
 
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
         $this->assertEquals(25, $count);
     }
 
@@ -394,17 +338,11 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
             $this->createDoctor();
         }
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
-
         $this->genericIndexer->setBatchSize(5);
         $this->genericIndexer->setLimit(10);
-        $this->genericIndexer->indexAll($indexableVO);
+        $this->genericIndexer->indexAll(TestDoctor::class);
 
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
         $this->assertEquals(10, $count);
     }
 
@@ -414,17 +352,11 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
             $this->createDoctor();
         }
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
-
         $this->genericIndexer->setBatchSize(5);
         $this->genericIndexer->setLimit(null);
-        $this->genericIndexer->indexAll($indexableVO);
+        $this->genericIndexer->indexAll(TestDoctor::class);
 
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
         $this->assertEquals(15, $count);
     }
 
@@ -434,17 +366,11 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
             $this->createDoctor();
         }
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
-
         $this->genericIndexer->setBatchSize(10);
         $this->genericIndexer->setLimit(5);
-        $this->genericIndexer->reindexAll($indexableVO);
+        $this->genericIndexer->reindexAll(TestDoctor::class);
 
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
         $this->assertEquals(5, $count);
     }
 
@@ -458,17 +384,11 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
             $this->createDoctor(['is_active' => false]);
         }
 
-        $cluster = new ClusterVO('type:doctor');
-        $indexableVO = new IndexableVO(
-            modelClass: TestDoctor::class,
-            cluster: $cluster,
-        );
-
         $this->genericIndexer->setBatchSize(5);
         $this->genericIndexer->setLimit(15);
-        $this->genericIndexer->indexAll($indexableVO);
+        $this->genericIndexer->indexAll(TestDoctor::class);
 
-        $count = $this->genericIndexer->countIndexed($indexableVO);
+        $count = $this->genericIndexer->countIndexed(TestDoctor::class);
         $this->assertEquals(10, $count);
     }
 }

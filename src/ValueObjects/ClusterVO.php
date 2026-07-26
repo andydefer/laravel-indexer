@@ -11,14 +11,6 @@ use InvalidArgumentException;
  * Value Object représentant un cluster pour le regroupement de données.
  *
  * Format: "key1:value1|key2:value2,value3|key3:value4,value5,value6"
- *
- * @example
- * $cluster = new ClusterVO('model:User|tenant:company_abc,company_xyz|env:production|category:electronics,music');
- * $cluster->get('model');    // ['User']
- * $cluster->get('tenant');   // ['company_abc', 'company_xyz']
- * $cluster->get('category'); // ['electronics', 'music']
- * $cluster->has('tenant');   // true
- * $cluster->has('unknown');  // false
  */
 final class ClusterVO extends AbstractValueObject
 {
@@ -33,16 +25,18 @@ final class ClusterVO extends AbstractValueObject
 
     public function __construct(public readonly string $value)
     {
+        if ($value === '') {
+            $this->parsed = [];
+
+            return;
+        }
+
         $this->validate($value);
         $this->parse($value);
     }
 
     private function validate(string $value): void
     {
-        if (empty($value)) {
-            throw new InvalidArgumentException('Cluster cannot be empty');
-        }
-
         if (! str_contains($value, self::SEPARATOR_PAIR)) {
             throw new InvalidArgumentException(
                 sprintf('Invalid cluster format. Expected "key:value", got "%s"', $value)
@@ -75,16 +69,17 @@ final class ClusterVO extends AbstractValueObject
                 throw new InvalidArgumentException('Cluster key cannot be empty');
             }
 
-            if (empty($values)) {
+            // ✅ '0' est une valeur valide
+            if ($values === '' || $values === null) {
                 throw new InvalidArgumentException(
                     sprintf('Cluster values cannot be empty for key "%s"', $key)
                 );
             }
 
-            // Valider que les valeurs ne sont pas vides
             $valueList = explode(self::SEPARATOR_VALUES, $values);
             foreach ($valueList as $val) {
-                if (empty(trim($val))) {
+                // ✅ '0' est une valeur valide
+                if ($val === '' || $val === null || trim($val) === '') {
                     throw new InvalidArgumentException(
                         sprintf('Empty value not allowed for key "%s"', $key)
                     );
@@ -110,28 +105,23 @@ final class ClusterVO extends AbstractValueObject
         }
     }
 
-    /**
-     * Récupère les valeurs par leur clé.
-     * Retourne toujours un tableau, même pour une seule valeur.
-     *
-     * @return string[]
-     */
     public function get(string $key): array
     {
         return $this->parsed[$key] ?? [];
     }
 
-    /**
-     * Vérifie si une clé existe.
-     */
+    public function getFirst(string $key): ?string
+    {
+        $values = $this->get($key);
+
+        return $values[0] ?? null;
+    }
+
     public function has(string $key): bool
     {
         return isset($this->parsed[$key]);
     }
 
-    /**
-     * Vérifie si une clé contient une valeur spécifique.
-     */
     public function contains(string $key, string $value): bool
     {
         if (! $this->has($key)) {
@@ -141,29 +131,27 @@ final class ClusterVO extends AbstractValueObject
         return in_array($value, $this->parsed[$key], true);
     }
 
-    /**
-     * Récupère toutes les paires clé-valeur sous forme de string.
-     */
     public function getValue(): string
     {
         return $this->value;
     }
 
-    /**
-     * Récupère toutes les paires clé-valeur sous forme de tableau.
-     *
-     * @return array<string, string[]>
-     */
     public function all(): array
     {
         return $this->parsed;
     }
 
-    /**
-     * Ajoute une valeur à une clé (retourne une nouvelle instance).
-     */
     public function with(string $key, string $value): self
     {
+        return $this->withIf(true, $key, $value);
+    }
+
+    public function withIf(bool $condition, string $key, string $value): self
+    {
+        if (! $condition) {
+            return $this;
+        }
+
         $newPairs = $this->parsed;
         if (! isset($newPairs[$key])) {
             $newPairs[$key] = [];
@@ -178,12 +166,46 @@ final class ClusterVO extends AbstractValueObject
     }
 
     /**
-     * Ajoute plusieurs valeurs à une clé (retourne une nouvelle instance).
-     *
-     * @param  string[]  $values
+     * Ajoute une paire clé-valeur avec une valeur par défaut si la valeur est null ou une chaîne vide.
+     * false, 0, '0' sont considérés comme des valeurs valides.
      */
+    public function withDefault(string $key, mixed $value, string $default): self
+    {
+        if ($value === null || $value === '') {
+            return $this->with($key, $default);
+        }
+
+        if (is_bool($value)) {
+            return $this->with($key, $value ? 'true' : 'false');
+        }
+
+        // ✅ Gérer 0, '0', 0.0
+        if ($value === 0 || $value === '0' || $value === 0.0) {
+            return $this->with($key, '0');
+        }
+
+        return $this->with($key, (string) $value);
+    }
+
+    /**
+     * Ajoute une paire clé-valeur en fonction d'un booléen (ternaire).
+     */
+    public function withTernary(string $key, bool $condition, string $trueValue, string $falseValue): self
+    {
+        return $this->with($key, $condition ? $trueValue : $falseValue);
+    }
+
     public function withMany(string $key, array $values): self
     {
+        return $this->withManyIf(true, $key, $values);
+    }
+
+    public function withManyIf(bool $condition, string $key, array $values): self
+    {
+        if (! $condition || empty($values)) {
+            return $this;
+        }
+
         $newPairs = $this->parsed;
         if (! isset($newPairs[$key])) {
             $newPairs[$key] = [];
@@ -199,9 +221,6 @@ final class ClusterVO extends AbstractValueObject
         return new self($newValue);
     }
 
-    /**
-     * Supprime une valeur d'une clé (retourne une nouvelle instance).
-     */
     public function without(string $key, ?string $value = null): self
     {
         if (! $this->has($key)) {
@@ -211,10 +230,8 @@ final class ClusterVO extends AbstractValueObject
         $newPairs = $this->parsed;
 
         if ($value === null) {
-            // Supprimer toute la clé
             unset($newPairs[$key]);
         } else {
-            // Supprimer une valeur spécifique
             $newPairs[$key] = array_filter(
                 $newPairs[$key],
                 fn ($v) => $v !== $value
@@ -229,9 +246,6 @@ final class ClusterVO extends AbstractValueObject
         return new self($newValue);
     }
 
-    /**
-     * Vérifie si le cluster contient toutes les clés demandées.
-     */
     public function hasAll(array $keys): bool
     {
         foreach ($keys as $key) {
@@ -243,9 +257,6 @@ final class ClusterVO extends AbstractValueObject
         return true;
     }
 
-    /**
-     * Vérifie si le cluster contient au moins une des clés demandées.
-     */
     public function hasAny(array $keys): bool
     {
         foreach ($keys as $key) {
@@ -257,11 +268,118 @@ final class ClusterVO extends AbstractValueObject
         return false;
     }
 
+    public static function make(string $key, string $value): self
+    {
+        return new self($key.self::SEPARATOR_PAIR.$value);
+    }
+
+    public static function fromPairs(array $pairs): self
+    {
+        if (empty($pairs)) {
+            return new self('');
+        }
+
+        $parts = [];
+        foreach ($pairs as $key => $value) {
+            if (is_array($value)) {
+                $parts[] = $key.self::SEPARATOR_PAIR.implode(self::SEPARATOR_VALUES, $value);
+            } else {
+                $parts[] = $key.self::SEPARATOR_PAIR.$value;
+            }
+        }
+
+        return new self(implode(self::SEPARATOR_GROUP, $parts));
+    }
+
     /**
-     * Construit la chaîne à partir d'un tableau de paires.
-     *
-     * @param  array<string, string[]>  $pairs
+     * Ajoute une paire clé-valeur si la valeur n'est pas vide.
+     * false, 0, '0' sont considérés comme des valeurs valides.
      */
+    public function whenNotEmpty(string $key, mixed $value): self
+    {
+        if ($value === null || $value === '' || $value === []) {
+            return $this;
+        }
+
+        if (is_bool($value)) {
+            return $this->with($key, $value ? 'true' : 'false');
+        }
+
+        // ✅ Gérer 0, '0', 0.0
+        if ($value === 0 || $value === '0' || $value === 0.0) {
+            return $this->with($key, '0');
+        }
+
+        return $this->with($key, (string) $value);
+    }
+
+    public function whenNotNull(string $key, mixed $value): self
+    {
+        if ($value === null) {
+            return $this;
+        }
+
+        if ($value === '') {
+            return $this;
+        }
+
+        return $this->with($key, (string) $value);
+    }
+
+    public function whenKeyExists(string $key, array $array, string $arrayKey): self
+    {
+        if (! isset($array[$arrayKey])) {
+            return $this;
+        }
+
+        $value = $array[$arrayKey];
+
+        if ($value === null || $value === '') {
+            return $this;
+        }
+
+        return $this->with($key, (string) $value);
+    }
+
+    public function whenArrayNotEmpty(string $key, array $values, string $separator = ','): self
+    {
+        if (empty($values)) {
+            return $this;
+        }
+
+        return $this->with($key, implode($separator, $values));
+    }
+
+    public function whenNumeric(string $key, mixed $value): self
+    {
+        if ($value === null) {
+            return $this;
+        }
+
+        if (! is_numeric($value)) {
+            return $this;
+        }
+
+        if ($value === '') {
+            return $this;
+        }
+
+        return $this->with($key, (string) $value);
+    }
+
+    public function whenBool(string $key, mixed $value): self
+    {
+        if ($value === null) {
+            return $this;
+        }
+
+        if (! is_bool($value)) {
+            return $this;
+        }
+
+        return $this->with($key, $value ? 'true' : 'false');
+    }
+
     private function buildFromPairs(array $pairs): string
     {
         $parts = [];
@@ -272,13 +390,13 @@ final class ClusterVO extends AbstractValueObject
         return implode(self::SEPARATOR_GROUP, $parts);
     }
 
-    /**
-     * Retourne la représentation en tableau.
-     *
-     * @return array<string, string[]>
-     */
     public function toArray(): array
     {
         return $this->parsed;
+    }
+
+    public function __toString(): string
+    {
+        return $this->value;
     }
 }
