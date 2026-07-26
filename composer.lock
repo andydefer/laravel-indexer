@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d2fa19f8d8b05f71bb0873b197f1d647",
+    "content-hash": "17ded93ef3d598a9268830a20cc6e2a0",
     "packages": [
         {
             "name": "andydefer/algo-kit",
@@ -164,16 +164,16 @@
         },
         {
             "name": "andydefer/laravel-directive",
-            "version": "v3.58.0",
+            "version": "v3.59.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/andydefer/laravel-directive.git",
-                "reference": "5e7eaf9ad41db17ad4ded75391b03484ee4d3e62"
+                "reference": "d8c91063c2d532029a1e566da869ffe85a971693"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/andydefer/laravel-directive/zipball/5e7eaf9ad41db17ad4ded75391b03484ee4d3e62",
-                "reference": "5e7eaf9ad41db17ad4ded75391b03484ee4d3e62",
+                "url": "https://api.github.com/repos/andydefer/laravel-directive/zipball/d8c91063c2d532029a1e566da869ffe85a971693",
+                "reference": "d8c91063c2d532029a1e566da869ffe85a971693",
                 "shasum": ""
             },
             "require": {
@@ -225,9 +225,9 @@
             "description": "A flexible CLI command system for Laravel that breaks free from Artisan's constraints. Directives introduces a clean separation between what your command does (business logic) and how it's presented (output/UI).",
             "support": {
                 "issues": "https://github.com/andydefer/laravel-directive/issues",
-                "source": "https://github.com/andydefer/laravel-directive/tree/v3.58.0"
+                "source": "https://github.com/andydefer/laravel-directive/tree/v3.59.0"
             },
-            "time": "2026-07-25T21:52:00+00:00"
+            "time": "2026-07-26T11:44:48+00:00"
         },
         {
             "name": "andydefer/laravel-jsonl",
@@ -401,20 +401,20 @@
         },
         {
             "name": "andydefer/laravel-task",
-            "version": "v4.10.25",
+            "version": "v4.10.26",
             "source": {
                 "type": "git",
                 "url": "https://github.com/andydefer/laravel-task.git",
-                "reference": "04f401c52bf6658156d8db319f146641559c1ff2"
+                "reference": "7a231d9afc17f6f3fb3d62f4238c5959ccbd1f3c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/andydefer/laravel-task/zipball/04f401c52bf6658156d8db319f146641559c1ff2",
-                "reference": "04f401c52bf6658156d8db319f146641559c1ff2",
+                "url": "https://api.github.com/repos/andydefer/laravel-task/zipball/7a231d9afc17f6f3fb3d62f4238c5959ccbd1f3c",
+                "reference": "7a231d9afc17f6f3fb3d62f4238c5959ccbd1f3c",
                 "shasum": ""
             },
             "require": {
-                "andydefer/laravel-directive": "^3.58.0",
+                "andydefer/laravel-directive": "^3.59.0",
                 "andydefer/laravel-logger": "^3.9.11",
                 "andydefer/laravel-repository": "^2.10.12",
                 "laravel/framework": "^12.0|^13.0|^14.0|^15.0",
@@ -454,9 +454,9 @@
             "description": "A lightweight, file-based task system for Laravel with async execution, recurring tasks, and JSONL storage",
             "support": {
                 "issues": "https://github.com/andydefer/laravel-task/issues",
-                "source": "https://github.com/andydefer/laravel-task/tree/v4.10.25"
+                "source": "https://github.com/andydefer/laravel-task/tree/v4.10.26"
             },
-            "time": "2026-07-26T07:32:12+00:00"
+            "time": "2026-07-26T11:48:03+00:00"
         },
         {
             "name": "andydefer/php-console",
