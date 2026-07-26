@@ -16,33 +16,20 @@ use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
 use AndyDefer\PhpServices\Enums\NormalizationMode;
 use Illuminate\Support\Str;
 
-/**
- * Service for writing/indexing documents and their tokens.
- *
- * Handles the full indexing pipeline:
- * - Document creation and persistence
- * - Token generation (lexical n-grams and metaphones)
- * - Buffering for bulk insertion
- * - Frequency tracking for duplicate tokens
- */
 final class IndexWriter
 {
-    /** Maximum length for full-text chunking */
-    private const FULL_TEXT_MAX_LENGTH = 25;
+    private int $fullTextMaxLength;
 
-    /** Maximum text length to index (prevents token explosion) */
-    private const MAX_TEXT_LENGTH = 100;
+    private int $maxTextLength;
 
-    /** @var array<string, array<string, mixed>> Buffer for new tokens */
+    /** @var array<string, array<string, mixed>> */
     private array $tokenBuffer = [];
 
-    /** @var array<string, int> Buffer for token frequency increments */
+    /** @var array<string, int> */
     private array $incrementBuffer = [];
 
-    /** Maximum number of tokens before flushing */
     private int $bufferSize = 5000;
 
-    /** Number of tokens per insert chunk (prevents MySQL placeholder limit) */
     private int $insertChunkSize = 1000;
 
     public function __construct(
@@ -53,13 +40,6 @@ final class IndexWriter
         private readonly IndexerConfigInterface $config,
     ) {}
 
-    /**
-     * Indexes a single document record.
-     *
-     * Creates the document, generates all tokens, and persists them to the index.
-     *
-     * @param  IndexedDocumentRecord  $entity  The record to index
-     */
     public function index(IndexedDocumentRecord $entity): void
     {
         $this->resetBuffers();
@@ -75,11 +55,6 @@ final class IndexWriter
         $this->flushTokens($document->id);
     }
 
-    /**
-     * Indexes multiple document records.
-     *
-     * @param  IndexableRecordCollection  $records  Collection of records to index
-     */
     public function indexMany(IndexableRecordCollection $records): void
     {
         $this->resetBuffers();
@@ -98,22 +73,12 @@ final class IndexWriter
         $this->flushTokens(null);
     }
 
-    /**
-     * Resets both token and increment buffers.
-     */
     private function resetBuffers(): void
     {
         $this->tokenBuffer = [];
         $this->incrementBuffer = [];
     }
 
-    /**
-     * Recursively indexes document data, handling nested structures.
-     *
-     * @param  IndexedDocument  $document  The document being indexed
-     * @param  array<mixed>  $data  The data to index
-     * @param  string  $prefix  Field prefix for nested structures
-     */
     private function indexDocumentData(IndexedDocument $document, array $data, string $prefix = ''): void
     {
         foreach ($data as $key => $value) {
@@ -138,36 +103,21 @@ final class IndexWriter
         }
     }
 
-    /**
-     * Determines if an array is associative (vs sequential).
-     *
-     * @param  array<mixed>  $array  The array to check
-     * @return bool True if associative, false if sequential
-     */
     private function isAssociativeArray(array $array): bool
     {
         return array_keys($array) !== range(0, count($array) - 1);
     }
 
-    /**
-     * Extracts tokens from a text value and adds them to the buffer.
-     *
-     * Handles text truncation and routes to short/long text processors.
-     *
-     * @param  string  $documentId  The document ID
-     * @param  string  $field  The field name
-     * @param  string  $value  The text value
-     */
     private function extractAndBufferTokens(string $documentId, string $field, string $value): void
     {
         $minSize = $this->config->getNgramMinSize();
         $maxSize = $this->config->getNgramMaxSize();
 
-        if (strlen($value) > self::MAX_TEXT_LENGTH) {
-            $value = substr($value, 0, self::MAX_TEXT_LENGTH);
+        if (strlen($value) > $this->config->getMaxTextLength()) {
+            $value = substr($value, 0, $this->config->getMaxTextLength());
         }
 
-        if (strlen($value) > self::FULL_TEXT_MAX_LENGTH) {
+        if (strlen($value) > $this->config->getFullTextMaxLength()) {
             $this->extractAndBufferTokensLong($documentId, $field, $value, $minSize, $maxSize);
 
             return;
@@ -176,9 +126,6 @@ final class IndexWriter
         $this->extractAndBufferTokensShort($documentId, $field, $value, $minSize, $maxSize);
     }
 
-    /**
-     * Processes short text by extracting tokens per word.
-     */
     private function extractAndBufferTokensShort(
         string $documentId,
         string $field,
@@ -196,9 +143,6 @@ final class IndexWriter
         }
     }
 
-    /**
-     * Processes long text by splitting into chunks and processing each chunk.
-     */
     private function extractAndBufferTokensLong(
         string $documentId,
         string $field,
@@ -226,7 +170,7 @@ final class IndexWriter
 
                 $newLength = $chunkLength + ($chunkLength > 0 ? 1 : 0) + $wordLength;
 
-                if ($newLength > self::FULL_TEXT_MAX_LENGTH && $chunkLength > 0) {
+                if ($newLength > $this->config->getFullTextMaxLength() && $chunkLength > 0) {
                     break;
                 }
 
@@ -243,7 +187,7 @@ final class IndexWriter
                 $index++;
             }
 
-            if ($chunkLength > self::FULL_TEXT_MAX_LENGTH) {
+            if ($chunkLength > $this->config->getFullTextMaxLength()) {
                 $this->extractAndBufferTokensShort($documentId, $field, $chunkOriginal, $minSize, $maxSize);
 
                 continue;
@@ -262,9 +206,6 @@ final class IndexWriter
         }
     }
 
-    /**
-     * Processes a single word: generates lexical and metaphone n-grams.
-     */
     private function processWord(
         string $documentId,
         string $field,
@@ -275,13 +216,11 @@ final class IndexWriter
     ): void {
         $phoneticMinSize = $minSize - 1;
 
-        // Generate LEXICAL n-grams
         $ngrams = $this->ngramGenerator->generate($normalizedWord, $minSize, $maxSize, NormalizationMode::WITH_NORMALIZATION);
         foreach ($ngrams as $ngram) {
             $this->addToBuffer($documentId, $ngram, $field, GramType::LEXICAL, $originalWord);
         }
 
-        // Generate METAPHONE n-grams
         $metaphone = metaphone($normalizedWord);
         $metaphoneNgrams = $this->ngramGenerator->generate($metaphone, $phoneticMinSize, $maxSize, NormalizationMode::WITH_NORMALIZATION);
         foreach ($metaphoneNgrams as $metaphoneNgram) {
@@ -289,15 +228,6 @@ final class IndexWriter
         }
     }
 
-    /**
-     * Adds a token to the buffer, handling duplicates via frequency increment.
-     *
-     * @param  string  $documentId  The document ID
-     * @param  string  $token  The token value
-     * @param  string  $field  The field name
-     * @param  GramType  $type  The token type
-     * @param  string  $originalText  The original text (preserves case)
-     */
     private function addToBuffer(string $documentId, string $token, string $field, GramType $type, string $originalText): void
     {
         $key = $documentId.'|'.$token.'|'.$field.'|'.$type->value;
@@ -332,13 +262,6 @@ final class IndexWriter
         }
     }
 
-    /**
-     * Flushes buffered tokens to the database.
-     *
-     * Handles both new token insertion and frequency increments.
-     *
-     * @param  string|null  $documentId  Optional document ID filter (null = all)
-     */
     private function flushTokens(?string $documentId = null): void
     {
         if (empty($this->tokenBuffer) && empty($this->incrementBuffer)) {
@@ -368,14 +291,6 @@ final class IndexWriter
         $this->resetBuffers();
     }
 
-    /**
-     * Extracts words from text while preserving original case.
-     *
-     * Splits on spaces, hyphens, underscores, and slashes.
-     *
-     * @param  string  $text  The text to extract words from
-     * @return array<string> Extracted words
-     */
     private function extractWordsPreserveCase(string $text): array
     {
         $words = preg_split('/[\s\-_\/]+/', $text, -1, PREG_SPLIT_NO_EMPTY);

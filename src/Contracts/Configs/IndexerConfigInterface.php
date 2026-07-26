@@ -24,4 +24,8 @@ interface IndexerConfigInterface
 
     /** @return array<class-string, string> */
     public function getModelIndexables(): array;
+
+    public function getFullTextMaxLength(): int;
+
+    public function getMaxTextLength(): int;
 }

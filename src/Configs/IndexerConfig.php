@@ -21,6 +21,10 @@ final class IndexerConfig implements IndexerConfigInterface
 
     private const DEFAULT_MODEL_INDEXABLES = [];
 
+    private const DEFAULT_FULL_TEXT_MAX_LENGTH = 100;
+
+    private const DEFAULT_MAX_TEXT_LENGTH = 1000;
+
     public function __construct(
         private readonly ConfigRepository $config
     ) {}
@@ -73,5 +77,15 @@ final class IndexerConfig implements IndexerConfigInterface
         $models = $this->config->get('indexer.model_indexables', self::DEFAULT_MODEL_INDEXABLES);
 
         return is_array($models) ? $models : self::DEFAULT_MODEL_INDEXABLES;
+    }
+
+    public function getFullTextMaxLength(): int
+    {
+        return (int) $this->config->get('indexer.full_text_max_length', self::DEFAULT_FULL_TEXT_MAX_LENGTH);
+    }
+
+    public function getMaxTextLength(): int
+    {
+        return (int) $this->config->get('indexer.max_text_length', self::DEFAULT_MAX_TEXT_LENGTH);
     }
 }
