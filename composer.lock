@@ -4,24 +4,24 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "55961e3f84a62c8186128a26c4a02443",
+    "content-hash": "998f284dff81a55586f4795da7366183",
     "packages": [
         {
             "name": "andydefer/algo-kit",
-            "version": "v0.8.10",
+            "version": "v0.8.11",
             "source": {
                 "type": "git",
                 "url": "https://github.com/andydefer/algo-kit.git",
-                "reference": "ca0c4e792d70a5dced0a8863e28e4cf629227c46"
+                "reference": "bd11f76055768da84dec0f8b0b8eb38588b614cd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/andydefer/algo-kit/zipball/ca0c4e792d70a5dced0a8863e28e4cf629227c46",
-                "reference": "ca0c4e792d70a5dced0a8863e28e4cf629227c46",
+                "url": "https://api.github.com/repos/andydefer/algo-kit/zipball/bd11f76055768da84dec0f8b0b8eb38588b614cd",
+                "reference": "bd11f76055768da84dec0f8b0b8eb38588b614cd",
                 "shasum": ""
             },
             "require": {
-                "andydefer/storage-kit": "^0.7.11",
+                "andydefer/storage-kit": "^0.7.12",
                 "php": ">=8.1"
             },
             "require-dev": {
@@ -49,9 +49,9 @@
             "description": "Algo KIT - Probabilistic data structures and algorithms for large-scale data processing in PHP",
             "support": {
                 "issues": "https://github.com/andydefer/algo-kit/issues",
-                "source": "https://github.com/andydefer/algo-kit/tree/v0.8.10"
+                "source": "https://github.com/andydefer/algo-kit/tree/v0.8.11"
             },
-            "time": "2026-07-25T19:16:11+00:00"
+            "time": "2026-07-26T20:12:39+00:00"
         },
         {
             "name": "andydefer/domain-structures",
@@ -401,21 +401,21 @@
         },
         {
             "name": "andydefer/laravel-task",
-            "version": "v4.10.26",
+            "version": "v4.10.27",
             "source": {
                 "type": "git",
                 "url": "https://github.com/andydefer/laravel-task.git",
-                "reference": "7a231d9afc17f6f3fb3d62f4238c5959ccbd1f3c"
+                "reference": "114e96cf57e91e40d60e7bd8bb0510c20fd39d13"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/andydefer/laravel-task/zipball/7a231d9afc17f6f3fb3d62f4238c5959ccbd1f3c",
-                "reference": "7a231d9afc17f6f3fb3d62f4238c5959ccbd1f3c",
+                "url": "https://api.github.com/repos/andydefer/laravel-task/zipball/114e96cf57e91e40d60e7bd8bb0510c20fd39d13",
+                "reference": "114e96cf57e91e40d60e7bd8bb0510c20fd39d13",
                 "shasum": ""
             },
             "require": {
-                "andydefer/laravel-directive": "^3.59.0",
-                "andydefer/laravel-logger": "^3.9.11",
+                "andydefer/laravel-directive": "^3.59.1",
+                "andydefer/laravel-logger": "^3.9.12",
                 "andydefer/laravel-repository": "^2.10.12",
                 "laravel/framework": "^12.0|^13.0|^14.0|^15.0",
                 "php": ">=8.1",
@@ -454,9 +454,9 @@
             "description": "A lightweight, file-based task system for Laravel with async execution, recurring tasks, and JSONL storage",
             "support": {
                 "issues": "https://github.com/andydefer/laravel-task/issues",
-                "source": "https://github.com/andydefer/laravel-task/tree/v4.10.26"
+                "source": "https://github.com/andydefer/laravel-task/tree/v4.10.27"
             },
-            "time": "2026-07-26T11:48:03+00:00"
+            "time": "2026-07-26T20:11:12+00:00"
         },
         {
             "name": "andydefer/php-client",

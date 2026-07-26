@@ -83,4 +83,21 @@ return [
         // App\Models\Hospital::class,
         // App\Models\Specialty::class,
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Text Length Limits
+    |--------------------------------------------------------------------------
+    |
+    | full_text_max_length: Maximum length for full-text chunking.
+    |   - Texts longer than this are split into chunks.
+    |   - Default: 100 characters
+    |
+    | max_text_length: Maximum text length to index.
+    |   - Prevents token explosion on very long texts.
+    |   - Default: 1000 characters
+    |
+    */
+    'full_text_max_length' => env('INDEXER_FULL_TEXT_MAX_LENGTH', 100),
+    'max_text_length' => env('INDEXER_MAX_TEXT_LENGTH', 1000),
 ];
