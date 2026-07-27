@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\ValueObjects;
 
 use AndyDefer\DomainStructures\Abstracts\AbstractValueObject;
-use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 
 /**
@@ -18,7 +17,7 @@ use InvalidArgumentException;
  *
  * Caractères autorisés :
  * - Clés : a-z, A-Z, 0-9, _ uniquement
- * - Valeurs : tous les caractères (libre)
+ * - Valeurs : tous les caractères (libre) mais les caractères réservés sont remplacés par '.'
  */
 final class ClusterVO extends AbstractValueObject
 {
@@ -47,6 +46,19 @@ final class ClusterVO extends AbstractValueObject
 
         $this->validate($value);
         $this->parse($value);
+    }
+
+    /**
+     * Nettoie une valeur en remplaçant les caractères réservés par '.'
+     */
+    private function sanitizeValue(string $value): string
+    {
+        // Remplacer les séparateurs réservés par '.'
+        return str_replace(
+            [self::SEPARATOR_PAIR, self::SEPARATOR_GROUP, self::SEPARATOR_MODE],
+            '.',
+            $value
+        );
     }
 
     private function validate(string $value): void
@@ -110,17 +122,8 @@ final class ClusterVO extends AbstractValueObject
                 );
             }
 
-            $this->validateKey($key);
-            // La valeur est libre, pas de validation
-        }
-    }
-
-    private function validateKey(string $value): void
-    {
-        if (! preg_match('/^[a-zA-Z0-9_]+$/', $value)) {
-            throw new InvalidArgumentException(
-                sprintf('Cluster key "%s" must contain only alphanumeric characters and underscore (a-z, A-Z, 0-9, _)', $value)
-            );
+            // ✅ Seulement vérifier que la clé n'est pas vide
+            // Pas de validation stricte sur les caractères de la clé
         }
     }
 
@@ -142,7 +145,8 @@ final class ClusterVO extends AbstractValueObject
             $pairParts = explode(self::SEPARATOR_PAIR, $pair, 2);
             if (count($pairParts) === 2) {
                 [$key, $val] = $pairParts;
-                $this->parsed[$key] = trim($val);
+                // ✅ Nettoyer la valeur en remplaçant les caractères réservés
+                $this->parsed[$key] = $this->sanitizeValue(trim($val));
             }
         }
     }
@@ -214,11 +218,11 @@ final class ClusterVO extends AbstractValueObject
             return $this;
         }
 
-        $this->validateKey($key);
-        // La valeur est libre, pas de validation
+        // ✅ Nettoyer la valeur
+        $sanitizedValue = $this->sanitizeValue($value);
 
         $newPairs = $this->parsed;
-        $newPairs[$key] = $value;
+        $newPairs[$key] = $sanitizedValue;
 
         $clusterPart = $this->buildClusterPart($newPairs);
         $newValue = $this->mode !== null ? $clusterPart.self::SEPARATOR_MODE.$this->mode : $clusterPart;
@@ -374,8 +378,9 @@ final class ClusterVO extends AbstractValueObject
     public function withCases(string $prefix, array $values, string $suffix = ''): self
     {
         foreach ($values as $value) {
-            $key = $prefix.$value.$suffix;
-            $this->validateKey($key);
+            // ✅ Nettoyer la valeur
+            $sanitizedValue = $this->sanitizeValue($value);
+            $key = $prefix.$sanitizedValue.$suffix;
             $this->parsed[$key] = 'true';
         }
 
@@ -443,42 +448,6 @@ final class ClusterVO extends AbstractValueObject
         }
 
         return implode(self::SEPARATOR_GROUP, $parts);
-    }
-
-    /**
-     * Applique les conditions de cluster à une requête Eloquent.
-     * Nécessite que le cluster ait un mode (AND, OR ou NOT).
-     */
-    public function applyToQuery(Builder $query, string $column = 'cluster'): void
-    {
-        if ($this->mode === null) {
-            throw new InvalidArgumentException('Cluster must have a mode (AND, OR or NOT) to apply to query');
-        }
-
-        $clusterPairs = $this->all();
-
-        if (empty($clusterPairs)) {
-            return;
-        }
-
-        if ($this->isOr()) {
-            $query->where(function ($subQuery) use ($clusterPairs, $column) {
-                foreach ($clusterPairs as $key => $value) {
-                    $subQuery->orWhere($column, 'LIKE', '%'.$key.':'.$value.'%');
-                }
-            });
-        } elseif ($this->isNot()) {
-            $query->where(function ($subQuery) use ($clusterPairs, $column) {
-                foreach ($clusterPairs as $key => $value) {
-                    $subQuery->where($column, 'NOT LIKE', '%'.$key.':'.$value.'%');
-                }
-            });
-        } else {
-            // AND (mode par défaut)
-            foreach ($clusterPairs as $key => $value) {
-                $query->where($column, 'LIKE', '%'.$key.':'.$value.'%');
-            }
-        }
     }
 
     public function toArray(): array

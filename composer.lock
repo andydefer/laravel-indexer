@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "998f284dff81a55586f4795da7366183",
+    "content-hash": "916da908d1145b510e5da4aca6e19173",
     "packages": [
         {
             "name": "andydefer/algo-kit",
@@ -164,20 +164,20 @@
         },
         {
             "name": "andydefer/laravel-directive",
-            "version": "v3.59.1",
+            "version": "v3.59.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/andydefer/laravel-directive.git",
-                "reference": "1929160c28b41dc0ec2cf670b7f0eb935b88feea"
+                "reference": "efe3cd0a6e265e96e2bedfe3e432227c2dd18548"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/andydefer/laravel-directive/zipball/1929160c28b41dc0ec2cf670b7f0eb935b88feea",
-                "reference": "1929160c28b41dc0ec2cf670b7f0eb935b88feea",
+                "url": "https://api.github.com/repos/andydefer/laravel-directive/zipball/efe3cd0a6e265e96e2bedfe3e432227c2dd18548",
+                "reference": "efe3cd0a6e265e96e2bedfe3e432227c2dd18548",
                 "shasum": ""
             },
             "require": {
-                "andydefer/algo-kit": "^0.8.10",
+                "andydefer/algo-kit": "^0.8.11",
                 "andydefer/laravel-jsonl": "^0.8.13",
                 "andydefer/php-console": "^1.6.11",
                 "andydefer/php-signature-parser": "^0.10.3",
@@ -225,9 +225,9 @@
             "description": "A flexible CLI command system for Laravel that breaks free from Artisan's constraints. Directives introduces a clean separation between what your command does (business logic) and how it's presented (output/UI).",
             "support": {
                 "issues": "https://github.com/andydefer/laravel-directive/issues",
-                "source": "https://github.com/andydefer/laravel-directive/tree/v3.59.1"
+                "source": "https://github.com/andydefer/laravel-directive/tree/v3.59.2"
             },
-            "time": "2026-07-26T20:06:08+00:00"
+            "time": "2026-07-26T21:46:00+00:00"
         },
         {
             "name": "andydefer/laravel-jsonl",
@@ -401,20 +401,20 @@
         },
         {
             "name": "andydefer/laravel-task",
-            "version": "v4.10.27",
+            "version": "v4.10.28",
             "source": {
                 "type": "git",
                 "url": "https://github.com/andydefer/laravel-task.git",
-                "reference": "114e96cf57e91e40d60e7bd8bb0510c20fd39d13"
+                "reference": "582d78fe42947ccaa5ac825bd3926f78cce42ea8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/andydefer/laravel-task/zipball/114e96cf57e91e40d60e7bd8bb0510c20fd39d13",
-                "reference": "114e96cf57e91e40d60e7bd8bb0510c20fd39d13",
+                "url": "https://api.github.com/repos/andydefer/laravel-task/zipball/582d78fe42947ccaa5ac825bd3926f78cce42ea8",
+                "reference": "582d78fe42947ccaa5ac825bd3926f78cce42ea8",
                 "shasum": ""
             },
             "require": {
-                "andydefer/laravel-directive": "^3.59.1",
+                "andydefer/laravel-directive": "^3.59.2",
                 "andydefer/laravel-logger": "^3.9.12",
                 "andydefer/laravel-repository": "^2.10.12",
                 "laravel/framework": "^12.0|^13.0|^14.0|^15.0",
@@ -454,9 +454,9 @@
             "description": "A lightweight, file-based task system for Laravel with async execution, recurring tasks, and JSONL storage",
             "support": {
                 "issues": "https://github.com/andydefer/laravel-task/issues",
-                "source": "https://github.com/andydefer/laravel-task/tree/v4.10.27"
+                "source": "https://github.com/andydefer/laravel-task/tree/v4.10.28"
             },
-            "time": "2026-07-26T20:11:12+00:00"
+            "time": "2026-07-26T21:55:13+00:00"
         },
         {
             "name": "andydefer/php-client",

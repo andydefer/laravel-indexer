@@ -130,20 +130,20 @@ final class ClusterVOTest extends TestCase
         new ClusterVO('@AND');
     }
 
-    public function test_throws_exception_when_key_has_dash(): void
+    // ✅ MODIFIÉ : Les clés avec dash et dot sont maintenant ACCEPTÉES
+    // car on ne valide plus strictement les clés
+    public function test_accepts_key_with_dash(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster key "role-doctor" must contain only alphanumeric characters and underscore (a-z, A-Z, 0-9, _)');
-
-        new ClusterVO('role-doctor:user');
+        $cluster = new ClusterVO('role-doctor:user');
+        $this->assertSame('role-doctor:user', $cluster->getValue());
+        $this->assertSame('user', $cluster->get('role-doctor'));
     }
 
-    public function test_throws_exception_when_key_has_dot(): void
+    public function test_accepts_key_with_dot(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster key "role.doctor" must contain only alphanumeric characters and underscore (a-z, A-Z, 0-9, _)');
-
-        new ClusterVO('role.doctor:user');
+        $cluster = new ClusterVO('role.doctor:user');
+        $this->assertSame('role.doctor:user', $cluster->getValue());
+        $this->assertSame('user', $cluster->get('role.doctor'));
     }
 
     // ============================================================
@@ -296,13 +296,24 @@ final class ClusterVOTest extends TestCase
         $this->assertSame('true', $newCluster->get('role_doctor'));
     }
 
-    public function test_with_throws_exception_for_dash_in_key(): void
+    // ✅ MODIFIÉ : Les clés avec dash sont maintenant ACCEPTÉES
+    public function test_accepts_key_with_dash_in_with(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster key "type-user" must contain only alphanumeric characters and underscore (a-z, A-Z, 0-9, _)');
-
         $cluster = ((new ClusterVO('type:user')));
-        $cluster->with('type-user', 'value');
+        $newCluster = $cluster->with('type-user', 'value');
+
+        $this->assertSame('type:user|type-user:value', $newCluster->getValue());
+        $this->assertSame('value', $newCluster->get('type-user'));
+    }
+
+    // ✅ AJOUTÉ : Test pour les clés avec dot
+    public function test_accepts_key_with_dot_in_with(): void
+    {
+        $cluster = ((new ClusterVO('type:user')));
+        $newCluster = $cluster->with('type.user', 'value');
+
+        $this->assertSame('type:user|type.user:value', $newCluster->getValue());
+        $this->assertSame('value', $newCluster->get('type.user'));
     }
 
     // ============================================================
@@ -779,26 +790,24 @@ final class ClusterVOTest extends TestCase
         $this->assertSame('john_doe', $cluster->get('email'));
     }
 
-    public function test_throws_exception_for_dot_in_key(): void
+    // ✅ MODIFIÉ : Les clés avec dot sont maintenant ACCEPTÉES
+    public function test_accepts_key_with_dot_in_construction(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster key "user.type" must contain only alphanumeric characters and underscore (a-z, A-Z, 0-9, _)');
-
-        new ClusterVO('user.type:user');
+        $cluster = new ClusterVO('user.type:user');
+        $this->assertSame('user.type:user', $cluster->getValue());
+        $this->assertSame('user', $cluster->get('user.type'));
     }
 
-    public function test_throws_exception_for_dash_in_key(): void
+    // ✅ MODIFIÉ : Les clés avec dash sont maintenant ACCEPTÉES
+    public function test_accepts_key_with_dash_in_construction(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster key "user-type" must contain only alphanumeric characters and underscore (a-z, A-Z, 0-9, _)');
-
-        new ClusterVO('user-type:user');
+        $cluster = new ClusterVO('user-type:user');
+        $this->assertSame('user-type:user', $cluster->getValue());
+        $this->assertSame('user', $cluster->get('user-type'));
     }
 
     public function test_accepts_special_characters_in_values(): void
     {
-        // Les caractères autorisés dans les valeurs : espaces, points, tirets, underscores
-        // MAIS PAS : @, :, | (réservés)
         $cluster = new ClusterVO('city:New York|email:john.doe|name:Jean-Pierre');
 
         $this->assertSame('city:New York|email:john.doe|name:Jean-Pierre', $cluster->getValue());
@@ -872,14 +881,15 @@ final class ClusterVOTest extends TestCase
         $this->assertSame('AND', $cluster->getMode());
     }
 
-    public function test_with_cases_throws_exception_for_invalid_key(): void
+    // ✅ MODIFIÉ : Les clés avec dash sont maintenant ACCEPTÉES
+    public function test_with_cases_accepts_key_with_dash(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster key "lang-fr" must contain only alphanumeric characters and underscore (a-z, A-Z, 0-9, _)');
-
         $languages = ['fr'];
         $cluster = (new ClusterVO('type:user'));
-        $cluster->withCases('lang-', $languages);
+        $newCluster = $cluster->withCases('lang-', $languages);
+
+        $this->assertSame('type:user|lang-fr:true', $newCluster->getValue());
+        $this->assertSame('true', $newCluster->get('lang-fr'));
     }
 
     public function test_with_cases_with_empty_array_does_nothing(): void
@@ -942,13 +952,14 @@ final class ClusterVOTest extends TestCase
         $cluster->withEnum('role_', 'Invalid\Enum\Class');
     }
 
-    public function test_with_enum_throws_exception_for_invalid_key(): void
+    // ✅ MODIFIÉ : Les clés avec dash sont maintenant ACCEPTÉES
+    public function test_with_enum_accepts_key_with_dash(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster key "role-patient" must contain only alphanumeric characters and underscore (a-z, A-Z, 0-9, _)');
-
         $cluster = (new ClusterVO('type:user'));
-        $cluster->withEnum('role-', UserType::class);
+        $newCluster = $cluster->withEnum('role-', UserType::class);
+
+        $this->assertStringContainsString('role-patient:true', $newCluster->getValue());
+        $this->assertSame('true', $newCluster->get('role-patient'));
     }
 
     // ============================================================
@@ -1003,12 +1014,13 @@ final class ClusterVOTest extends TestCase
         $cluster->withEnumValues('status_', 'Invalid\Enum\Class');
     }
 
-    public function test_with_enum_values_throws_exception_for_invalid_key(): void
+    // ✅ MODIFIÉ : Les clés avec dash sont maintenant ACCEPTÉES
+    public function test_with_enum_values_accepts_key_with_dash(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster key "status-active" must contain only alphanumeric characters and underscore (a-z, A-Z, 0-9, _)');
-
         $cluster = (new ClusterVO('type:user'));
-        $cluster->withEnumValues('status-', UserStatus::class);
+        $newCluster = $cluster->withEnumValues('status-', UserStatus::class);
+
+        $this->assertStringContainsString('status-active:true', $newCluster->getValue());
+        $this->assertSame('true', $newCluster->get('status-active'));
     }
 }
