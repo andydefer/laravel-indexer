@@ -2,37 +2,50 @@
 
 ## Description
 
-Service de recherche et d'interrogation de l'index, permettant de rechercher des documents via des n-grammes lexicaux et phonétiques (métaphones) avec des filtres avancés.
+Service de recherche d'index pour Laravel Indexer. Orchestre la recherche de documents indexés en combinant les correspondances lexicales et métaphoniques avec des filtres avancés par clusters.
 
 ## Hiérarchie / Implémentations
 
 ```
 IndexSearcher (final)
-    └── Dépendances : IndexedDocumentRepository, IndexedTokenRepository, TextNormalizerInterface, IndexerConfig
 ```
 
 ## Rôle principal
 
-Assure la recherche dans l'index en combinant :
+`IndexSearcher` est le moteur de recherche du package. Il :
 
-- Recherche lexicale (n-grammes exacts)
-- Recherche phonétique (métaphones pour tolérer les fautes d'orthographe)
-- Filtrage par champ, cluster, fingerprint
-- Intersection de résultats (logique AND)
-- Restitution des métadonnées de correspondance (champ, valeur, type)
+- **Recherche textuelle** : Recherche par n-grammes lexicaux et métaphoniques
+- **Filtrage avancé** : Filtre les résultats par clusters avec opérateurs AND, OR, NOT
+- **Intersection** : Combine les résultats de plusieurs n-grammes (AND logique)
+- **Limitation** : Limite le nombre de résultats
+- **Vérification** : Vérifie l'existence de documents par fingerprint
+
+## DETAILS
+
+[Voir la classe IndexSearcher](https://github.com/andydefer/laravel-indexer/blob/main/src/Services/Composants/IndexSearcher.php)
 
 ## API / Méthodes publiques
 
-### `__construct(IndexedDocumentRepository $documentRepository, IndexedTokenRepository $tokenRepository, TextNormalizerInterface $textNormalizer, IndexerConfig $config)`
+### `__construct()`
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$documentRepository` | `IndexedDocumentRepository` | Repository des documents |
 | `$tokenRepository` | `IndexedTokenRepository` | Repository des tokens |
-| `$textNormalizer` | `TextNormalizerInterface` | Service de normalisation des textes |
-| `$config` | `IndexerConfig` | Configuration de l'indexeur |
+| `$textNormalizer` | `TextNormalizerInterface` | Normaliseur de texte |
+| `$config` | `IndexerConfigInterface` | Configuration de l'indexeur |
 
 **Retourne :** `void`
+
+**Exemple :**
+```php
+$searcher = new IndexSearcher(
+    $documentRepository,
+    $tokenRepository,
+    $textNormalizer,
+    $config
+);
+```
 
 ---
 
@@ -40,17 +53,14 @@ Assure la recherche dans l'index en combinant :
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$fingerprint` | `IndexableFingerPrintVO` | Fingerprint à vérifier |
+| `$fingerprint` | `IndexableFingerPrintVO` | Fingerprint du document |
 
-**Retourne :** `bool` - `true` si le document existe, `false` sinon
+**Retourne :** `bool` - `true` si le document existe
 
 **Exemple :**
 ```php
-$fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-
-if ($searcher->exists($fingerPrint)) {
-    echo "Le document existe\n";
-}
+$fingerprint = new IndexableFingerPrintVO('App.Models.User|123');
+$exists = $searcher->exists($fingerprint);
 ```
 
 ---
@@ -59,174 +69,224 @@ if ($searcher->exists($fingerPrint)) {
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$query` | `SearchQueryRecord` | La requête de recherche (n-grams, filtres, limite) |
+| `$query` | `SearchQueryRecord` | Requête de recherche |
 
-**Retourne :** `IndexableSearchResultCollection<IndexableSearchResultRecord>` - Collection des résultats de recherche
+**Retourne :** `IndexableSearchResultCollection` - Collection de résultats
 
 **Exemple :**
 ```php
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('type:user|status:active@AND'));
+
 $query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name|developer=description'),
-    cluster: new ClusterVO('tenant:company_abc'),
-    limit: 50
+    query: new SearchQueryVO('john=name,email'),
+    clusters: $clusters,
+    clustersOperator: 'AND',
+    limit: 20
 );
 
 $results = $searcher->search($query);
-
-foreach ($results as $result) {
-    echo $result->item->fingerprint->getValue(); // 'App.Models.User|123'
-    echo $result->field; // 'name'
-    echo $result->gram_value; // 'john'
-    echo $result->gram_type->value; // 'lexical'
-}
 ```
+
+---
+
+## Méthodes internes (privées)
+
+### `resolveMinSize(SearchQueryRecord $query): int`
+
+Résout la taille minimale des n-grammes.
+
+- Utilise la valeur configurée ou celle de la requête
+- Vérifie les limites configurées
+
+---
+
+### `resolveMaxSize(SearchQueryRecord $query): int`
+
+Résout la taille maximale des n-grammes.
+
+- Utilise la valeur configurée ou celle de la requête
+- Vérifie les limites configurées
+
+---
+
+### `searchTokens()`
+
+Recherche les tokens correspondant aux critères.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$ngram` | `string` | N-gramme à rechercher |
+| `$fields` | `array<string>` | Champs à filtrer |
+| `$clusters` | `ClusterVOCollection` | Collection de clusters |
+| `$clustersOperator` | `?string` | Opérateur entre clusters |
+| `$type` | `GramType` | Type de token (LEXICAL/METAPHONE) |
+| `$minSize` | `int` | Taille minimale des n-grammes |
+| `$maxSize` | `int` | Taille maximale des n-grammes |
+
+**Retourne :** `Collection<int, string>` - IDs des documents
+
+---
+
+### `intersectResults(array $results): Collection`
+
+Calcule l'intersection de plusieurs ensembles de résultats.
+
+**Retourne :** `Collection<int, string>` - IDs des documents
+
+---
+
+### `findMatchInfo()`
+
+Trouve les informations de correspondance pour un document.
+
+**Retourne :** `?array{field: string, gram_value: string, gram_type: GramType}`
+
+---
+
+### `generateNgramsFromTerm(string $term, int $minSize, int $maxSize): array`
+
+Génère tous les n-grammes possibles d'un terme.
+
+**Retourne :** `array<string>` - N-grammes uniques
+
+---
 
 ## Cas d'utilisation
 
-### Cas 1 : Recherche simple (un seul n-gram)
+### Cas 1 : Recherche simple sans clusters
 
 ```php
-<?php
-
-use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
+$clusters = new ClusterVOCollection();
 
 $query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name')
+    query: new SearchQueryVO('john=name,email'),
+    clusters: $clusters,
+    clustersOperator: 'AND',
+    limit: 20
 );
 
 $results = $searcher->search($query);
-// Trouve tous les documents contenant "john" dans le champ "name"
 ```
 
-### Cas 2 : Recherche multi-champs
+### Cas 2 : Recherche avec cluster AND
 
 ```php
-<?php
-
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name,email,description')
-);
-
-$results = $searcher->search($query);
-// Trouve "john" dans "name", "email" ou "description"
-```
-
-### Cas 3 : Recherche multi-n-grams (AND)
-
-```php
-<?php
-
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name|developer=description')
-);
-
-$results = $searcher->search($query);
-// Trouve les documents contenant "john" dans "name" ET "developer" dans "description"
-```
-
-### Cas 4 : Recherche avec cluster
-
-```php
-<?php
-
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('type:user@AND'));
+$clusters->add(new ClusterVO('status:active@AND'));
 
 $query = new SearchQueryRecord(
     query: new SearchQueryVO('john=name'),
-    cluster: new ClusterVO('tenant:company_abc|env:production')
+    clusters: $clusters,
+    clustersOperator: 'AND',
+    limit: 20
 );
 
 $results = $searcher->search($query);
-// Trouve "john" uniquement dans le tenant "company_abc" en production
 ```
 
-### Cas 5 : Recherche avec fingerprint
+### Cas 3 : Recherche avec cluster OR
 
 ```php
-<?php
-
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('role_doctor:true@OR'));
+$clusters->add(new ClusterVO('role_admin:true@OR'));
 
 $query = new SearchQueryRecord(
     query: new SearchQueryVO('john=name'),
-    fingerprint: new IndexableFingerPrintVO('App.Models.User|123')
+    clusters: $clusters,
+    clustersOperator: 'OR',
+    limit: 20
 );
 
 $results = $searcher->search($query);
-// Vérifie si le document 123 contient "john" dans "name"
 ```
 
-### Cas 6 : Autocomplétion partielle
+### Cas 4 : Recherche avec cluster NOT
 
 ```php
-<?php
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('status:inactive@NOT'));
 
-// Avec min_size=3, max_size=5
 $query = new SearchQueryRecord(
-    query: new SearchQueryVO('joh=name')
+    query: new SearchQueryVO('john=name'),
+    clusters: $clusters,
+    clustersOperator: 'NOT',
+    limit: 20
 );
 
 $results = $searcher->search($query);
-// Trouve "john", "johndoe", etc. (partielle, car "joh" est un n-gram)
 ```
+
+### Cas 5 : Recherche multi-termes (AND)
+
+```php
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('type:user@AND'));
+
+$query = new SearchQueryRecord(
+    query: new SearchQueryVO('john=name|developer=description'),
+    clusters: $clusters,
+    clustersOperator: 'AND',
+    limit: 20,
+    min_size: 3,
+    max_size: 5
+);
+
+$results = $searcher->search($query);
+```
+
+---
+
+## Gestion des erreurs
+
+| Situation | Comportement |
+|-----------|--------------|
+| Cluster sans mode | Lève `InvalidArgumentException` via `ClusterFilterApplier` |
+| Aucun n-gramme généré | Retourne une collection vide |
+| Aucun token trouvé | Passe au n-gramme suivant |
+| Aucun document trouvé | Retourne une collection vide |
+| Opérateur de clusters invalide | Lève `InvalidArgumentException` |
+
+---
 
 ## Flux d'exécution
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ IndexSearcher::search(SearchQueryRecord $query)                           │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  1. Résoudre minSize / maxSize (query ou config)                           │
-│                                                                             │
-│  2. Pour chaque n-gram dans $query->query->getNgrams() :                   │
-│     ├── Normaliser le n-gram                                                │
-│     ├── Recherche LEXICAL (tokens exacts)                                  │
-│     │   └── searchTokens() → collection de document_ids                    │
-│     ├── Recherche METAPHONE (phonétique)                                   │
-│     │   └── searchTokens() → collection de document_ids                    │
-│     └── Fusionner les deux collections (UNION)                             │
-│                                                                             │
-│  3. Intersecter tous les résultats (AND)                                   │
-│                                                                             │
-│  4. Appliquer la limite                                                    │
-│                                                                             │
-│  5. Charger les documents depuis la base                                   │
-│                                                                             │
-│  6. Pour chaque document :                                                 │
-│     └── findMatchInfo() → champ, gram_value, gram_type                     │
-│                                                                             │
-│  7. Retourner IndexableSearchResultCollection                              │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+1. Normalisation du n-gramme
+2. Génération des n-grammes (lexicaux)
+3. Recherche des tokens LEXICAL
+4. Génération du métaphone
+5. Recherche des tokens METAPHONE
+6. Union LEXICAL ∪ METAPHONE
+7. Application des filtres de clusters (AND/OR/NOT)
+8. Intersection avec les résultats précédents (AND)
+9. Application de la limite
+10. Récupération des documents
+11. Création des résultats
 ```
-
-## Gestion des erreurs
-
-| Situation | Exception | Message |
-|-----------|-----------|---------|
-| Query vide | `InvalidArgumentException` | `Search query cannot be empty` |
-| n-gram invalide | `InvalidArgumentException` | `Invalid format. Expected "ngram=field1,field2"` |
-| Document non trouvé | Aucune | Retourne `null` ou collection vide |
 
 ## Performance
 
-| Opération | Complexité | Notes |
-|-----------|------------|-------|
-| `search()` avec 1 n-gram | O(log n + k) | 1 recherche + chargement des k résultats |
-| `search()` avec N n-grams | O(N log n + k) | N recherches + intersection |
-| `searchTokens()` LEXICAL | O(log n) | Index sur `token` |
-| `searchTokens()` METAPHONE | O(log n) | Index sur `token` |
+- **Complexité** : O(n × m) où n = nombre de n-grammes, m = nombre de tokens
+- **Optimisations** :
+  - Utilisation de `distinct()` et `unique()`
+  - Intersection progressive (AND)
+  - Utilisation des IDs plutôt que des objets complets
+  - Limitation en base de données
+  - Filtrage par clusters optimisé via `ClusterFilterApplier`
+
+---
 
 ## Compatibilité
 
 | Version | Support |
 |---------|---------|
-| PHP 8.1+ | ✅ Complet |
-| Laravel 10.x | ✅ Complet |
-| Laravel 11.x | ✅ Complet |
-| Laravel 12.x | ✅ Complet |
+| PHP 8.2+ | ✅ Complet |
+| Laravel 10.x+ | ✅ Complet |
+
+---
 
 ## Exemple complet
 
@@ -239,56 +299,70 @@ use AndyDefer\LaravelIndexer\Services\Composants\IndexSearcher;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
-$searcher = new IndexSearcher(
-    new IndexedDocumentRepository(),
-    new IndexedTokenRepository(),
-    new TextNormalizerService(),
-    new IndexerConfig()
-);
+$searcher = app(IndexSearcher::class);
 
-// 1. Recherche simple
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name')
-);
-$results = $searcher->search($query);
-echo "Résultats: " . $results->count() . "\n";
+// 1. Vérification d'existence
+$fingerprint = new IndexableFingerPrintVO('App.Models.User|123');
+if ($searcher->exists($fingerprint)) {
+    echo "Document exists";
+}
 
-// 2. Recherche avec cluster et limite
+// 2. Recherche simple
+$clusters = new ClusterVOCollection();
+
 $query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name|developer=description'),
-    cluster: new ClusterVO('tenant:company_abc|env:production'),
+    query: new SearchQueryVO('john=name,email'),
+    clusters: $clusters,
+    clustersOperator: 'AND',
     limit: 20
 );
 $results = $searcher->search($query);
 
-// 3. Affichage des résultats
-foreach ($results as $result) {
-    echo sprintf(
-        "Document: %s | Champ: %s | Token: %s | Type: %s\n",
-        $result->item->fingerprint->getValue(),
-        $result->field,
-        $result->gram_value,
-        $result->gram_type->value
-    );
-}
+// 3. Recherche avec clusters AND
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('type:user@AND'));
+$clusters->add(new ClusterVO('status:active@AND'));
 
-// 4. Vérification d'existence
-$fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-if ($searcher->exists($fingerPrint)) {
-    echo "Le document existe\n";
+$query = new SearchQueryRecord(
+    query: new SearchQueryVO('john=name'),
+    clusters: $clusters,
+    clustersOperator: 'AND',
+    limit: 20
+);
+$results = $searcher->search($query);
+
+// 4. Recherche avec clusters OR
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('role_doctor:true@OR'));
+$clusters->add(new ClusterVO('role_admin:true@OR'));
+
+$query = new SearchQueryRecord(
+    query: new SearchQueryVO('john=name'),
+    clusters: $clusters,
+    clustersOperator: 'OR',
+    limit: 20
+);
+$results = $searcher->search($query);
+
+// 5. Parcours des résultats
+foreach ($results as $result) {
+    echo $result->item->fingerprint->getValue() . "\n";
+    echo "Field: " . $result->field . "\n";
+    echo "Gram value: " . $result->gram_value . "\n";
+    echo "Gram type: " . $result->gram_type->value . "\n";
 }
 ```
 
 ## Voir aussi
 
-- `SearchQueryRecord` - Record de requête de recherche
-- `SearchQueryVO` - Value Object de requête
-- `IndexableSearchResultRecord` - Record de résultat
-- `IndexableSearchResultCollection` - Collection de résultats
-- `GramType` - Types de tokens (LEXICAL, METAPHONE)
+- `SearchQueryRecord` - Record de requête
 - `ClusterVO` - Value Object pour les clusters
-- `IndexableFingerPrintVO` - Value Object pour les fingerprints
-- `TextNormalizerInterface` - Normalisation des textes
-- `IndexerConfig` - Configuration de l'indexeur
+- `ClusterVOCollection` - Collection de clusters
+- `ClusterFilterApplier` - Service d'application des filtres de clusters
+- `IndexedDocumentRepository` - Repository des documents
+- `IndexedTokenRepository` - Repository des tokens
+- `GramType` - Enum des types de tokens
+- [Laravel Indexer - Documentation](https://github.com/andydefer/laravel-indexer)

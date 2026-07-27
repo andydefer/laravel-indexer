@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Repositories;
 
 use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
+use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
 use AndyDefer\LaravelIndexer\Contracts\IndexedTokenRepositoryInterface;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\Models\IndexedToken;
 use AndyDefer\LaravelIndexer\Records\IndexedTokenFiltersRecord;
 use AndyDefer\LaravelIndexer\Records\IndexedTokenRecord;
+use AndyDefer\LaravelIndexer\Services\Composants\ClusterFilterApplier;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Repository\AbstractRepository;
@@ -17,24 +19,16 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
-/**
- * Repository for managing indexed tokens.
- *
- * Provides CRUD operations and specialized queries for tokens,
- * including filtering by token value, type, field, namespace, and cluster.
- *
- * @extends AbstractRepository<IndexedToken, IndexedTokenRecord>
- */
 final class IndexedTokenRepository extends AbstractRepository implements IndexedTokenRepositoryInterface
 {
+    private ClusterFilterApplier $clusterFilterApplier;
+
     public function __construct()
     {
         parent::__construct(IndexedToken::class, IndexedTokenRecord::class);
+        $this->clusterFilterApplier = new ClusterFilterApplier;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     protected function applyFilters(Builder $query, AbstractRecord $filters): void
     {
         if (! $filters instanceof IndexedTokenFiltersRecord) {
@@ -50,17 +44,11 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
         $this->applyDocumentIdsFilter($query, $filters);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function getModel(): Model
     {
         return $this->model;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByToken(string $token): Collection
     {
         return $this->model->newQuery()
@@ -68,9 +56,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByType(GramType $type): Collection
     {
         return $this->model->newQuery()
@@ -78,9 +63,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByField(string $field): Collection
     {
         return $this->model->newQuery()
@@ -88,9 +70,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByDocumentId(string $documentId): Collection
     {
         return $this->model->newQuery()
@@ -98,9 +77,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByDocumentFingerPrint(IndexableFingerPrintVO $fingerPrint): Collection
     {
         return $this->model->newQuery()
@@ -110,9 +86,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByNamespace(string $namespace): Collection
     {
         return $this->model->newQuery()
@@ -122,21 +95,22 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByCluster(ClusterVO $cluster): Collection
     {
-        return $this->model->newQuery()
-            ->whereHas('document', function (Builder $query) use ($cluster): void {
-                $query->where('cluster', $cluster->value);
-            })
-            ->get();
+        $clusters = new ClusterVOCollection;
+        $clusters->add($cluster);
+
+        return $this->findByClusters($clusters, $cluster->getMode() ?? 'AND');
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    public function findByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): Collection
+    {
+        $query = $this->model->newQuery();
+        $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $operator);
+
+        return $query->get();
+    }
+
     public function findByClusterKeyValue(string $key, string $value): Collection
     {
         $searchPattern = $key.':'.$value;
@@ -148,9 +122,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByTokenAndField(string $token, string $field): Collection
     {
         return $this->model->newQuery()
@@ -159,9 +130,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByTokenAndType(string $token, GramType $type): Collection
     {
         return $this->model->newQuery()
@@ -170,9 +138,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByTokenAndNamespace(string $token, string $namespace): Collection
     {
         return $this->model->newQuery()
@@ -183,22 +148,24 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function findByTokenAndCluster(string $token, ClusterVO $cluster): Collection
     {
-        return $this->model->newQuery()
-            ->where('token', $token)
-            ->whereHas('document', function (Builder $query) use ($cluster): void {
-                $query->where('cluster', $cluster->value);
-            })
-            ->get();
+        $clusters = new ClusterVOCollection;
+        $clusters->add($cluster);
+
+        return $this->findByTokenAndClusters($token, $clusters, $cluster->getMode() ?? 'AND');
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    public function findByTokenAndClusters(string $token, ClusterVOCollection $clusters, string $operator = 'AND'): Collection
+    {
+        $query = $this->model->newQuery()
+            ->where('token', $token);
+
+        $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $operator);
+
+        return $query->get();
+    }
+
     public function findByTokenFieldAndNamespace(string $token, string $field, string $namespace): Collection
     {
         return $this->model->newQuery()
@@ -210,9 +177,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function autocomplete(string $prefix, ?int $limit = 10): Collection
     {
         $query = $this->model->newQuery()
@@ -227,9 +191,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
         return $query->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function startingWith(string $letter, ?int $limit = null): Collection
     {
         $query = $this->model->newQuery()
@@ -242,9 +203,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
         return $query->get();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function getDocumentIdsForToken(string $token): Collection
     {
         return $this->model->newQuery()
@@ -254,9 +212,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->pluck('document_id');
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function getDocumentIdsForTokenAndField(string $token, string $field): Collection
     {
         return $this->model->newQuery()
@@ -267,40 +222,47 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->pluck('document_id');
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function getDocumentIdsForTokenAndCluster(string $token, ClusterVO $cluster): Collection
     {
-        return $this->model->newQuery()
-            ->where('token', $token)
-            ->whereHas('document', function (Builder $query) use ($cluster): void {
-                $query->where('cluster', $cluster->value);
-            })
-            ->select('document_id')
-            ->distinct()
-            ->pluck('document_id');
+        $clusters = new ClusterVOCollection;
+        $clusters->add($cluster);
+
+        return $this->getDocumentIdsForTokenAndClusters($token, $clusters, $cluster->getMode() ?? 'AND');
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    public function getDocumentIdsForTokenAndClusters(string $token, ClusterVOCollection $clusters, string $operator = 'AND'): Collection
+    {
+        $query = $this->model->newQuery()
+            ->where('token', $token)
+            ->select('document_id')
+            ->distinct();
+
+        $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $operator);
+
+        return $query->pluck('document_id');
+    }
+
     public function getDocumentIdsForTokenFieldAndCluster(string $token, string $field, ClusterVO $cluster): Collection
     {
-        return $this->model->newQuery()
-            ->where('token', $token)
-            ->where('field', $field)
-            ->whereHas('document', function (Builder $query) use ($cluster): void {
-                $query->where('cluster', $cluster->value);
-            })
-            ->select('document_id')
-            ->distinct()
-            ->pluck('document_id');
+        $clusters = new ClusterVOCollection;
+        $clusters->add($cluster);
+
+        return $this->getDocumentIdsForTokenFieldAndClusters($token, $field, $clusters, $cluster->getMode() ?? 'AND');
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    public function getDocumentIdsForTokenFieldAndClusters(string $token, string $field, ClusterVOCollection $clusters, string $operator = 'AND'): Collection
+    {
+        $query = $this->model->newQuery()
+            ->where('token', $token)
+            ->where('field', $field)
+            ->select('document_id')
+            ->distinct();
+
+        $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $operator);
+
+        return $query->pluck('document_id');
+    }
+
     public function findByTokenFieldAndDocument(
         string $token,
         string $field,
@@ -315,9 +277,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->first();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function countDistinctTokens(): int
     {
         return $this->model->newQuery()
@@ -325,9 +284,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->count('token');
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function countByType(GramType $type): int
     {
         return $this->model->newQuery()
@@ -335,9 +291,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->count();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function countByField(string $field): int
     {
         return $this->model->newQuery()
@@ -345,9 +298,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->count();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function countByNamespace(string $namespace): int
     {
         return $this->model->newQuery()
@@ -357,9 +307,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->count();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function deleteByDocumentId(string $documentId): int
     {
         return $this->model->newQuery()
@@ -367,9 +314,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->delete();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function deleteByDocumentFingerPrint(IndexableFingerPrintVO $fingerPrint): int
     {
         return $this->model->newQuery()
@@ -379,9 +323,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->delete();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function deleteByNamespace(string $namespace): int
     {
         return $this->model->newQuery()
@@ -391,21 +332,22 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->delete();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function deleteByCluster(ClusterVO $cluster): int
     {
-        return $this->model->newQuery()
-            ->whereHas('document', function (Builder $query) use ($cluster): void {
-                $query->where('cluster', $cluster->value);
-            })
-            ->delete();
+        $clusters = new ClusterVOCollection;
+        $clusters->add($cluster);
+
+        return $this->deleteByClusters($clusters, $cluster->getMode() ?? 'AND');
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    public function deleteByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): int
+    {
+        $query = $this->model->newQuery();
+        $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $operator);
+
+        return $query->delete();
+    }
+
     public function deleteByClusterKeyValue(string $key, string $value): int
     {
         $searchPattern = $key.':'.$value;
@@ -417,9 +359,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->delete();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function deleteByToken(string $token): int
     {
         return $this->model->newQuery()
@@ -427,9 +366,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->delete();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function deleteByTokenAndField(string $token, string $field): int
     {
         return $this->model->newQuery()
@@ -438,9 +374,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->delete();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function getDistinctTokens(): Collection
     {
         return $this->model->newQuery()
@@ -449,9 +382,6 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->pluck('token');
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function getDistinctFields(): Collection
     {
         return $this->model->newQuery()
@@ -461,19 +391,12 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->pluck('field');
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function incrementFrequency(string $id): int
     {
         return $this->model->newQuery()
             ->where('id', $id)
             ->increment('frequency');
     }
-
-    // ============================================================
-    // Private Helpers for Filter Application
-    // ============================================================
 
     private function applyIdFilter(Builder $query, IndexedTokenFiltersRecord $filters): void
     {

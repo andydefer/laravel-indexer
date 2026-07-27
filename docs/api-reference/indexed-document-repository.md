@@ -1,31 +1,37 @@
-## `IndexedDocumentRepository` - Référence Technique
-
 # IndexedDocumentRepository - Référence Technique
 
 ## Description
 
-Repository gérant les opérations CRUD et les requêtes spécialisées pour les documents indexés dans la base de données.
+Repository pour la gestion des documents indexés dans Laravel Indexer. Fournit des opérations CRUD et des méthodes de recherche avancées pour les documents indexés, avec support des filtres par clusters multiples.
 
 ## Hiérarchie / Implémentations
 
 ```
-AbstractRepository<IndexedDocument, IndexedDocumentRecord>
+AbstractRepository
     └── IndexedDocumentRepository
         └── IndexedDocumentRepositoryInterface
 ```
 
 ## Rôle principal
 
-Fournit une couche d'abstraction pour l'accès aux documents indexés, avec des méthodes spécialisées pour :
+`IndexedDocumentRepository` est le point d'accès principal pour interagir avec les documents indexés en base de données. Il gère :
 
-- Recherche par fingerprint, namespace, cluster
-- Opérations de suppression groupées
-- Bulk insertion pour l'indexation massive
-- Récupération des métadonnées (clusters distincts, namespaces)
+- **CRUD** : Création, lecture, mise à jour, suppression de documents
+- **Recherche** : Par fingerprint, namespace, cluster(s), ID
+- **Filtrage avancé** : Filtrage par clusters multiples avec opérateurs AND, OR, NOT
+- **Métadonnées** : Récupération des namespaces et clusters distincts
+
+## DETAILS
+
+[Voir la classe IndexedDocumentRepository](https://github.com/andydefer/laravel-indexer/blob/main/src/Repositories/IndexedDocumentRepository.php)
 
 ## API / Méthodes publiques
 
 ### `__construct()`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| Aucun | - | - |
 
 **Retourne :** `void`
 
@@ -36,78 +42,58 @@ $repository = new IndexedDocumentRepository();
 
 ---
 
-### `applyFilters(Builder $query, AbstractRecord $filters): void`
+### `create(AbstractRecord $record): Model` (hérité)
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$query` | `Builder` | La requête Eloquent à filtrer |
-| `$filters` | `AbstractRecord` | Les filtres à appliquer (doit être `IndexedDocumentFiltersRecord`) |
+| `$record` | `IndexedDocumentRecord` | Record du document à créer |
 
-**Retourne :** `void`
-
-**Exemple :**
-```php
-$filters = new IndexedDocumentFiltersRecord(
-    namespace: 'App.Models.User',
-    cluster: new ClusterVO('model:User')
-);
-
-$query = IndexedDocument::query();
-$repository->applyFilters($query, $filters);
-$results = $query->get();
-```
-
----
-
-### `getModel(): Model`
-
-**Retourne :** `Model` - L'instance du modèle Eloquent
+**Retourne :** `IndexedDocument` - Le document créé
 
 **Exemple :**
 ```php
-$model = $repository->getModel();
-$count = $model->newQuery()->count();
+$record = IndexedDocumentRecord::from([
+    'fingerprint' => 'App.Models.User|123',
+    'cluster' => 'type:user|status:active',
+    'data' => ['name' => 'John Doe'],
+]);
+
+$document = $repository->create($record);
 ```
 
 ---
 
 ### `createMany(array $records): array`
 
+Crée plusieurs documents en une seule requête.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$records` | `array<IndexedDocumentRecord>` | Tableau de records à insérer |
+| `$records` | `array<IndexedDocumentRecord>` | Liste des records |
 
-**Retourne :** `array<IndexedDocument>` - Les documents créés
+**Retourne :** `array<IndexedDocument>` - Documents créés
 
-**Exceptions :** Aucune (erreurs PDO possibles)
+---
 
-**Exemple :**
-```php
-$records = [
-    new IndexedDocumentRecord(
-        fingerprint: 'App.Models.User|1',
-        cluster: 'model:User',
-        data: ['name' => 'John']
-    ),
-    new IndexedDocumentRecord(
-        fingerprint: 'App.Models.User|2',
-        cluster: 'model:User',
-        data: ['name' => 'Jane']
-    ),
-];
+### `find(int|string $id): ?Model` (hérité)
 
-$documents = $repository->createMany($records);
-```
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$id` | `int|string` | ID du document (UUID) |
+
+**Retourne :** `?IndexedDocument` - Document trouvé ou `null`
 
 ---
 
 ### `findByFingerPrint(IndexableFingerPrintVO $fingerPrint): ?IndexedDocument`
 
+Recherche un document par son fingerprint.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$fingerPrint` | `IndexableFingerPrintVO` | Fingerprint du document |
 
-**Retourne :** `IndexedDocument|null` - Le document trouvé ou `null`
+**Retourne :** `?IndexedDocument` - Document trouvé ou `null`
 
 **Exemple :**
 ```php
@@ -119,341 +105,338 @@ $document = $repository->findByFingerPrint($fingerPrint);
 
 ### `findByFingerprintString(string $fingerprint): ?IndexedDocument`
 
+Recherche un document par son fingerprint (string).
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$fingerprint` | `string` | Fingerprint brut |
+| `$fingerprint` | `string` | Fingerprint du document |
 
-**Retourne :** `IndexedDocument|null` - Le document trouvé ou `null`
-
-**Exemple :**
-```php
-$document = $repository->findByFingerprintString('App.Models.User|123');
-```
+**Retourne :** `?IndexedDocument` - Document trouvé ou `null`
 
 ---
 
 ### `findByNamespace(string $namespace): Collection`
 
+Recherche tous les documents d'un namespace.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$namespace` | `string` | Namespace à filtrer |
+| `$namespace` | `string` | Namespace (ex: `App.Models.User`) |
 
-**Retourne :** `Collection<int, IndexedDocument>` - Collection des documents
-
-**Exemple :**
-```php
-$documents = $repository->findByNamespace('App.Models.User');
-```
+**Retourne :** `Collection<int, IndexedDocument>` - Collection de documents
 
 ---
 
 ### `findByCluster(ClusterVO $cluster): Collection`
 
+Recherche les documents correspondant à un cluster.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$cluster` | `ClusterVO` | Cluster à filtrer |
+| `$cluster` | `ClusterVO` | Cluster avec mode (AND, OR ou NOT) |
 
-**Retourne :** `Collection<int, IndexedDocument>` - Collection des documents
+**Retourne :** `Collection<int, IndexedDocument>` - Collection de documents
+
+**Exceptions :** `InvalidArgumentException` - Si le cluster n'a pas de mode
 
 **Exemple :**
 ```php
-$cluster = new ClusterVO('model:User|tenant:company_abc');
+$cluster = new ClusterVO('type:user|status:active@AND');
 $documents = $repository->findByCluster($cluster);
+```
+
+---
+
+### `findByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): Collection`
+
+Recherche les documents correspondant à une collection de clusters.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$clusters` | `ClusterVOCollection` | Collection de clusters |
+| `$operator` | `string` | Opérateur: `'AND'`, `'OR'`, `'NOT'` (défaut: `'AND'`) |
+
+**Retourne :** `Collection<int, IndexedDocument>` - Collection de documents
+
+**Exceptions :** `InvalidArgumentException` - Si l'opérateur est invalide
+
+**Exemple :**
+```php
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('tenant:company_abc@AND'));
+$clusters->add(new ClusterVO('env:production@AND'));
+
+$documents = $repository->findByClusters($clusters, 'AND');
 ```
 
 ---
 
 ### `findByClusterKeyValue(string $key, string $value): Collection`
 
+Recherche les documents contenant une paire clé-valeur spécifique dans leur cluster.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$key` | `string` | Clé du cluster |
-| `$value` | `string` | Valeur du cluster |
+| `$key` | `string` | Clé recherchée |
+| `$value` | `string` | Valeur recherchée |
 
-**Retourne :** `Collection<int, IndexedDocument>` - Collection des documents
-
-**Exemple :**
-```php
-$documents = $repository->findByClusterKeyValue('model', 'User');
-```
+**Retourne :** `Collection<int, IndexedDocument>` - Collection de documents
 
 ---
 
 ### `findByIds(array $ids): Collection`
 
+Recherche des documents par leurs IDs.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$ids` | `array<string>` | Liste des UUIDs des documents |
+| `$ids` | `array<string>` | Liste des IDs (UUID) |
 
-**Retourne :** `Collection<int, IndexedDocument>` - Collection des documents
+**Retourne :** `Collection<int, IndexedDocument>` - Collection de documents
 
-**Exemple :**
-```php
-$ids = ['550e8400-e29b-41d4-a716-446655440000', '550e8400-e29b-41d4-a716-446655440001'];
-$documents = $repository->findByIds($ids);
-```
+---
+
+### `update(int|string $id, AbstractRecord $record): Model` (hérité)
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$id` | `int|string` | ID du document |
+| `$record` | `IndexedDocumentRecord` | Record de mise à jour |
+
+**Retourne :** `IndexedDocument` - Document mis à jour
+
+**Exceptions :** `ModelNotFoundException` - Si le document n'existe pas
+
+---
+
+### `delete(int|string $id): bool` (hérité)
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$id` | `int|string` | ID du document |
+
+**Retourne :** `bool` - `true` si supprimé
 
 ---
 
 ### `deleteByFingerPrint(IndexableFingerPrintVO $fingerPrint): int`
 
+Supprime un document par son fingerprint.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$fingerPrint` | `IndexableFingerPrintVO` | Fingerprint du document à supprimer |
+| `$fingerPrint` | `IndexableFingerPrintVO` | Fingerprint du document |
 
-**Retourne :** `int` - Nombre de lignes supprimées (0 ou 1)
-
-**Exemple :**
-```php
-$fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-$count = $repository->deleteByFingerPrint($fingerPrint);
-```
+**Retourne :** `int` - Nombre de documents supprimés (0 ou 1)
 
 ---
 
 ### `deleteByFingerprintString(string $fingerprint): int`
 
+Supprime un document par son fingerprint (string).
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$fingerprint` | `string` | Fingerprint brut du document à supprimer |
+| `$fingerprint` | `string` | Fingerprint du document |
 
-**Retourne :** `int` - Nombre de lignes supprimées
-
-**Exemple :**
-```php
-$count = $repository->deleteByFingerprintString('App.Models.User|123');
-```
+**Retourne :** `int` - Nombre de documents supprimés
 
 ---
 
 ### `deleteByNamespace(string $namespace): int`
 
+Supprime tous les documents d'un namespace.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$namespace` | `string` | Namespace à supprimer |
+| `$namespace` | `string` | Namespace |
 
-**Retourne :** `int` - Nombre de lignes supprimées
-
-**Exemple :**
-```php
-$count = $repository->deleteByNamespace('App.Models.User');
-```
+**Retourne :** `int` - Nombre de documents supprimés
 
 ---
 
 ### `deleteByCluster(ClusterVO $cluster): int`
 
+Supprime les documents correspondant à un cluster.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$cluster` | `ClusterVO` | Cluster à supprimer |
+| `$cluster` | `ClusterVO` | Cluster avec mode |
 
-**Retourne :** `int` - Nombre de lignes supprimées
+**Retourne :** `int` - Nombre de documents supprimés
 
-**Exemple :**
-```php
-$cluster = new ClusterVO('model:User|tenant:company_abc');
-$count = $repository->deleteByCluster($cluster);
-```
+**Exceptions :** `InvalidArgumentException` - Si le cluster n'a pas de mode
+
+---
+
+### `deleteByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): int`
+
+Supprime les documents correspondant à une collection de clusters.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$clusters` | `ClusterVOCollection` | Collection de clusters |
+| `$operator` | `string` | Opérateur: `'AND'`, `'OR'`, `'NOT'` |
+
+**Retourne :** `int` - Nombre de documents supprimés
+
+**Exceptions :** `InvalidArgumentException` - Si l'opérateur est invalide
 
 ---
 
 ### `deleteByClusterKeyValue(string $key, string $value): int`
 
+Supprime les documents contenant une paire clé-valeur spécifique.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$key` | `string` | Clé du cluster |
-| `$value` | `string` | Valeur du cluster |
+| `$key` | `string` | Clé |
+| `$value` | `string` | Valeur |
 
-**Retourne :** `int` - Nombre de lignes supprimées
-
-**Exemple :**
-```php
-$count = $repository->deleteByClusterKeyValue('model', 'User');
-```
+**Retourne :** `int` - Nombre de documents supprimés
 
 ---
 
 ### `countByNamespace(string $namespace): int`
 
+Compte les documents d'un namespace.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$namespace` | `string` | Namespace à compter |
+| `$namespace` | `string` | Namespace |
 
 **Retourne :** `int` - Nombre de documents
-
-**Exemple :**
-```php
-$count = $repository->countByNamespace('App.Models.User');
-```
 
 ---
 
 ### `countByCluster(ClusterVO $cluster): int`
 
+Compte les documents correspondant à un cluster.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$cluster` | `ClusterVO` | Cluster à compter |
+| `$cluster` | `ClusterVO` | Cluster avec mode |
 
 **Retourne :** `int` - Nombre de documents
 
-**Exemple :**
-```php
-$cluster = new ClusterVO('model:User');
-$count = $repository->countByCluster($cluster);
-```
+---
+
+### `countByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): int`
+
+Compte les documents correspondant à une collection de clusters.
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$clusters` | `ClusterVOCollection` | Collection de clusters |
+| `$operator` | `string` | Opérateur: `'AND'`, `'OR'`, `'NOT'` |
+
+**Retourne :** `int` - Nombre de documents
 
 ---
 
 ### `getDistinctNamespaces(): Collection`
 
-**Retourne :** `Collection<int, string>` - Liste des namespaces uniques
+Retourne tous les namespaces distincts présents dans l'index.
 
-**Exemple :**
-```php
-$namespaces = $repository->getDistinctNamespaces();
-// ['App.Models.User', 'App.Models.Product']
-```
+**Retourne :** `Collection<int, string>` - Liste des namespaces
 
 ---
 
 ### `getDistinctClusterKeys(): Collection`
 
-**Retourne :** `Collection<int, string>` - Liste des clés de cluster uniques
+Retourne toutes les clés de cluster distinctes.
 
-**Exemple :**
-```php
-$keys = $repository->getDistinctClusterKeys();
-// ['model', 'tenant', 'env', 'category']
-```
+**Retourne :** `Collection<int, string>` - Liste des clés
 
 ---
 
 ### `getDistinctClusterValues(string $key): Collection`
 
+Retourne toutes les valeurs distinctes pour une clé de cluster donnée.
+
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$key` | `string` | Clé du cluster |
 
-**Retourne :** `Collection<int, string>` - Liste des valeurs uniques pour une clé donnée
-
-**Exemple :**
-```php
-$values = $repository->getDistinctClusterValues('model');
-// ['User', 'Product', 'Order']
-```
+**Retourne :** `Collection<int, string>` - Liste des valeurs
 
 ---
 
 ### `existsByFingerPrint(IndexableFingerPrintVO $fingerPrint): bool`
 
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `$fingerPrint` | `IndexableFingerPrintVO` | Fingerprint à vérifier |
-
-**Retourne :** `bool` - `true` si le document existe, `false` sinon
-
-**Exemple :**
-```php
-$fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-if ($repository->existsByFingerPrint($fingerPrint)) {
-    // Le document existe
-}
-```
+Vérifie l'existence d'un document par fingerprint.
 
 ---
 
 ### `existsByNamespace(string $namespace): bool`
 
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `$namespace` | `string` | Namespace à vérifier |
-
-**Retourne :** `bool` - `true` si au moins un document existe
-
-**Exemple :**
-```php
-if ($repository->existsByNamespace('App.Models.User')) {
-    // Des utilisateurs existent
-}
-```
+Vérifie l'existence de documents dans un namespace.
 
 ---
 
 ### `existsByCluster(ClusterVO $cluster): bool`
 
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `$cluster` | `ClusterVO` | Cluster à vérifier |
+Vérifie l'existence de documents correspondant à un cluster.
 
-**Retourne :** `bool` - `true` si au moins un document existe
+---
 
-**Exemple :**
-```php
-$cluster = new ClusterVO('model:User');
-if ($repository->existsByCluster($cluster)) {
-    // Des utilisateurs existent
-}
-```
+### `existsByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): bool`
+
+Vérifie l'existence de documents correspondant à une collection de clusters.
 
 ---
 
 ### `findAllWithTokens(): Collection`
 
-**Retourne :** `Collection<int, IndexedDocument>` - Tous les documents avec leurs tokens préchargés
+Retourne tous les documents avec leurs tokens chargés.
 
-**Exemple :**
-```php
-$documents = $repository->findAllWithTokens();
-foreach ($documents as $document) {
-    $tokens = $document->tokens;
-}
-```
+**Retourne :** `Collection<int, IndexedDocument>` - Documents avec relation `tokens`
 
 ---
 
 ## Cas d'utilisation
 
-### Cas 1 : Indexation en masse
+### Cas 1 : Recherche de tous les médecins actifs
 
 ```php
-$records = [];
-for ($i = 1; $i <= 1000; $i++) {
-    $records[] = new IndexedDocumentRecord(
-        fingerprint: 'App.Models.User|' . $i,
-        cluster: 'model:User|tenant:company_abc',
-        data: ['name' => 'User ' . $i]
-    );
-}
-
-$documents = $repository->createMany($records);
-// 1 requête SQL pour 1000 documents
+$cluster = new ClusterVO('type:user|role_doctor:true|status:active@AND');
+$doctors = $repository->findByCluster($cluster);
 ```
 
-### Cas 2 : Nettoyage d'un tenant
+### Cas 2 : Recherche par clusters multiples (AND)
 
 ```php
-$tenant = 'company_xyz';
-$cluster = new ClusterVO('tenant:' . $tenant);
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('tenant:company_abc@AND'));
+$clusters->add(new ClusterVO('env:production@AND'));
 
-// Compter avant suppression
-$count = $repository->countByCluster($cluster);
-echo "Suppression de $count documents\n";
-
-// Supprimer
-$repository->deleteByCluster($cluster);
+$documents = $repository->findByClusters($clusters, 'AND');
 ```
 
-### Cas 3 : Exploration des données
+### Cas 3 : Recherche par clusters multiples (OR)
 
 ```php
-// Quels types de modèles sont indexés ?
-$namespaces = $repository->getDistinctNamespaces();
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('role_doctor:true@OR'));
+$clusters->add(new ClusterVO('role_admin:true@OR'));
 
-// Quelles sont les catégories ?
-$categories = $repository->getDistinctClusterValues('category');
+$documents = $repository->findByClusters($clusters, 'OR');
+```
 
-// Quels tenants sont présents ?
-$tenants = $repository->getDistinctClusterValues('tenant');
+### Cas 4 : Exclusion par cluster (NOT)
+
+```php
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('status:inactive@NOT'));
+
+$documents = $repository->findByClusters($clusters, 'NOT');
+```
+
+### Cas 5 : Nettoyage par tenant
+
+```php
+$cluster = new ClusterVO('tenant:company_abc@AND');
+$deleted = $repository->deleteByCluster($cluster);
 ```
 
 ---
@@ -462,21 +445,30 @@ $tenants = $repository->getDistinctClusterValues('tenant');
 
 | Situation | Exception | Message |
 |-----------|-----------|---------|
-| Record invalide | `ModelNotFoundException` | Pas d'exception native (gérée par Laravel) |
-| Insertion en base | `QueryException` | Erreur PDO (contraintes, syntaxe) |
-| ID inexistant | `ModelNotFoundException` | `No query results for model` |
+| Cluster sans mode | `InvalidArgumentException` | `Cluster must have a mode (AND, OR or NOT) to apply to query` |
+| Opérateur invalide | `InvalidArgumentException` | `Invalid operator. Expected "AND", "OR" or "NOT", got "..."` |
+| Document non trouvé (update) | `ModelNotFoundException` | `Model [ModelClass] not found with ID [id]` |
+
+---
+
+## Intégration
+
+`IndexedDocumentRepository` est utilisé par :
+
+- `IndexSearcher` - Recherche de documents
+- `IndexWriter` - Écriture/indexation
+- `IndexDeleter` - Suppression de documents
+- `IndexerService` - Service principal d'indexation
+- `GenericIndexerService` - Indexation générique
 
 ---
 
 ## Performance
 
-| Opération | Complexité | Notes |
-|-----------|------------|-------|
-| `createMany()` | O(1) | 1 requête INSERT pour N documents |
-| `findByFingerPrint()` | O(log n) | Index sur `fingerprint` |
-| `findByNamespace()` | O(log n + k) | Index sur `fingerprint` + LIKE |
-| `findByCluster()` | O(log n + k) | Index sur `cluster` |
-| `getDistinct*()` | O(n) | Scan complet, à utiliser avec précaution |
+- `findByCluster()` et `findByClusters()` utilisent `LIKE` avec `%` → indexation recommandée
+- `createMany()` utilise `insert()` en lot → performant pour les gros volumes
+- `findByIds()` utilise `whereIn()` → index sur `id` recommandé
+- Les filtres par clusters multiples avec `NOT` peuvent être plus lents
 
 ---
 
@@ -484,10 +476,8 @@ $tenants = $repository->getDistinctClusterValues('tenant');
 
 | Version | Support |
 |---------|---------|
-| PHP 8.1+ | ✅ Complet |
-| Laravel 10.x | ✅ Complet |
-| Laravel 11.x | ✅ Complet |
-| Laravel 12.x | ✅ Complet |
+| PHP 8.2+ | ✅ Complet |
+| Laravel 10.x+ | ✅ Complet |
 
 ---
 
@@ -501,57 +491,55 @@ declare(strict_types=1);
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
+use AndyDefer\DomainStructures\Utils\StrictAssociative;
 
 $repository = new IndexedDocumentRepository();
 
-// 1. Créer plusieurs documents
-$records = [
-    new IndexedDocumentRecord(
-        fingerprint: 'App.Models.User|1',
-        cluster: 'model:User|tenant:company_abc',
-        data: ['name' => 'John Doe']
-    ),
-    new IndexedDocumentRecord(
-        fingerprint: 'App.Models.User|2',
-        cluster: 'model:User|tenant:company_abc',
-        data: ['name' => 'Jane Smith']
-    ),
-    new IndexedDocumentRecord(
-        fingerprint: 'App.Models.Product|1',
-        cluster: 'model:Product|tenant:company_abc',
-        data: ['name' => 'Laptop Pro']
-    ),
-];
+// 1. Création
+$record = IndexedDocumentRecord::from([
+    'fingerprint' => new IndexableFingerPrintVO('App.Models.User|1'),
+    'cluster' => new ClusterVO('type:user|role_doctor:true|status:active'),
+    'data' => StrictAssociative::from([
+        'name' => 'Dr. John',
+        'specialty' => 'Cardiology',
+    ]),
+]);
 
-$documents = $repository->createMany($records);
+$doc = $repository->create($record);
 
-// 2. Rechercher par namespace
-$users = $repository->findByNamespace('App.Models.User');
-echo "Nombre d'utilisateurs : " . $users->count() . "\n";
+// 2. Recherche par cluster (AND)
+$cluster = new ClusterVO('type:user|role_doctor:true@AND');
+$doctors = $repository->findByCluster($cluster);
 
-// 3. Rechercher par cluster
-$cluster = new ClusterVO('model:User');
-$userDocs = $repository->findByCluster($cluster);
+// 3. Recherche par clusters multiples (OR)
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('role_doctor:true@OR'));
+$clusters->add(new ClusterVO('role_admin:true@OR'));
+$users = $repository->findByClusters($clusters, 'OR');
 
-// 4. Vérifier l'existence
-$fingerPrint = new IndexableFingerPrintVO('App.Models.User|1');
-if ($repository->existsByFingerPrint($fingerPrint)) {
-    echo "Le document existe\n";
-}
+// 4. Exclusion (NOT)
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('status:inactive@NOT'));
+$activeUsers = $repository->findByClusters($clusters, 'NOT');
 
-// 5. Explorer les données
-$namespaces = $repository->getDistinctNamespaces();
+// 5. Suppression par tenant
+$cluster = new ClusterVO('tenant:company_abc@AND');
+$deleted = $repository->deleteByCluster($cluster);
+
+// 6. Statistiques
+$doctorCount = $repository->countByNamespace('App.Models.Doctor');
 $keys = $repository->getDistinctClusterKeys();
-$models = $repository->getDistinctClusterValues('model');
-
-// 6. Nettoyer un tenant
-$count = $repository->deleteByClusterKeyValue('tenant', 'company_abc');
-echo "Supprimé $count documents\n";
+$roles = $repository->getDistinctClusterValues('role');
 ```
 
 ## Voir aussi
 
-- `IndexedTokenRepository` - Gestion des tokens
-- `IndexableFingerPrintVO` - Value Object pour les fingerprints
 - `ClusterVO` - Value Object pour les clusters
-- `IndexedDocumentFiltersRecord` - Record de filtrage
+- `ClusterVOCollection` - Collection de clusters
+- `ClusterFilterApplier` - Service d'application des filtres
+- `IndexedDocument` - Modèle Eloquent
+- `IndexSearcher` - Service de recherche
+- `IndexWriter` - Service d'indexation
+- `AbstractRepository` - Repository de base

@@ -74,6 +74,7 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
             'hospital' => 'General Hospital',
             'is_active' => true,
         ], $attributes));
+
     }
 
     private function createPharmacy(array $attributes = []): TestPharmacy

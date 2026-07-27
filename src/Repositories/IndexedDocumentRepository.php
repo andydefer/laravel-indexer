@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Repositories;
 
 use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
+use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
 use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentFiltersRecord;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
+use AndyDefer\LaravelIndexer\Services\Composants\ClusterFilterApplier;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Repository\AbstractRepository;
@@ -19,9 +21,12 @@ use Illuminate\Support\Str;
 
 final class IndexedDocumentRepository extends AbstractRepository implements IndexedDocumentRepositoryInterface
 {
+    private ClusterFilterApplier $clusterFilterApplier;
+
     public function __construct()
     {
         parent::__construct(IndexedDocument::class, IndexedDocumentRecord::class);
+        $this->clusterFilterApplier = new ClusterFilterApplier;
     }
 
     protected function applyFilters(Builder $query, AbstractRecord $filters): void
@@ -102,9 +107,18 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
 
     public function findByCluster(ClusterVO $cluster): Collection
     {
-        return $this->model->newQuery()
-            ->where('cluster', $cluster->value)
-            ->get();
+        $query = $this->model->newQuery();
+        $this->clusterFilterApplier->applyCluster($query, $cluster);
+
+        return $query->get();
+    }
+
+    public function findByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): Collection
+    {
+        $query = $this->model->newQuery();
+        $this->clusterFilterApplier->applyClusters($query, $clusters, $operator);
+
+        return $query->get();
     }
 
     public function findByClusterKeyValue(string $key, string $value): Collection
@@ -152,9 +166,18 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
 
     public function deleteByCluster(ClusterVO $cluster): int
     {
-        return $this->model->newQuery()
-            ->where('cluster', $cluster->value)
-            ->delete();
+        $query = $this->model->newQuery();
+        $this->clusterFilterApplier->applyCluster($query, $cluster);
+
+        return $query->delete();
+    }
+
+    public function deleteByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): int
+    {
+        $query = $this->model->newQuery();
+        $this->clusterFilterApplier->applyClusters($query, $clusters, $operator);
+
+        return $query->delete();
     }
 
     public function deleteByClusterKeyValue(string $key, string $value): int
@@ -177,9 +200,18 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
 
     public function countByCluster(ClusterVO $cluster): int
     {
-        return $this->model->newQuery()
-            ->where('cluster', $cluster->value)
-            ->count();
+        $query = $this->model->newQuery();
+        $this->clusterFilterApplier->applyCluster($query, $cluster);
+
+        return $query->count();
+    }
+
+    public function countByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): int
+    {
+        $query = $this->model->newQuery();
+        $this->clusterFilterApplier->applyClusters($query, $clusters, $operator);
+
+        return $query->count();
     }
 
     public function getDistinctNamespaces(): Collection
@@ -236,10 +268,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             $cluster = new ClusterVO($clusterString);
 
             if ($cluster->has($key)) {
-                foreach ($cluster->get($key) as $value) {
-                    if (! $values->contains($value)) {
-                        $values->add($value);
-                    }
+                $value = $cluster->get($key);
+                if ($value !== null && ! $values->contains($value)) {
+                    $values->add($value);
                 }
             }
         }
@@ -265,9 +296,18 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
 
     public function existsByCluster(ClusterVO $cluster): bool
     {
-        return $this->model->newQuery()
-            ->where('cluster', $cluster->value)
-            ->exists();
+        $query = $this->model->newQuery();
+        $this->clusterFilterApplier->applyCluster($query, $cluster);
+
+        return $query->exists();
+    }
+
+    public function existsByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): bool
+    {
+        $query = $this->model->newQuery();
+        $this->clusterFilterApplier->applyClusters($query, $clusters, $operator);
+
+        return $query->exists();
     }
 
     public function findAllWithTokens(): Collection
@@ -309,7 +349,7 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
     private function applyClusterFilter(Builder $query, IndexedDocumentFiltersRecord $filters): void
     {
         if ($filters->cluster !== null) {
-            $query->where('cluster', $filters->cluster->value);
+            $this->clusterFilterApplier->applyCluster($query, $filters->cluster);
         }
     }
 

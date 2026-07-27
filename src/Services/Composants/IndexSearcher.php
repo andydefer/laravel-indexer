@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Services\Composants;
 
+use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
 use AndyDefer\LaravelIndexer\Collections\IndexableSearchResultCollection;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Enums\GramType;
@@ -12,47 +13,28 @@ use AndyDefer\LaravelIndexer\Records\IndexableSearchResultRecord;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
 use Illuminate\Support\Collection;
 
-/**
- * Service for searching the index and checking document existence.
- *
- * Provides search capabilities with support for:
- * - Lexical n-gram matching
- * - Metaphone phonetic matching
- * - Cluster filtering
- * - Fingerprint filtering
- * - Multi-ngram intersection (AND logic)
- */
 final class IndexSearcher
 {
+    private ClusterFilterApplier $clusterFilterApplier;
+
     public function __construct(
         private readonly IndexedDocumentRepository $documentRepository,
         private readonly IndexedTokenRepository $tokenRepository,
         private readonly TextNormalizerInterface $textNormalizer,
         private readonly IndexerConfigInterface $config,
-    ) {}
+    ) {
+        $this->clusterFilterApplier = new ClusterFilterApplier;
+    }
 
-    /**
-     * Checks whether a document exists by its fingerprint.
-     *
-     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint to check
-     * @return bool True if the document exists, false otherwise
-     */
     public function exists(IndexableFingerPrintVO $fingerprint): bool
     {
         return $this->documentRepository->existsByFingerPrint($fingerprint);
     }
 
-    /**
-     * Executes a search query against the index.
-     *
-     * @param  SearchQueryRecord  $query  The search query containing n-grams, filters, and limits
-     * @return IndexableSearchResultCollection<IndexableSearchResultRecord> Collection of search results
-     */
     public function search(SearchQueryRecord $query): IndexableSearchResultCollection
     {
         $results = new IndexableSearchResultCollection;
@@ -68,8 +50,8 @@ final class IndexSearcher
             $lexicalIds = $this->searchTokens(
                 $normalizedNgram,
                 $fields,
-                $query->fingerprint,
-                $query->cluster,
+                $query->clusters,
+                $query->clustersOperator,
                 GramType::LEXICAL,
                 $minSize,
                 $maxSize
@@ -78,8 +60,8 @@ final class IndexSearcher
             $metaphoneIds = $this->searchTokens(
                 $normalizedNgram,
                 $fields,
-                $query->fingerprint,
-                $query->cluster,
+                $query->clusters,
+                $query->clustersOperator,
                 GramType::METAPHONE,
                 $minSize,
                 $maxSize
@@ -113,12 +95,6 @@ final class IndexSearcher
         return $results;
     }
 
-    /**
-     * Resolves the minimum n-gram size from query or configuration.
-     *
-     * @param  SearchQueryRecord  $query  The search query
-     * @return int The resolved minimum n-gram size
-     */
     private function resolveMinSize(SearchQueryRecord $query): int
     {
         $configMin = $this->config->getNgramMinSize();
@@ -134,12 +110,6 @@ final class IndexSearcher
         return max($configMin, $requestedMin);
     }
 
-    /**
-     * Resolves the maximum n-gram size from query or configuration.
-     *
-     * @param  SearchQueryRecord  $query  The search query
-     * @return int The resolved maximum n-gram size
-     */
     private function resolveMaxSize(SearchQueryRecord $query): int
     {
         $configMin = $this->config->getNgramMinSize();
@@ -155,23 +125,11 @@ final class IndexSearcher
         return min($configMax, $requestedMax);
     }
 
-    /**
-     * Searches for tokens matching the given criteria.
-     *
-     * @param  string  $ngram  The n-gram to search for
-     * @param  array<string>  $fields  The fields to search in
-     * @param  IndexableFingerPrintVO|null  $fingerprint  Optional fingerprint filter
-     * @param  ClusterVO|null  $cluster  Optional cluster filter
-     * @param  GramType  $type  The token type (LEXICAL or METAPHONE)
-     * @param  int  $minSize  Minimum n-gram size
-     * @param  int  $maxSize  Maximum n-gram size
-     * @return Collection<int, string> Collection of document IDs
-     */
     private function searchTokens(
         string $ngram,
         array $fields,
-        ?IndexableFingerPrintVO $fingerprint,
-        ?ClusterVO $cluster,
+        ClusterVOCollection $clusters,
+        ?string $clustersOperator,
         GramType $type,
         int $minSize,
         int $maxSize
@@ -196,27 +154,13 @@ final class IndexSearcher
             $query->whereIn('field', $fields);
         }
 
-        if ($fingerprint !== null) {
-            $query->whereHas('document', function ($q) use ($fingerprint): void {
-                $q->where('fingerprint', $fingerprint->getValue());
-            });
-        }
-
-        if ($cluster !== null) {
-            $query->whereHas('document', function ($q) use ($cluster): void {
-                $q->where('cluster', 'LIKE', '%'.$cluster->value.'%');
-            });
+        if ($clusters !== null && ! $clusters->isEmpty()) {
+            $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $clustersOperator);
         }
 
         return $query->pluck('document_id')->unique()->values();
     }
 
-    /**
-     * Computes the intersection of multiple result sets (AND logic).
-     *
-     * @param  array<Collection<int, string>>  $results  Array of document ID collections
-     * @return Collection<int, string> Intersection of all result sets
-     */
     private function intersectResults(array $results): Collection
     {
         if (empty($results)) {
@@ -238,15 +182,6 @@ final class IndexSearcher
         return $intersection->values();
     }
 
-    /**
-     * Finds the match information for a document against the query.
-     *
-     * @param  IndexedDocument  $document  The document to check
-     * @param  SearchQueryRecord  $query  The search query
-     * @param  int  $minSize  Minimum n-gram size
-     * @param  int  $maxSize  Maximum n-gram size
-     * @return array{field: string, gram_value: string, gram_type: GramType}|null Match information or null if no match
-     */
     private function findMatchInfo(
         IndexedDocument $document,
         SearchQueryRecord $query,
@@ -263,7 +198,6 @@ final class IndexSearcher
                 continue;
             }
 
-            // Try LEXICAL match first
             $token = $this->tokenRepository->getModel()->newQuery()
                 ->where('document_id', $document->id)
                 ->whereIn('token', $ngrams)
@@ -279,7 +213,6 @@ final class IndexSearcher
                 ];
             }
 
-            // Fallback to METAPHONE match
             $metaphone = strtolower(metaphone($normalizedNgram));
             $token = $this->tokenRepository->getModel()->newQuery()
                 ->where('document_id', $document->id)
@@ -300,14 +233,6 @@ final class IndexSearcher
         return null;
     }
 
-    /**
-     * Generates all n-grams from a term within the given size range.
-     *
-     * @param  string  $term  The term to generate n-grams from
-     * @param  int  $minSize  Minimum n-gram size
-     * @param  int  $maxSize  Maximum n-gram size
-     * @return string[] Unique n-grams
-     */
     private function generateNgramsFromTerm(string $term, int $minSize, int $maxSize): array
     {
         $length = strlen($term);

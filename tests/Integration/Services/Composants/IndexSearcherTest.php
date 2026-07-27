@@ -6,6 +6,7 @@ namespace AndyDefer\LaravelIndexer\Tests\Integration\Services\Composants;
 
 use AndyDefer\DomainStructures\Normalizers\Core\NormalizerInterface;
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
 use AndyDefer\LaravelIndexer\Collections\IndexableSearchResultCollection;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
@@ -45,11 +46,9 @@ final class IndexSearcherTest extends IntegrationTestCase
     {
         parent::setUp();
 
-        // Config pour les tests : min_size=3, max_size=5
         $this->app['config']->set('indexer.token_types.ngrams.min_size', 3);
         $this->app['config']->set('indexer.token_types.ngrams.max_size', 5);
 
-        // Re-bind IndexerConfig après changement de config
         $this->app->singleton(IndexerConfigInterface::class, function ($app) {
             return new IndexerConfig($app['config']);
         });
@@ -105,8 +104,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'email' => 'john@example.com',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User|tenant:company_abc|env:production@AND'));
+
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('john=name')
+            query: new SearchQueryVO('john=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -127,8 +131,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User|tenant:company_abc|env:production@AND'));
+
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('xyz=name')
+            query: new SearchQueryVO('xyz=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -146,8 +155,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'description' => 'Software Developer',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User|tenant:company_abc|env:production@AND'));
+
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('john=name,description')
+            query: new SearchQueryVO('john=name,description'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -174,8 +188,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'description' => 'Junior Developer',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User|tenant:company_abc|env:production@AND'));
+
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('john=name|developer=description')
+            query: new SearchQueryVO('john=name|developer=description'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -187,31 +206,9 @@ final class IndexSearcherTest extends IntegrationTestCase
         $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
     }
 
-    // ==================== TESTS SEARCH WITH FINGERPRINT FILTER ====================
+    // ==================== TESTS SEARCH WITH CLUSTER FILTER (AND) ====================
 
-    public function test_search_with_fingerprint_filter_returns_only_matching_document(): void
-    {
-        $this->createAndIndexDocument('App.Models.User|123', ['name' => 'John Doe']);
-        $this->createAndIndexDocument('App.Models.User|456', ['name' => 'John Smith']);
-
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-        $query = new SearchQueryRecord(
-            query: new SearchQueryVO('john=name'),
-            fingerprint: $fingerPrint,
-        );
-
-        $results = $this->indexSearcher->search($query);
-
-        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
-        $this->assertCount(1, $results);
-
-        $result = $results->first();
-        $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
-    }
-
-    // ==================== TESTS SEARCH WITH CLUSTER FILTER ====================
-
-    public function test_search_with_cluster_filter_returns_only_matching_documents(): void
+    public function test_search_with_cluster_filter_and_returns_only_matching_documents(): void
     {
         $this->createAndIndexDocument(
             'App.Models.User|123',
@@ -225,10 +222,132 @@ final class IndexSearcherTest extends IntegrationTestCase
             'model:User|tenant:company_xyz|env:staging'
         );
 
-        $cluster = new ClusterVO('tenant:company_abc|env:production');
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('tenant:company_abc@AND'));
+        $clusters->add(new ClusterVO('env:production@AND'));
+
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('john=name'),
-            cluster: $cluster,
+            clusters: $clusters,
+            clustersOperator: 'AND'
+        );
+
+        $results = $this->indexSearcher->search($query);
+
+        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
+        $this->assertCount(1, $results);
+
+        $result = $results->first();
+        $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
+    }
+
+    // ==================== TESTS SEARCH WITH CLUSTER FILTER (OR) ====================
+
+    public function test_search_with_cluster_filter_or_returns_matching_documents(): void
+    {
+        $this->createAndIndexDocument(
+            'App.Models.User|123',
+            ['name' => 'John Doe'],
+            'model:User|role_doctor:true'
+        );
+
+        $this->createAndIndexDocument(
+            'App.Models.User|456',
+            ['name' => 'Jane Smith'],
+            'model:User|role_admin:true'
+        );
+
+        $this->createAndIndexDocument(
+            'App.Models.User|789',
+            ['name' => 'Bob Johnson'],
+            'model:User|role_staff:true'
+        );
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('role_doctor:true@OR'));
+        $clusters->add(new ClusterVO('role_admin:true@OR'));
+
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('john=name|jane=name'),
+            clusters: $clusters,
+            clustersOperator: 'OR'
+        );
+
+        $results = $this->indexSearcher->search($query);
+
+        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
+        $this->assertCount(2, $results);
+
+        $fingerprints = $results->map(fn ($r) => $r->item->fingerprint->getValue())->toArray();
+        $this->assertContains('App.Models.User|123', $fingerprints);
+        $this->assertContains('App.Models.User|456', $fingerprints);
+        $this->assertNotContains('App.Models.User|789', $fingerprints);
+    }
+
+    // ==================== TESTS SEARCH WITH CLUSTER FILTER (NOT) ====================
+
+    public function test_search_with_cluster_filter_not_excludes_matching_documents(): void
+    {
+        $this->createAndIndexDocument(
+            'App.Models.User|123',
+            ['name' => 'John Doe'],
+            'model:User|status_active:true'
+        );
+
+        $this->createAndIndexDocument(
+            'App.Models.User|456',
+            ['name' => 'Jane Smith'],
+            'model:User|status_inactive:true'
+        );
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('status_inactive:true@AND'));
+
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('john=name|jane=name'),
+            clusters: $clusters,
+            clustersOperator: 'NOT'
+        );
+
+        $results = $this->indexSearcher->search($query);
+
+        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
+        $this->assertCount(1, $results);
+
+        $result = $results->first();
+        $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
+    }
+
+    // ==================== TESTS SEARCH WITH MULTIPLE CLUSTERS ====================
+
+    public function test_search_with_multiple_clusters_and_operator(): void
+    {
+        $this->createAndIndexDocument(
+            'App.Models.User|123',
+            ['name' => 'John Doe'],
+            'model:User|tenant:company_abc|role:doctor'
+        );
+
+        $this->createAndIndexDocument(
+            'App.Models.User|456',
+            ['name' => 'Jane Smith'],
+            'model:User|tenant:company_abc|role:admin'
+        );
+
+        $this->createAndIndexDocument(
+            'App.Models.User|789',
+            ['name' => 'Bob Johnson'],
+            'model:User|tenant:company_xyz|role:doctor'
+        );
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('tenant:company_abc@AND'));
+        $clusters->add(new ClusterVO('role:doctor@AND'));
+
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('john=name|bob=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -251,8 +370,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             );
         }
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('john=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND',
             limit: 3,
         );
 
@@ -270,8 +394,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('jon=name')
+            query: new SearchQueryVO('jon=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -298,8 +427,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             ],
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('john=profile.social.twitter')
+            query: new SearchQueryVO('john=profile.social.twitter'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -316,13 +450,19 @@ final class IndexSearcherTest extends IntegrationTestCase
 
     public function test_search_with_array_values_returns_results(): void
     {
-        $this->createAndIndexDocument('App.Models.Product|123', [
-            'name' => 'Laptop Pro',
-            'tags' => ['php', 'laravel', 'vuejs'],
-        ]);
+        $this->createAndIndexDocument(
+            'App.Models.Product|123',
+            ['name' => 'Laptop Pro', 'tags' => ['php', 'laravel', 'vuejs']],
+            'type:product'
+        );
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('type:product@AND'));
 
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('php=tags')
+            query: new SearchQueryVO('php=tags'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -343,8 +483,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('joh=name')
+            query: new SearchQueryVO('joh=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -365,8 +510,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('JOHN=name')
+            query: new SearchQueryVO('JOHN=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -387,8 +537,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'Jean-Pierre',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('jean=name')
+            query: new SearchQueryVO('jean=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -405,10 +560,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
-        // min_size=2 est clampé à 3 (config)
-        // On cherche un terme qui n'existe pas
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('xyz=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND',
             min_size: 2,
             max_size: 3,
         );
@@ -425,8 +583,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'Programming',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('programming=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND',
             min_size: 3,
             max_size: 6,
         );
@@ -443,8 +606,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('john=name')
+            query: new SearchQueryVO('john=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
         );
 
         $results = $this->indexSearcher->search($query);
@@ -459,8 +627,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('john=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND',
             min_size: 5,
             max_size: 3,
         );
@@ -477,8 +650,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'Programming',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('programming=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND',
             min_size: 4,
             max_size: 4,
         );
@@ -495,8 +673,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('john=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND',
             min_size: 4,
             max_size: 4,
         );
@@ -513,8 +696,13 @@ final class IndexSearcherTest extends IntegrationTestCase
             'name' => 'John Doe',
         ]);
 
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
         $query = new SearchQueryRecord(
             query: new SearchQueryVO('john=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND',
             min_size: 8,
             max_size: 10,
         );
@@ -523,5 +711,30 @@ final class IndexSearcherTest extends IntegrationTestCase
 
         $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
         $this->assertCount(1, $results);
+    }
+
+    // ==================== TESTS SEARCH WITH EMPTY CLUSTERS ====================
+
+    public function test_search_with_empty_clusters_returns_all_matching(): void
+    {
+        $this->createAndIndexDocument('App.Models.User|123', [
+            'name' => 'John Doe',
+        ]);
+
+        $clusters = new ClusterVOCollection;
+
+        $query = new SearchQueryRecord(
+            query: new SearchQueryVO('john=name'),
+            clusters: $clusters,
+            clustersOperator: 'AND'
+        );
+
+        $results = $this->indexSearcher->search($query);
+
+        $this->assertInstanceOf(IndexableSearchResultCollection::class, $results);
+        $this->assertCount(1, $results);
+
+        $result = $results->first();
+        $this->assertEquals('App.Models.User|123', $result->item->fingerprint->getValue());
     }
 }

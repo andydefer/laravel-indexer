@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Tests\Integration\Repositories;
 
+use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentFiltersRecord;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
@@ -192,7 +193,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
         $this->createProductDocument('789', 'Laptop', 999.99);
 
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production@AND');
         $results = $this->repository->findByCluster($cluster);
 
         $this->assertInstanceOf(Collection::class, $results);
@@ -200,8 +201,19 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
 
         foreach ($results as $doc) {
             $this->assertInstanceOf(IndexedDocument::class, $doc);
-            $this->assertEquals('model:User|tenant:company_abc|env:production', $doc->cluster);
+            $this->assertStringContainsString('model:User', $doc->cluster);
+            $this->assertStringContainsString('tenant:company_abc', $doc->cluster);
+            $this->assertStringContainsString('env:production', $doc->cluster);
         }
+    }
+
+    public function test_find_by_cluster_without_mode_throws_exception(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cluster must have a mode (AND, OR or NOT) to apply to query');
+
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $this->repository->findByCluster($cluster);
     }
 
     public function test_find_by_cluster_key_value_returns_collection(): void
@@ -356,7 +368,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
         $this->createProductDocument('789', 'Laptop', 999.99);
 
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production@AND');
         $count = $this->repository->deleteByCluster($cluster);
         $this->assertEquals(2, $count);
 
@@ -365,6 +377,15 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
 
         $productResults = $this->repository->findByNamespace('App.Models.Product');
         $this->assertCount(1, $productResults);
+    }
+
+    public function test_delete_by_cluster_without_mode_throws_exception(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cluster must have a mode (AND, OR or NOT) to apply to query');
+
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $this->repository->deleteByCluster($cluster);
     }
 
     public function test_delete_by_cluster_key_value_removes_documents(): void
@@ -400,9 +421,18 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
         $this->createProductDocument('789', 'Laptop', 999.99);
 
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production@AND');
         $count = $this->repository->countByCluster($cluster);
         $this->assertEquals(2, $count);
+    }
+
+    public function test_count_by_cluster_without_mode_throws_exception(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cluster must have a mode (AND, OR or NOT) to apply to query');
+
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $this->repository->countByCluster($cluster);
     }
 
     public function test_count_with_filters(): void
@@ -464,9 +494,18 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
     {
         $this->createUserDocument('123', 'John Doe', 'john@example.com');
 
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production@AND');
         $exists = $this->repository->existsByCluster($cluster);
         $this->assertTrue($exists);
+    }
+
+    public function test_exists_by_cluster_without_mode_throws_exception(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cluster must have a mode (AND, OR or NOT) to apply to query');
+
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $this->repository->existsByCluster($cluster);
     }
 
     // ==================== TESTS DISTINCT ====================
@@ -567,7 +606,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
         $this->createProductDocument('789', 'Laptop', 999.99);
 
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production@AND');
         $filters = new IndexedDocumentFiltersRecord(
             cluster: $cluster
         );
@@ -584,7 +623,9 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
 
         foreach ($results as $doc) {
             $this->assertInstanceOf(IndexedDocument::class, $doc);
-            $this->assertEquals('model:User|tenant:company_abc|env:production', $doc->cluster);
+            $this->assertStringContainsString('model:User', $doc->cluster);
+            $this->assertStringContainsString('tenant:company_abc', $doc->cluster);
+            $this->assertStringContainsString('env:production', $doc->cluster);
         }
     }
 
@@ -604,5 +645,144 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
             $this->assertInstanceOf(IndexedDocument::class, $doc);
             $this->assertTrue($doc->relationLoaded('tokens'));
         }
+    }
+
+    // ==================== TESTS FIND BY CLUSTERS ====================
+
+    public function test_find_by_clusters_with_or_operator(): void
+    {
+        $doc1 = $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $doc2 = $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
+        $doc3 = $this->createProductDocument('789', 'Laptop', 999.99);
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+        $clusters->add(new ClusterVO('model:Product@AND'));
+
+        $results = $this->repository->findByClusters($clusters, 'OR');
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(3, $results);
+
+        $ids = $results->pluck('id')->toArray();
+        $this->assertContains($doc1->id, $ids);
+        $this->assertContains($doc2->id, $ids);
+        $this->assertContains($doc3->id, $ids);
+    }
+
+    public function test_find_by_clusters_throws_exception_for_invalid_operator(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid operator. Expected "AND", "OR" or "NOT", got "INVALID"');
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
+        $this->repository->findByClusters($clusters, 'INVALID');
+    }
+
+    // ==================== TESTS COUNT BY CLUSTERS ====================
+
+    public function test_count_by_clusters(): void
+    {
+        $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
+        $this->createProductDocument('789', 'Laptop', 999.99);
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
+        $count = $this->repository->countByClusters($clusters, 'AND');
+
+        $this->assertEquals(2, $count);
+    }
+
+    // ==================== TESTS DELETE BY CLUSTERS ====================
+
+    public function test_delete_by_clusters(): void
+    {
+        $doc1 = $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $doc2 = $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
+        $doc3 = $this->createProductDocument('789', 'Laptop', 999.99);
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
+        $deleted = $this->repository->deleteByClusters($clusters, 'AND');
+
+        $this->assertEquals(2, $deleted);
+
+        $remaining = $this->repository->findBy(new FindByRecord(filters: new IndexedDocumentFiltersRecord));
+        $remainingIds = $remaining->pluck('id')->toArray();
+        $this->assertNotContains($doc1->id, $remainingIds);
+        $this->assertNotContains($doc2->id, $remainingIds);
+        $this->assertContains($doc3->id, $remainingIds);
+    }
+
+    // ==================== TESTS EXISTS BY CLUSTERS ====================
+
+    public function test_exists_by_clusters_returns_true_when_found(): void
+    {
+        $this->createUserDocument('123', 'John Doe', 'john@example.com');
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
+        $exists = $this->repository->existsByClusters($clusters, 'AND');
+
+        $this->assertTrue($exists);
+    }
+
+    public function test_exists_by_clusters_returns_false_when_not_found(): void
+    {
+        $this->createProductDocument('789', 'Laptop', 999.99);
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('model:User@AND'));
+
+        $exists = $this->repository->existsByClusters($clusters, 'AND');
+
+        $this->assertFalse($exists);
+    }
+
+    public function test_find_by_clusters_with_and_operator(): void
+    {
+        $doc1 = $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $doc2 = $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
+        $doc3 = $this->createProductDocument('789', 'Laptop', 999.99);
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('tenant:company_abc@AND'));
+        $clusters->add(new ClusterVO('env:production@AND'));
+
+        $results = $this->repository->findByClusters($clusters, 'AND');
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
+
+        $ids = $results->pluck('id')->toArray();
+        $this->assertContains($doc1->id, $ids);
+        $this->assertContains($doc2->id, $ids);
+        $this->assertNotContains($doc3->id, $ids);
+    }
+
+    public function test_find_by_clusters_with_not_operator(): void
+    {
+        $doc1 = $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $doc2 = $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
+        $doc3 = $this->createProductDocument('789', 'Laptop', 999.99);
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('category:electronics@AND'));
+
+        $results = $this->repository->findByClusters($clusters, 'NOT');
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
+
+        $ids = $results->pluck('id')->toArray();
+        $this->assertContains($doc1->id, $ids);
+        $this->assertContains($doc2->id, $ids);
+        $this->assertNotContains($doc3->id, $ids);
     }
 }

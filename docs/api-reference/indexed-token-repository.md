@@ -2,30 +2,37 @@
 
 ## Description
 
-Repository gérant les opérations CRUD et les requêtes spécialisées pour les tokens indexés dans la base de données.
+Repository pour la gestion des tokens indexés dans Laravel Indexer. Fournit des opérations CRUD, des méthodes de recherche avancées et des filtres par clusters multiples pour les tokens.
 
 ## Hiérarchie / Implémentations
 
 ```
-AbstractRepository<IndexedToken, IndexedTokenRecord>
+AbstractRepository
     └── IndexedTokenRepository
         └── IndexedTokenRepositoryInterface
 ```
 
 ## Rôle principal
 
-Fournit une couche d'abstraction pour l'accès aux tokens indexés, avec des méthodes spécialisées pour :
+`IndexedTokenRepository` est le point d'accès principal pour interagir avec les tokens indexés en base de données. Il gère :
 
-- Recherche par token, type, champ, document, namespace, cluster
-- Autocomplétion et suggestions
-- Récupération des IDs de documents associés
-- Gestion de la fréquence des tokens
-- Opérations de suppression groupées
-- Bulk insertion pour l'indexation massive
+- **CRUD** : Création, lecture, mise à jour, suppression de tokens
+- **Recherche** : Par token, type, champ, document, namespace, cluster(s)
+- **Filtrage avancé** : Filtrage par clusters multiples avec opérateurs AND, OR, NOT
+- **Autocomplétion** : Suggestions de tokens par préfixe
+- **Agrégation** : Récupération d'IDs de documents par token
+
+## DETAILS
+
+[Voir la classe IndexedTokenRepository](https://github.com/andydefer/laravel-indexer/blob/main/src/Repositories/IndexedTokenRepository.php)
 
 ## API / Méthodes publiques
 
 ### `__construct()`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| Aucun | - | - |
 
 **Retourne :** `void`
 
@@ -36,38 +43,25 @@ $repository = new IndexedTokenRepository();
 
 ---
 
-### `applyFilters(Builder $query, AbstractRecord $filters): void`
+### `create(AbstractRecord $record): Model` (hérité)
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$query` | `Builder` | La requête Eloquent à filtrer |
-| `$filters` | `AbstractRecord` | Les filtres à appliquer (doit être `IndexedTokenFiltersRecord`) |
+| `$record` | `IndexedTokenRecord` | Record du token |
 
-**Retourne :** `void`
+**Retourne :** `IndexedToken` - Token créé
 
 **Exemple :**
 ```php
-$filters = new IndexedTokenFiltersRecord(
-    token: 'john',
+$record = new IndexedTokenRecord(
+    document_id: $docId,
     token_type: GramType::LEXICAL,
-    field: 'name'
+    token: 'john',
+    field: 'name',
+    original_text: 'John'
 );
 
-$query = IndexedToken::query();
-$repository->applyFilters($query, $filters);
-$results = $query->get();
-```
-
----
-
-### `getModel(): Model`
-
-**Retourne :** `Model` - L'instance du modèle Eloquent
-
-**Exemple :**
-```php
-$model = $repository->getModel();
-$count = $model->newQuery()->count();
+$token = $repository->create($record);
 ```
 
 ---
@@ -76,14 +70,9 @@ $count = $model->newQuery()->count();
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token à rechercher |
+| `$token` | `string` | Valeur du token |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$tokens = $repository->findByToken('john');
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens trouvés
 
 ---
 
@@ -91,14 +80,9 @@ $tokens = $repository->findByToken('john');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$type` | `GramType` | Le type de token (`LEXICAL` ou `METAPHONE`) |
+| `$type` | `GramType` | Type de token (`LEXICAL` ou `METAPHONE`) |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$lexicalTokens = $repository->findByType(GramType::LEXICAL);
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens trouvés
 
 ---
 
@@ -106,14 +90,9 @@ $lexicalTokens = $repository->findByType(GramType::LEXICAL);
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$field` | `string` | Le nom du champ |
+| `$field` | `string` | Nom du champ (ex: `name`, `email`) |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$tokens = $repository->findByField('name');
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens trouvés
 
 ---
 
@@ -121,14 +100,9 @@ $tokens = $repository->findByField('name');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$documentId` | `string` | L'UUID du document |
+| `$documentId` | `string` | ID du document (UUID) |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$tokens = $repository->findByDocumentId('550e8400-e29b-41d4-a716-446655440000');
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens du document
 
 ---
 
@@ -136,15 +110,9 @@ $tokens = $repository->findByDocumentId('550e8400-e29b-41d4-a716-446655440000');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$fingerPrint` | `IndexableFingerPrintVO` | Le fingerprint du document |
+| `$fingerPrint` | `IndexableFingerPrintVO` | Fingerprint du document |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-$tokens = $repository->findByDocumentFingerPrint($fingerPrint);
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens du document
 
 ---
 
@@ -152,14 +120,9 @@ $tokens = $repository->findByDocumentFingerPrint($fingerPrint);
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$namespace` | `string` | Le namespace à filtrer |
+| `$namespace` | `string` | Namespace (ex: `App.Models.User`) |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$tokens = $repository->findByNamespace('App.Models.User');
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens du namespace
 
 ---
 
@@ -167,14 +130,38 @@ $tokens = $repository->findByNamespace('App.Models.User');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$cluster` | `ClusterVO` | Le cluster à filtrer |
+| `$cluster` | `ClusterVO` | Cluster avec mode |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
+**Retourne :** `Collection<int, IndexedToken>` - Tokens correspondants
+
+**Exceptions :** `InvalidArgumentException` - Si le cluster n'a pas de mode
 
 **Exemple :**
 ```php
-$cluster = new ClusterVO('model:User|tenant:company_abc');
+$cluster = new ClusterVO('type:user|status:active@AND');
 $tokens = $repository->findByCluster($cluster);
+```
+
+---
+
+### `findByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): Collection`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$clusters` | `ClusterVOCollection` | Collection de clusters |
+| `$operator` | `string` | Opérateur: `'AND'`, `'OR'`, `'NOT'` (défaut: `'AND'`) |
+
+**Retourne :** `Collection<int, IndexedToken>` - Tokens correspondants
+
+**Exceptions :** `InvalidArgumentException` - Si l'opérateur est invalide
+
+**Exemple :**
+```php
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('role_doctor:true@OR'));
+$clusters->add(new ClusterVO('role_admin:true@OR'));
+
+$tokens = $repository->findByClusters($clusters, 'OR');
 ```
 
 ---
@@ -183,15 +170,10 @@ $tokens = $repository->findByCluster($cluster);
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$key` | `string` | La clé du cluster |
-| `$value` | `string` | La valeur du cluster |
+| `$key` | `string` | Clé du cluster |
+| `$value` | `string` | Valeur du cluster |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$tokens = $repository->findByClusterKeyValue('model', 'User');
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens correspondants
 
 ---
 
@@ -199,15 +181,10 @@ $tokens = $repository->findByClusterKeyValue('model', 'User');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
-| `$field` | `string` | Le nom du champ |
+| `$token` | `string` | Valeur du token |
+| `$field` | `string` | Nom du champ |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$tokens = $repository->findByTokenAndField('john', 'name');
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens trouvés
 
 ---
 
@@ -215,15 +192,10 @@ $tokens = $repository->findByTokenAndField('john', 'name');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
-| `$type` | `GramType` | Le type de token |
+| `$token` | `string` | Valeur du token |
+| `$type` | `GramType` | Type de token |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$tokens = $repository->findByTokenAndType('john', GramType::LEXICAL);
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens trouvés
 
 ---
 
@@ -231,15 +203,10 @@ $tokens = $repository->findByTokenAndType('john', GramType::LEXICAL);
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
-| `$namespace` | `string` | Le namespace à filtrer |
+| `$token` | `string` | Valeur du token |
+| `$namespace` | `string` | Namespace |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$tokens = $repository->findByTokenAndNamespace('john', 'App.Models.User');
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens trouvés
 
 ---
 
@@ -247,16 +214,22 @@ $tokens = $repository->findByTokenAndNamespace('john', 'App.Models.User');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
-| `$cluster` | `ClusterVO` | Le cluster à filtrer |
+| `$token` | `string` | Valeur du token |
+| `$cluster` | `ClusterVO` | Cluster avec mode |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
+**Retourne :** `Collection<int, IndexedToken>` - Tokens trouvés
 
-**Exemple :**
-```php
-$cluster = new ClusterVO('model:User');
-$tokens = $repository->findByTokenAndCluster('john', $cluster);
-```
+---
+
+### `findByTokenAndClusters(string $token, ClusterVOCollection $clusters, string $operator = 'AND'): Collection`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$token` | `string` | Valeur du token |
+| `$clusters` | `ClusterVOCollection` | Collection de clusters |
+| `$operator` | `string` | Opérateur: `'AND'`, `'OR'`, `'NOT'` |
+
+**Retourne :** `Collection<int, IndexedToken>` - Tokens trouvés
 
 ---
 
@@ -264,16 +237,11 @@ $tokens = $repository->findByTokenAndCluster('john', $cluster);
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
-| `$field` | `string` | Le nom du champ |
-| `$namespace` | `string` | Le namespace à filtrer |
+| `$token` | `string` | Valeur du token |
+| `$field` | `string` | Nom du champ |
+| `$namespace` | `string` | Namespace |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$tokens = $repository->findByTokenFieldAndNamespace('john', 'name', 'App.Models.User');
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens trouvés
 
 ---
 
@@ -281,15 +249,15 @@ $tokens = $repository->findByTokenFieldAndNamespace('john', 'name', 'App.Models.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$prefix` | `string` | Le préfixe pour l'autocomplétion |
-| `$limit` | `?int` | Nombre maximum de suggestions (défaut: 10) |
+| `$prefix` | `string` | Préfixe de recherche |
+| `$limit` | `int|null` | Limite de résultats |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des suggestions distinctes
+**Retourne :** `Collection<int, IndexedToken>` - Tokens distincts
 
 **Exemple :**
 ```php
-$suggestions = $repository->autocomplete('jo', 5);
-// ['john', 'joe', 'jordan']
+$tokens = $repository->autocomplete('joh', 5);
+// ['john', 'johanna', 'johnson']
 ```
 
 ---
@@ -298,15 +266,10 @@ $suggestions = $repository->autocomplete('jo', 5);
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$letter` | `string` | La lettre de début |
-| `$limit` | `?int` | Nombre maximum de résultats |
+| `$letter` | `string` | Lettre de début |
+| `$limit` | `int|null` | Limite de résultats |
 
-**Retourne :** `Collection<int, IndexedToken>` - Collection des tokens trouvés
-
-**Exemple :**
-```php
-$tokens = $repository->startingWith('j', 20);
-```
+**Retourne :** `Collection<int, IndexedToken>` - Tokens trouvés
 
 ---
 
@@ -314,14 +277,9 @@ $tokens = $repository->startingWith('j', 20);
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
+| `$token` | `string` | Valeur du token |
 
-**Retourne :** `Collection<int, string>` - Collection des UUIDs des documents
-
-**Exemple :**
-```php
-$documentIds = $repository->getDocumentIdsForToken('john');
-```
+**Retourne :** `Collection<int, string>` - IDs des documents
 
 ---
 
@@ -329,15 +287,10 @@ $documentIds = $repository->getDocumentIdsForToken('john');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
-| `$field` | `string` | Le nom du champ |
+| `$token` | `string` | Valeur du token |
+| `$field` | `string` | Nom du champ |
 
-**Retourne :** `Collection<int, string>` - Collection des UUIDs des documents
-
-**Exemple :**
-```php
-$documentIds = $repository->getDocumentIdsForTokenAndField('john', 'name');
-```
+**Retourne :** `Collection<int, string>` - IDs des documents
 
 ---
 
@@ -345,16 +298,22 @@ $documentIds = $repository->getDocumentIdsForTokenAndField('john', 'name');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
-| `$cluster` | `ClusterVO` | Le cluster à filtrer |
+| `$token` | `string` | Valeur du token |
+| `$cluster` | `ClusterVO` | Cluster avec mode |
 
-**Retourne :** `Collection<int, string>` - Collection des UUIDs des documents
+**Retourne :** `Collection<int, string>` - IDs des documents
 
-**Exemple :**
-```php
-$cluster = new ClusterVO('model:User');
-$documentIds = $repository->getDocumentIdsForTokenAndCluster('john', $cluster);
-```
+---
+
+### `getDocumentIdsForTokenAndClusters(string $token, ClusterVOCollection $clusters, string $operator = 'AND'): Collection`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$token` | `string` | Valeur du token |
+| `$clusters` | `ClusterVOCollection` | Collection de clusters |
+| `$operator` | `string` | Opérateur: `'AND'`, `'OR'`, `'NOT'` |
+
+**Retourne :** `Collection<int, string>` - IDs des documents
 
 ---
 
@@ -362,17 +321,24 @@ $documentIds = $repository->getDocumentIdsForTokenAndCluster('john', $cluster);
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
-| `$field` | `string` | Le nom du champ |
-| `$cluster` | `ClusterVO` | Le cluster à filtrer |
+| `$token` | `string` | Valeur du token |
+| `$field` | `string` | Nom du champ |
+| `$cluster` | `ClusterVO` | Cluster avec mode |
 
-**Retourne :** `Collection<int, string>` - Collection des UUIDs des documents
+**Retourne :** `Collection<int, string>` - IDs des documents
 
-**Exemple :**
-```php
-$cluster = new ClusterVO('model:User');
-$documentIds = $repository->getDocumentIdsForTokenFieldAndCluster('john', 'name', $cluster);
-```
+---
+
+### `getDocumentIdsForTokenFieldAndClusters(string $token, string $field, ClusterVOCollection $clusters, string $operator = 'AND'): Collection`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$token` | `string` | Valeur du token |
+| `$field` | `string` | Nom du champ |
+| `$clusters` | `ClusterVOCollection` | Collection de clusters |
+| `$operator` | `string` | Opérateur: `'AND'`, `'OR'`, `'NOT'` |
+
+**Retourne :** `Collection<int, string>` - IDs des documents
 
 ---
 
@@ -380,22 +346,12 @@ $documentIds = $repository->getDocumentIdsForTokenFieldAndCluster('john', 'name'
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
-| `$field` | `string` | Le nom du champ |
-| `$documentId` | `string` | L'UUID du document |
-| `$tokenType` | `GramType` | Le type de token |
+| `$token` | `string` | Valeur du token |
+| `$field` | `string` | Nom du champ |
+| `$documentId` | `string` | ID du document |
+| `$tokenType` | `GramType` | Type de token |
 
-**Retourne :** `IndexedToken|null` - Le token trouvé ou `null`
-
-**Exemple :**
-```php
-$token = $repository->findByTokenFieldAndDocument(
-    'john',
-    'name',
-    '550e8400-e29b-41d4-a716-446655440000',
-    GramType::LEXICAL
-);
-```
+**Retourne :** `?IndexedToken` - Token trouvé ou `null`
 
 ---
 
@@ -403,25 +359,15 @@ $token = $repository->findByTokenFieldAndDocument(
 
 **Retourne :** `int` - Nombre de tokens distincts
 
-**Exemple :**
-```php
-$count = $repository->countDistinctTokens();
-```
-
 ---
 
 ### `countByType(GramType $type): int`
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$type` | `GramType` | Le type de token |
+| `$type` | `GramType` | Type de token |
 
 **Retourne :** `int` - Nombre de tokens
-
-**Exemple :**
-```php
-$count = $repository->countByType(GramType::LEXICAL);
-```
 
 ---
 
@@ -429,14 +375,9 @@ $count = $repository->countByType(GramType::LEXICAL);
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$field` | `string` | Le nom du champ |
+| `$field` | `string` | Nom du champ |
 
 **Retourne :** `int` - Nombre de tokens
-
-**Exemple :**
-```php
-$count = $repository->countByField('name');
-```
 
 ---
 
@@ -444,14 +385,9 @@ $count = $repository->countByField('name');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$namespace` | `string` | Le namespace à filtrer |
+| `$namespace` | `string` | Namespace |
 
 **Retourne :** `int` - Nombre de tokens
-
-**Exemple :**
-```php
-$count = $repository->countByNamespace('App.Models.User');
-```
 
 ---
 
@@ -459,14 +395,9 @@ $count = $repository->countByNamespace('App.Models.User');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$documentId` | `string` | L'UUID du document |
+| `$documentId` | `string` | ID du document |
 
 **Retourne :** `int` - Nombre de tokens supprimés
-
-**Exemple :**
-```php
-$count = $repository->deleteByDocumentId('550e8400-e29b-41d4-a716-446655440000');
-```
 
 ---
 
@@ -474,15 +405,9 @@ $count = $repository->deleteByDocumentId('550e8400-e29b-41d4-a716-446655440000')
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$fingerPrint` | `IndexableFingerPrintVO` | Le fingerprint du document |
+| `$fingerPrint` | `IndexableFingerPrintVO` | Fingerprint du document |
 
 **Retourne :** `int` - Nombre de tokens supprimés
-
-**Exemple :**
-```php
-$fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-$count = $repository->deleteByDocumentFingerPrint($fingerPrint);
-```
 
 ---
 
@@ -490,14 +415,9 @@ $count = $repository->deleteByDocumentFingerPrint($fingerPrint);
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$namespace` | `string` | Le namespace à supprimer |
+| `$namespace` | `string` | Namespace |
 
 **Retourne :** `int` - Nombre de tokens supprimés
-
-**Exemple :**
-```php
-$count = $repository->deleteByNamespace('App.Models.User');
-```
 
 ---
 
@@ -505,15 +425,20 @@ $count = $repository->deleteByNamespace('App.Models.User');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$cluster` | `ClusterVO` | Le cluster à supprimer |
+| `$cluster` | `ClusterVO` | Cluster avec mode |
 
 **Retourne :** `int` - Nombre de tokens supprimés
 
-**Exemple :**
-```php
-$cluster = new ClusterVO('model:User');
-$count = $repository->deleteByCluster($cluster);
-```
+---
+
+### `deleteByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): int`
+
+| Paramètre | Type | Description |
+|-----------|------|-------------|
+| `$clusters` | `ClusterVOCollection` | Collection de clusters |
+| `$operator` | `string` | Opérateur: `'AND'`, `'OR'`, `'NOT'` |
+
+**Retourne :** `int` - Nombre de tokens supprimés
 
 ---
 
@@ -521,15 +446,10 @@ $count = $repository->deleteByCluster($cluster);
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$key` | `string` | La clé du cluster |
-| `$value` | `string` | La valeur du cluster |
+| `$key` | `string` | Clé du cluster |
+| `$value` | `string` | Valeur du cluster |
 
 **Retourne :** `int` - Nombre de tokens supprimés
-
-**Exemple :**
-```php
-$count = $repository->deleteByClusterKeyValue('model', 'User');
-```
 
 ---
 
@@ -537,14 +457,9 @@ $count = $repository->deleteByClusterKeyValue('model', 'User');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
+| `$token` | `string` | Valeur du token |
 
 **Retourne :** `int` - Nombre de tokens supprimés
-
-**Exemple :**
-```php
-$count = $repository->deleteByToken('john');
-```
 
 ---
 
@@ -552,39 +467,22 @@ $count = $repository->deleteByToken('john');
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$token` | `string` | La valeur du token |
-| `$field` | `string` | Le nom du champ |
+| `$token` | `string` | Valeur du token |
+| `$field` | `string` | Nom du champ |
 
 **Retourne :** `int` - Nombre de tokens supprimés
-
-**Exemple :**
-```php
-$count = $repository->deleteByTokenAndField('john', 'name');
-```
 
 ---
 
 ### `getDistinctTokens(): Collection`
 
-**Retourne :** `Collection<int, string>` - Liste des tokens distincts
-
-**Exemple :**
-```php
-$tokens = $repository->getDistinctTokens();
-// ['john', 'jane', 'doe', 'smith']
-```
+**Retourne :** `Collection<int, string>` - Tokens distincts
 
 ---
 
 ### `getDistinctFields(): Collection`
 
-**Retourne :** `Collection<int, string>` - Liste des champs distincts
-
-**Exemple :**
-```php
-$fields = $repository->getDistinctFields();
-// ['name', 'email', 'description', 'bio']
-```
+**Retourne :** `Collection<int, string>` - Champs distincts
 
 ---
 
@@ -592,67 +490,50 @@ $fields = $repository->getDistinctFields();
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$id` | `string` | L'UUID du token |
+| `$id` | `string` | ID du token |
 
-**Retourne :** `int` - La nouvelle valeur de fréquence
-
-**Exemple :**
-```php
-$newFrequency = $repository->incrementFrequency($token->id);
-```
+**Retourne :** `int` - Nouveau compteur de fréquence
 
 ---
 
 ## Cas d'utilisation
 
-### Cas 1 : Recherche de documents contenant un token
+### Cas 1 : Recherche de tokens par clusters multiples (OR)
 
 ```php
-// Trouver tous les documents contenant "john" dans le champ "name"
-$documentIds = $repository->getDocumentIdsForTokenAndField('john', 'name');
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('role_doctor:true@OR'));
+$clusters->add(new ClusterVO('role_admin:true@OR'));
 
-$documents = IndexedDocument::whereIn('id', $documentIds)->get();
+$tokens = $repository->findByClusters($clusters, 'OR');
 ```
 
-### Cas 2 : Autocomplétion pour une barre de recherche
+### Cas 2 : Recherche de tokens par token et clusters
 
 ```php
-$query = 'joh';
-$suggestions = $repository->autocomplete($query, 10);
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('type:user@AND'));
 
-// Afficher les suggestions
-foreach ($suggestions as $suggestion) {
-    echo $suggestion->token . "\n";
-}
-// john, johnson, johndoe, ...
+$tokens = $repository->findByTokenAndClusters('john', $clusters, 'AND');
 ```
 
-### Cas 3 : Analyse de la couverture des tokens
+### Cas 3 : Récupération des IDs de documents par token et clusters
 
 ```php
-$totalTokens = $repository->countDistinctTokens();
-$lexicalCount = $repository->countByType(GramType::LEXICAL);
-$metaphoneCount = $repository->countByType(GramType::METAPHONE);
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('role_doctor:true@OR'));
+$clusters->add(new ClusterVO('role_admin:true@OR'));
 
-echo "Tokens distincts: $totalTokens\n";
-echo "Lexicaux: $lexicalCount\n";
-echo "Métaphones: $metaphoneCount\n";
-
-$fields = $repository->getDistinctFields();
-foreach ($fields as $field) {
-    $count = $repository->countByField($field);
-    echo "$field: $count tokens\n";
-}
+$documentIds = $repository->getDocumentIdsForTokenAndClusters('john', $clusters, 'OR');
 ```
 
-### Cas 4 : Nettoyage des tokens d'un tenant
+### Cas 4 : Suppression par clusters
 
 ```php
-$tenant = 'company_xyz';
-$cluster = new ClusterVO('tenant:' . $tenant);
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('status:inactive@AND'));
 
-$count = $repository->deleteByCluster($cluster);
-echo "Supprimé $count tokens du tenant $tenant\n";
+$deleted = $repository->deleteByClusters($clusters, 'AND');
 ```
 
 ---
@@ -661,21 +542,29 @@ echo "Supprimé $count tokens du tenant $tenant\n";
 
 | Situation | Exception | Message |
 |-----------|-----------|---------|
-| Token inexistant | `ModelNotFoundException` | Pas d'exception native (retourne `null` ou collection vide) |
-| Insertion en base | `QueryException` | Erreur PDO (contraintes, syntaxe) |
-| ID inexistant | `ModelNotFoundException` | `No query results for model` |
+| Cluster sans mode | `InvalidArgumentException` | `Cluster must have a mode (AND, OR or NOT) to apply to query` |
+| Opérateur invalide | `InvalidArgumentException` | `Invalid operator. Expected "AND", "OR" or "NOT", got "..."` |
+
+---
+
+## Intégration
+
+`IndexedTokenRepository` est utilisé par :
+
+- `IndexSearcher` - Recherche de tokens
+- `IndexWriter` - Écriture/indexation des tokens
+- `IndexDeleter` - Suppression de tokens
+- `IndexerService` - Service principal d'indexation
+- `HermesRepository` - Recherche avancée (package Laravel Hermes)
 
 ---
 
 ## Performance
 
-| Opération | Complexité | Notes |
-|-----------|------------|-------|
-| `findByToken()` | O(log n) | Index sur `token` |
-| `autocomplete()` | O(log n + k) | Index sur `token` avec LIKE |
-| `getDocumentIdsForToken()` | O(log n + k) | Index sur `token` et `document_id` |
-| `incrementFrequency()` | O(1) | Mise à jour directe par ID |
-| `deleteByCluster()` | O(log n + k) | Suppression via sous-requête |
+- `autocomplete()` utilise `LIKE` avec `prefix%` → index sur `token` recommandé
+- `whereHas('document')` peut être lent sur de grands volumes
+- `distinct()` et `pluck()` sont optimisés pour les agrégations
+- Les filtres par clusters multiples avec `NOT` peuvent être plus lents
 
 ---
 
@@ -683,10 +572,8 @@ echo "Supprimé $count tokens du tenant $tenant\n";
 
 | Version | Support |
 |---------|---------|
-| PHP 8.1+ | ✅ Complet |
-| Laravel 10.x | ✅ Complet |
-| Laravel 11.x | ✅ Complet |
-| Laravel 12.x | ✅ Complet |
+| PHP 8.2+ | ✅ Complet |
+| Laravel 10.x+ | ✅ Complet |
 
 ---
 
@@ -698,48 +585,65 @@ echo "Supprimé $count tokens du tenant $tenant\n";
 declare(strict_types=1);
 
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
+use AndyDefer\LaravelIndexer\Records\IndexedTokenRecord;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
 
 $repository = new IndexedTokenRepository();
 
-// 1. Rechercher un token
-$tokens = $repository->findByToken('john');
+// 1. Création d'un token
+$record = new IndexedTokenRecord(
+    document_id: 'uuid-123',
+    token_type: GramType::LEXICAL,
+    token: 'john',
+    field: 'name',
+    original_text: 'John'
+);
 
-// 2. Filtrer par type et champ
-$tokens = $repository->findByTokenAndField('john', 'name');
-$tokens = $repository->findByTokenAndType('john', GramType::LEXICAL);
+$token = $repository->create($record);
 
-// 3. Autocomplétion
-$suggestions = $repository->autocomplete('jo', 10);
+// 2. Recherche par autocomplétion
+$suggestions = $repository->autocomplete('joh', 10);
 
-// 4. Récupérer les documents associés
-$documentIds = $repository->getDocumentIdsForToken('john');
+// 3. Recherche par clusters (OR)
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('role_doctor:true@OR'));
+$clusters->add(new ClusterVO('role_admin:true@OR'));
 
-// 5. Compter
+$tokens = $repository->findByClusters($clusters, 'OR');
+
+// 4. Recherche par token et clusters (AND)
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('type:user@AND'));
+$clusters->add(new ClusterVO('status:active@AND'));
+
+$tokens = $repository->findByTokenAndClusters('john', $clusters, 'AND');
+
+// 5. Récupération des IDs de documents
+$documentIds = $repository->getDocumentIdsForTokenAndClusters('john', $clusters, 'AND');
+
+// 6. Incrémentation de la fréquence
+$repository->incrementFrequency($token->id);
+
+// 7. Suppression par clusters
+$clusters = new ClusterVOCollection();
+$clusters->add(new ClusterVO('status:inactive@AND'));
+$deleted = $repository->deleteByClusters($clusters, 'AND');
+
+// 8. Statistiques
+$distinctTokens = $repository->getDistinctTokens();
+$distinctFields = $repository->getDistinctFields();
 $count = $repository->countDistinctTokens();
-$countByName = $repository->countByField('name');
-
-// 6. Incrémenter la fréquence
-$token = $repository->findByToken('john')->first();
-if ($token) {
-    $newFrequency = $repository->incrementFrequency($token->id);
-    echo "Nouvelle fréquence: $newFrequency\n";
-}
-
-// 7. Supprimer
-$deleted = $repository->deleteByToken('john');
-echo "Supprimé $deleted tokens\n";
-
-// 8. Explorer
-$fields = $repository->getDistinctFields();
-$allTokens = $repository->getDistinctTokens();
 ```
 
 ## Voir aussi
 
-- `IndexedDocumentRepository` - Gestion des documents
-- `GramType` - Types de tokens (LEXICAL, METAPHONE)
-- `IndexedTokenFiltersRecord` - Record de filtrage
-- `IndexableFingerPrintVO` - Value Object pour les fingerprints
 - `ClusterVO` - Value Object pour les clusters
+- `ClusterVOCollection` - Collection de clusters
+- `ClusterFilterApplier` - Service d'application des filtres
+- `GramType` - Enum des types de tokens
+- `IndexedToken` - Modèle Eloquent
+- `IndexSearcher` - Service de recherche
+- `IndexWriter` - Service d'indexation
+- `AbstractRepository` - Repository de base

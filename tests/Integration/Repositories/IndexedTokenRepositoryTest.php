@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Tests\Integration\Repositories;
 
+use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
 use AndyDefer\LaravelIndexer\Models\IndexedToken;
@@ -13,6 +14,7 @@ use AndyDefer\LaravelIndexer\Records\IndexedTokenRecord;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
+use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\Repository\Records\FindByRecord;
 use AndyDefer\Repository\ValueObjects\SortColumns;
 use Illuminate\Support\Collection;
@@ -216,6 +218,205 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
         }
     }
 
+    // ==================== TESTS FIND BY CLUSTER ====================
+
+    public function test_find_by_cluster_with_and_mode(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true|status:active');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true|status:active');
+        $doc3 = $this->createDocument('App.Models.User|789', 'type:user|role_doctor:true|status:inactive');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'jane', 'name', 'Jane');
+        $this->createToken($doc3->id, 'bob', 'name', 'Bob');
+
+        $cluster = new ClusterVO('type:user|role_doctor:true@AND');
+
+        $results = $this->repository->findByCluster($cluster);
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
+
+        $documentIds = $results->pluck('document_id')->toArray();
+        $this->assertContains($doc1->id, $documentIds);
+        $this->assertContains($doc3->id, $documentIds);
+        $this->assertNotContains($doc2->id, $documentIds);
+    }
+
+    public function test_find_by_cluster_with_or_mode(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true|status:active');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true|status:active');
+        $doc3 = $this->createDocument('App.Models.User|789', 'type:user|role_staff:true|status:inactive');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'jane', 'name', 'Jane');
+        $this->createToken($doc3->id, 'bob', 'name', 'Bob');
+
+        $cluster = new ClusterVO('role_doctor:true|role_admin:true@OR');
+
+        $results = $this->repository->findByCluster($cluster);
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
+
+        $documentIds = $results->pluck('document_id')->toArray();
+        $this->assertContains($doc1->id, $documentIds);
+        $this->assertContains($doc2->id, $documentIds);
+        $this->assertNotContains($doc3->id, $documentIds);
+    }
+
+    public function test_find_by_cluster_without_mode_throws_exception(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cluster must have a mode (AND, OR or NOT) to apply to query');
+
+        $cluster = new ClusterVO('type:user|role_doctor:true');
+        $this->repository->findByCluster($cluster);
+    }
+
+    public function test_delete_by_cluster_without_mode_throws_exception(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cluster must have a mode (AND, OR or NOT) to apply to query');
+
+        $cluster = new ClusterVO('type:user|role_doctor:true');
+        $this->repository->deleteByCluster($cluster);
+    }
+
+    // ==================== TESTS FIND BY TOKEN AND CLUSTER ====================
+
+    public function test_find_by_token_and_cluster_with_and_mode(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true|status:active');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true|status:active');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'john', 'name', 'John');
+
+        $cluster = new ClusterVO('type:user|role_doctor:true@AND');
+
+        $results = $this->repository->findByTokenAndCluster('john', $cluster);
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(1, $results);
+
+        $token = $results->first();
+        $this->assertEquals($doc1->id, $token->document_id);
+        $this->assertEquals('john', $token->token);
+    }
+
+    public function test_find_by_token_and_cluster_with_or_mode(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true|status:active');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true|status:active');
+        $doc3 = $this->createDocument('App.Models.User|789', 'type:user|role_staff:true|status:active');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'john', 'name', 'John');
+        $this->createToken($doc3->id, 'john', 'name', 'John');
+
+        $cluster = new ClusterVO('role_doctor:true|role_admin:true@OR');
+
+        $results = $this->repository->findByTokenAndCluster('john', $cluster);
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
+
+        $documentIds = $results->pluck('document_id')->toArray();
+        $this->assertContains($doc1->id, $documentIds);
+        $this->assertContains($doc2->id, $documentIds);
+        $this->assertNotContains($doc3->id, $documentIds);
+    }
+
+    // ==================== TESTS GET DOCUMENT IDS FOR TOKEN AND CLUSTER ====================
+
+    public function test_get_document_ids_for_token_and_cluster_with_and_mode(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true|status:active');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true|status:active');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'john', 'name', 'John');
+
+        $cluster = new ClusterVO('type:user|role_doctor:true@AND');
+
+        $results = $this->repository->getDocumentIdsForTokenAndCluster('john', $cluster);
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(1, $results);
+        $this->assertEquals($doc1->id, $results->first());
+    }
+
+    public function test_get_document_ids_for_token_and_cluster_with_or_mode(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true|status:active');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true|status:active');
+        $doc3 = $this->createDocument('App.Models.User|789', 'type:user|role_staff:true|status:active');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'john', 'name', 'John');
+        $this->createToken($doc3->id, 'john', 'name', 'John');
+
+        $cluster = new ClusterVO('role_doctor:true|role_admin:true@OR');
+
+        $results = $this->repository->getDocumentIdsForTokenAndCluster('john', $cluster);
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
+        $this->assertContains($doc1->id, $results->toArray());
+        $this->assertContains($doc2->id, $results->toArray());
+        $this->assertNotContains($doc3->id, $results->toArray());
+    }
+
+    // ==================== TESTS DELETE BY CLUSTER ====================
+
+    public function test_delete_by_cluster_with_and_mode(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true|status:active');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true|status:active');
+        $doc3 = $this->createDocument('App.Models.User|789', 'type:user|role_doctor:true|status:inactive');
+
+        $token1 = $this->createToken($doc1->id, 'john', 'name', 'John');
+        $token2 = $this->createToken($doc2->id, 'jane', 'name', 'Jane');
+        $token3 = $this->createToken($doc3->id, 'bob', 'name', 'Bob');
+
+        $cluster = new ClusterVO('type:user|role_doctor:true@AND');
+
+        $deleted = $this->repository->deleteByCluster($cluster);
+
+        $this->assertEquals(2, $deleted);
+
+        $remaining = $this->repository->findBy(new FindByRecord(filters: new IndexedTokenFiltersRecord));
+        $remainingIds = $remaining->pluck('id')->toArray();
+        $this->assertNotContains($token1->id, $remainingIds);
+        $this->assertContains($token2->id, $remainingIds);
+        $this->assertNotContains($token3->id, $remainingIds);
+    }
+
+    public function test_delete_by_cluster_with_or_mode(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true|status:active');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true|status:active');
+        $doc3 = $this->createDocument('App.Models.User|789', 'type:user|role_staff:true|status:active');
+
+        $token1 = $this->createToken($doc1->id, 'john', 'name', 'John');
+        $token2 = $this->createToken($doc2->id, 'jane', 'name', 'Jane');
+        $token3 = $this->createToken($doc3->id, 'bob', 'name', 'Bob');
+
+        $cluster = new ClusterVO('role_doctor:true|role_admin:true@OR');
+
+        $deleted = $this->repository->deleteByCluster($cluster);
+
+        $this->assertEquals(2, $deleted);
+
+        $remaining = $this->repository->findBy(new FindByRecord(filters: new IndexedTokenFiltersRecord));
+        $remainingIds = $remaining->pluck('id')->toArray();
+        $this->assertNotContains($token1->id, $remainingIds);
+        $this->assertNotContains($token2->id, $remainingIds);
+        $this->assertContains($token3->id, $remainingIds);
+    }
+
     // ==================== TESTS AUTOCOMPLETE ====================
 
     public function test_autocomplete_returns_distinct_tokens(): void
@@ -367,5 +568,173 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
         );
 
         $this->assertNull($null);
+    }
+
+    // ==================== TESTS FIND BY CLUSTERS ====================
+
+    public function test_find_by_clusters_with_and_operator(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true');
+        $doc3 = $this->createDocument('App.Models.User|789', 'type:user|role_staff:true');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'jane', 'name', 'Jane');
+        $this->createToken($doc3->id, 'bob', 'name', 'Bob');
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('type:user@AND'));
+        $clusters->add(new ClusterVO('role_doctor:true@AND'));
+
+        $results = $this->repository->findByClusters($clusters, 'AND');
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(1, $results);
+
+        $documentIds = $results->pluck('document_id')->toArray();
+        $this->assertContains($doc1->id, $documentIds);
+    }
+
+    public function test_find_by_clusters_with_or_operator(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true');
+        $doc3 = $this->createDocument('App.Models.User|789', 'type:user|role_staff:true');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'jane', 'name', 'Jane');
+        $this->createToken($doc3->id, 'bob', 'name', 'Bob');
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('role_doctor:true@AND'));
+        $clusters->add(new ClusterVO('role_admin:true@AND'));
+
+        $results = $this->repository->findByClusters($clusters, 'OR');
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
+
+        $documentIds = $results->pluck('document_id')->toArray();
+        $this->assertContains($doc1->id, $documentIds);
+        $this->assertContains($doc2->id, $documentIds);
+        $this->assertNotContains($doc3->id, $documentIds);
+    }
+
+    public function test_find_by_clusters_with_not_operator(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true');
+        $doc3 = $this->createDocument('App.Models.User|789', 'type:user|role_staff:true');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'jane', 'name', 'Jane');
+        $this->createToken($doc3->id, 'bob', 'name', 'Bob');
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('role_staff:true@AND'));
+
+        $results = $this->repository->findByClusters($clusters, 'NOT');
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
+
+        $documentIds = $results->pluck('document_id')->toArray();
+        $this->assertContains($doc1->id, $documentIds);
+        $this->assertContains($doc2->id, $documentIds);
+        $this->assertNotContains($doc3->id, $documentIds);
+    }
+
+    // ==================== TESTS FIND BY TOKEN AND CLUSTERS ====================
+
+    public function test_find_by_token_and_clusters_with_and_operator(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'john', 'name', 'John');
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('type:user@AND'));
+        $clusters->add(new ClusterVO('role_doctor:true@AND'));
+
+        $results = $this->repository->findByTokenAndClusters('john', $clusters, 'AND');
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(1, $results);
+
+        $token = $results->first();
+        $this->assertEquals($doc1->id, $token->document_id);
+        $this->assertEquals('john', $token->token);
+    }
+
+    public function test_find_by_token_and_clusters_with_or_operator(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'john', 'name', 'John');
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('role_doctor:true@AND'));
+        $clusters->add(new ClusterVO('role_admin:true@AND'));
+
+        $results = $this->repository->findByTokenAndClusters('john', $clusters, 'OR');
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
+
+        $documentIds = $results->pluck('document_id')->toArray();
+        $this->assertContains($doc1->id, $documentIds);
+        $this->assertContains($doc2->id, $documentIds);
+    }
+
+    // ==================== TESTS GET DOCUMENT IDS FOR TOKEN AND CLUSTERS ====================
+
+    public function test_get_document_ids_for_token_and_clusters(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true');
+
+        $this->createToken($doc1->id, 'john', 'name', 'John');
+        $this->createToken($doc2->id, 'john', 'name', 'John');
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('role_doctor:true@AND'));
+        $clusters->add(new ClusterVO('role_admin:true@AND'));
+
+        $results = $this->repository->getDocumentIdsForTokenAndClusters('john', $clusters, 'OR');
+
+        $this->assertInstanceOf(Collection::class, $results);
+        $this->assertCount(2, $results);
+        $this->assertContains($doc1->id, $results->toArray());
+        $this->assertContains($doc2->id, $results->toArray());
+    }
+
+    // ==================== TESTS DELETE BY CLUSTERS ====================
+
+    public function test_delete_by_clusters(): void
+    {
+        $doc1 = $this->createDocument('App.Models.User|123', 'type:user|role_doctor:true');
+        $doc2 = $this->createDocument('App.Models.User|456', 'type:user|role_admin:true');
+        $doc3 = $this->createDocument('App.Models.User|789', 'type:user|role_staff:true');
+
+        $token1 = $this->createToken($doc1->id, 'john', 'name', 'John');
+        $token2 = $this->createToken($doc2->id, 'jane', 'name', 'Jane');
+        $token3 = $this->createToken($doc3->id, 'bob', 'name', 'Bob');
+
+        $clusters = new ClusterVOCollection;
+        $clusters->add(new ClusterVO('role_doctor:true@AND'));
+
+        $deleted = $this->repository->deleteByClusters($clusters, 'AND');
+
+        $remaining = $this->repository->findBy(new FindByRecord(filters: new IndexedTokenFiltersRecord));
+        $remainingIds = $remaining->pluck('id')->toArray();
+
+        $this->assertEquals(1, $deleted);
+        $this->assertNotContains($token1->id, $remainingIds);
+        $this->assertContains($token2->id, $remainingIds);
+        $this->assertContains($token3->id, $remainingIds);
     }
 }

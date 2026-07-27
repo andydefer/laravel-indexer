@@ -62,10 +62,10 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
 
         $this->assertNotNull($record->cluster);
         $this->assertEquals('model:Product|tenant:company_abc|env:production', $record->cluster->value);
-        $this->assertEquals(['Product'], $record->cluster->get('model'));
-        $this->assertEquals(['company_abc'], $record->cluster->get('tenant'));
-        $this->assertEquals(['production'], $record->cluster->get('env'));
-        $this->assertEquals([], $record->cluster->get('nonexistent'));
+        $this->assertEquals('Product', $record->cluster->get('model'));
+        $this->assertEquals('company_abc', $record->cluster->get('tenant'));
+        $this->assertEquals('production', $record->cluster->get('env'));
+        $this->assertNull($record->cluster->get('nonexistent'));
     }
 
     public function test_convert_preserves_data_types(): void
@@ -169,20 +169,22 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
             ],
         );
 
-        $cluster = new ClusterVO('key-with-dash:value-with-dash|key_with_underscore:value_with_underscore|key.with.dots:value.with.dots');
+        // Les clés doivent être alphanumériques + underscore
+        // Les valeurs peuvent contenir des caractères spéciaux
+        $cluster = new ClusterVO('key1:value-with-dash|key2:value_with_underscore|key3:value.with.dots');
         $record = IndexableRecordFactory::convert($entity, $cluster);
 
         $this->assertInstanceOf(IndexedDocumentRecord::class, $record);
 
         $this->assertNotNull($record->cluster);
-        $this->assertStringContainsString('key-with-dash:value-with-dash', $record->cluster->value);
-        $this->assertStringContainsString('key_with_underscore:value_with_underscore', $record->cluster->value);
-        $this->assertStringContainsString('key.with.dots:value.with.dots', $record->cluster->value);
+        $this->assertStringContainsString('key1:value-with-dash', $record->cluster->value);
+        $this->assertStringContainsString('key2:value_with_underscore', $record->cluster->value);
+        $this->assertStringContainsString('key3:value.with.dots', $record->cluster->value);
 
-        $this->assertEquals(['value-with-dash'], $record->cluster->get('key-with-dash'));
-        $this->assertEquals(['value_with_underscore'], $record->cluster->get('key_with_underscore'));
-        $this->assertEquals(['value.with.dots'], $record->cluster->get('key.with.dots'));
-        $this->assertEquals([], $record->cluster->get('nonexistent'));
+        $this->assertEquals('value-with-dash', $record->cluster->get('key1'));
+        $this->assertEquals('value_with_underscore', $record->cluster->get('key2'));
+        $this->assertEquals('value.with.dots', $record->cluster->get('key3'));
+        $this->assertNull($record->cluster->get('nonexistent'));
     }
 
     public function test_convert_same_entity_with_different_clusters(): void
@@ -219,17 +221,20 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
             ],
         );
 
-        $cluster = new ClusterVO('model:Product|tenant:company_abc,company_xyz|env:production|category:electronics,music,books');
+        $cluster = new ClusterVO('model:Product|tenant_company_abc:true|tenant_company_xyz:true|env:production|category_electronics:true|category_music:true|category_books:true');
         $record = IndexableRecordFactory::convert($entity, $cluster);
 
         $this->assertInstanceOf(IndexedDocumentRecord::class, $record);
         $this->assertEquals('App.Models.Product|789', $record->fingerprint->getValue());
 
         $this->assertNotNull($record->cluster);
-        $this->assertEquals(['Product'], $record->cluster->get('model'));
-        $this->assertEquals(['company_abc', 'company_xyz'], $record->cluster->get('tenant'));
-        $this->assertEquals(['production'], $record->cluster->get('env'));
-        $this->assertEquals(['electronics', 'music', 'books'], $record->cluster->get('category'));
-        $this->assertEquals([], $record->cluster->get('nonexistent'));
+        $this->assertEquals('Product', $record->cluster->get('model'));
+        $this->assertEquals('true', $record->cluster->get('tenant_company_abc'));
+        $this->assertEquals('true', $record->cluster->get('tenant_company_xyz'));
+        $this->assertEquals('production', $record->cluster->get('env'));
+        $this->assertEquals('true', $record->cluster->get('category_electronics'));
+        $this->assertEquals('true', $record->cluster->get('category_music'));
+        $this->assertEquals('true', $record->cluster->get('category_books'));
+        $this->assertNull($record->cluster->get('nonexistent'));
     }
 }
