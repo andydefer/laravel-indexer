@@ -3,8 +3,8 @@
 namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 
 class TestComplexUser extends Model implements Indexable
@@ -49,8 +49,6 @@ class TestComplexUser extends Model implements Indexable
             'metadata' => $this->metadata,
             'tags' => $this->tags,
             'is_active' => $this->is_active,
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ]);
     }
 
@@ -66,10 +64,11 @@ class TestComplexUser extends Model implements Indexable
 
     public function getIndexableCluster(): ClusterVO
     {
-        return ClusterVO::make('type', 'complex_user')
-            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
-            ->whenArrayNotEmpty('tags', $this->tags)
-            ->whenKeyExists('role', $this->metadata, 'role')
-            ->whenKeyExists('tenant', $this->metadata, 'tenant');
+        return new ClusterVO([
+            'type' => 'complex_user',
+            'status' => $this->is_active,
+            'tags' => $this->tags,
+            'metadata' => $this->metadata,
+        ]);
     }
 }

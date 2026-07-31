@@ -24,7 +24,7 @@ use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
  * @method self reverse()
  * @method self sort(int $flags = SORT_REGULAR)
  */
-final class ClusterVOCollection extends AbstractTypedCollection
+final class ClusterVOCollectionDELETE extends AbstractTypedCollection
 {
     public function __construct()
     {

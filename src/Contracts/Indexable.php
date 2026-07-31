@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Contracts;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 
 /**
  * Interface for entities that can be indexed.

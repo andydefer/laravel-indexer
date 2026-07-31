@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Benchmark\Factories;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use Faker\Factory;
 use Faker\Generator;
@@ -26,7 +26,7 @@ final class TestDataFactory
         $id = $this->faker->unique()->numberBetween(1, 1000000);
         $fingerprint = new IndexableFingerPrintVO($namespace.'|'.$id);
 
-        $clusters = [
+        $clusterData = [
             'model' => 'User',
             'tenant' => $this->faker->company(),
             'env' => $this->faker->randomElement(['production', 'staging', 'development']),
@@ -51,19 +51,10 @@ final class TestDataFactory
             'salary' => $this->faker->numberBetween(30000, 150000),
         ]);
 
-        $clusterString = '';
-        foreach ($clusters as $key => $value) {
-            if (is_array($value)) {
-                $value = implode(',', $value);
-            }
-            $clusterString .= $key.':'.$value.'|';
-        }
-        $clusterString = rtrim($clusterString, '|');
-
         return new IndexedDocumentRecord(
             fingerprint: $fingerprint,
             data: $data,
-            cluster: new ClusterVO($clusterString),
+            cluster: new ClusterVO($clusterData),
         );
     }
 

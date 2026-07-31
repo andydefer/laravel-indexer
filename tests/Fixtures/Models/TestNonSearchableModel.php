@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 
 class TestNonSearchableModel extends Model implements Indexable
@@ -30,6 +30,14 @@ class TestNonSearchableModel extends Model implements Indexable
         ]);
     }
 
+    public function getSearchResultFormat(): StrictAssociative
+    {
+        return StrictAssociative::from([
+            'id' => $this->id,
+            'name' => $this->name,
+        ]);
+    }
+
     public function getMorphClass()
     {
         return self::class;
@@ -42,7 +50,9 @@ class TestNonSearchableModel extends Model implements Indexable
 
     public function getIndexableCluster(): ClusterVO
     {
-        return ClusterVO::make('type', 'non_searchable')
-            ->with('status', 'active');
+        return new ClusterVO([
+            'type' => 'non_searchable',
+            'status' => 'active',
+        ]);
     }
 }

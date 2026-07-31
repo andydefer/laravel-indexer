@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -48,8 +48,6 @@ class TestUser extends Model implements Indexable
             'email' => $this->email,
             'description' => $this->description,
             'is_active' => $this->is_active,
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ]);
     }
 
@@ -70,8 +68,18 @@ class TestUser extends Model implements Indexable
 
     public function getIndexableCluster(): ClusterVO
     {
-        return ClusterVO::make('type', 'user')
-            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
-            ->whenNotEmpty('email', $this->email);
+        $this->loadMissing('addresses');
+
+        return new ClusterVO([
+            'type' => 'user',
+            'status' => $this->is_active,
+            'email' => $this->email,
+            'addresses' => $this->addresses->map(fn ($address) => [
+                'city' => $address->city,
+                'country' => $address->country,
+                'postal_code' => $address->postal_code,
+                'street' => $address->street,
+            ])->values()->toArray(),
+        ]);
     }
 }

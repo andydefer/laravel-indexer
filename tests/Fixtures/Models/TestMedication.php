@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
@@ -55,6 +55,8 @@ class TestMedication extends Model implements Indexable
 
     public function getSearchResultFormat(): StrictAssociative
     {
+        $this->loadMissing('pharmacies');
+
         return StrictAssociative::from([
             'id' => $this->id,
             'name' => $this->name,
@@ -66,8 +68,6 @@ class TestMedication extends Model implements Indexable
             'is_prescription_required' => $this->is_prescription_required,
             'is_active' => $this->is_active,
             'pharmacies' => $this->pharmacies->map(fn ($p) => $p->name)->toArray(),
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ]);
     }
 
@@ -83,11 +83,19 @@ class TestMedication extends Model implements Indexable
 
     public function getIndexableCluster(): ClusterVO
     {
-        return ClusterVO::make('type', 'medication')
-            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
-            ->withTernary('prescription', (bool) $this->is_prescription_required, 'required', 'not_required')
-            ->whenNotEmpty('laboratory', $this->laboratory)
-            ->whenNotEmpty('active_substance', $this->active_substance)
-            ->whenNotEmpty('form', $this->form);
+        $this->loadMissing('pharmacies');
+
+        return new ClusterVO([
+            'type' => 'medication',
+            'status' => $this->is_active,
+            'prescription' => $this->is_prescription_required,
+            'laboratory' => $this->laboratory,
+            'active_substance' => $this->active_substance,
+            'form' => $this->form,
+            'pharmacies' => $this->pharmacies->map(fn ($p) => [
+                'name' => $p->name,
+                'city' => $p->city,
+            ])->values()->toArray(),
+        ]);
     }
 }

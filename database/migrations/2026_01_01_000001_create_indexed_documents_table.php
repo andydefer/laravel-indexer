@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,7 +11,7 @@ return new class extends Migration
         Schema::create('indexed_documents', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('fingerprint')->unique();
-            $table->string('cluster');
+            $table->json('cluster');
             $table->json('data');
             $table->timestamps();
 

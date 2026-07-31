@@ -6,7 +6,7 @@ namespace AndyDefer\LaravelIndexer\Records;
 
 use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
 final class IndexedDocumentRecord extends AbstractRecord

@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Contracts;
 
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
+use AndyDefer\LaravelCluster\Enums\DatabaseDriver;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Repository\AbstractRepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -20,19 +19,61 @@ use Illuminate\Support\Collection;
  */
 interface IndexedDocumentRepositoryInterface extends AbstractRepositoryInterface
 {
+    // ==================== FIND BY FINGERPRINT ====================
+
     public function findByFingerPrint(IndexableFingerPrintVO $fingerPrint): ?IndexedDocument;
 
     public function findByFingerprintString(string $fingerprint): ?IndexedDocument;
 
+    // ==================== FIND BY NAMESPACE ====================
+
     public function findByNamespace(string $namespace): Collection;
 
-    public function findByCluster(ClusterVO $cluster): Collection;
+    // ==================== FIND BY CLUSTER ====================
 
-    public function findByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): Collection;
+    /**
+     * Find documents matching a cluster query expression.
+     *
+     * Les requêtes supportent les opérateurs :
+     * - & ou AND pour le ET logique
+     * - | ou OR pour le OU logique
+     * - Parenthèses pour le regroupement
+     * - Fonctions SQL : COUNT, SUM, AVG, MIN, MAX, LENGTH, EXISTS, HAS, ALL
+     * - Sous-conditions : addresses[city=Kinshasa]
+     * - Opérateurs spéciaux : * (EXISTS), # (NOT_EXISTS)
+     *
+     * @param  string  $query  La requête cluster (ex: 'status=active & role=admin')
+     * @param  string  $column  La colonne contenant les données cluster
+     * @param  DatabaseDriver|null  $driver  Le driver de base de données
+     * @return Collection<IndexedDocument>
+     *
+     * @example
+     * // Recherche simple
+     * $repository->findByClusterQuery('status=active');
+     *
+     * // Recherche avec AND
+     * $repository->findByClusterQuery('status=active & role=admin');
+     *
+     * // Recherche avec OR
+     * $repository->findByClusterQuery('status=active | status=pending');
+     *
+     * // Recherche avec fonction SQL
+     * $repository->findByClusterQuery('COUNT(addresses) > 2');
+     *
+     * // Recherche avec sous-condition
+     * $repository->findByClusterQuery('addresses[city=Kinshasa]');
+     */
+    public function findByClusterQuery(
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): Collection;
 
-    public function findByClusterKeyValue(string $key, string $value): Collection;
+    // ==================== FIND BY IDS ====================
 
     public function findByIds(array $ids): Collection;
+
+    // ==================== DELETE ====================
 
     public function deleteByFingerPrint(IndexableFingerPrintVO $fingerPrint): int;
 
@@ -40,17 +81,53 @@ interface IndexedDocumentRepositoryInterface extends AbstractRepositoryInterface
 
     public function deleteByNamespace(string $namespace): int;
 
-    public function deleteByCluster(ClusterVO $cluster): int;
+    /**
+     * Delete documents matching a cluster query expression.
+     *
+     * @param  string  $query  La requête cluster
+     * @param  string  $column  La colonne contenant les données cluster
+     * @return int Nombre de documents supprimés
+     */
+    public function deleteByClusterQuery(
+        string $query,
+        string $column = 'cluster'
+    ): int;
 
-    public function deleteByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): int;
-
-    public function deleteByClusterKeyValue(string $key, string $value): int;
+    // ==================== COUNT ====================
 
     public function countByNamespace(string $namespace): int;
 
-    public function countByCluster(ClusterVO $cluster): int;
+    /**
+     * Count documents matching a cluster query expression.
+     *
+     * @param  string  $query  La requête cluster
+     * @param  string  $column  La colonne contenant les données cluster
+     * @return int Nombre de documents correspondants
+     */
+    public function countByClusterQuery(
+        string $query,
+        string $column = 'cluster'
+    ): int;
 
-    public function countByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): int;
+    // ==================== EXISTS ====================
+
+    public function existsByFingerPrint(IndexableFingerPrintVO $fingerPrint): bool;
+
+    public function existsByNamespace(string $namespace): bool;
+
+    /**
+     * Check if any document matches a cluster query expression.
+     *
+     * @param  string  $query  La requête cluster
+     * @param  string  $column  La colonne contenant les données cluster
+     * @return bool True si au moins un document correspond
+     */
+    public function existsByClusterQuery(
+        string $query,
+        string $column = 'cluster'
+    ): bool;
+
+    // ==================== DISTINCT VALUES ====================
 
     public function getDistinctNamespaces(): Collection;
 
@@ -58,13 +135,7 @@ interface IndexedDocumentRepositoryInterface extends AbstractRepositoryInterface
 
     public function getDistinctClusterValues(string $key): Collection;
 
-    public function existsByFingerPrint(IndexableFingerPrintVO $fingerPrint): bool;
-
-    public function existsByNamespace(string $namespace): bool;
-
-    public function existsByCluster(ClusterVO $cluster): bool;
-
-    public function existsByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): bool;
+    // ==================== UTILITY ====================
 
     public function findAllWithTokens(): Collection;
 

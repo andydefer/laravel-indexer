@@ -16,8 +16,7 @@ final class IndexedTokenFiltersRecord extends AbstractRecord
         public readonly ?GramType $token_type = null,
         public readonly ?string $field = null,
         public readonly ?string $namespace = null,
-        public readonly ?string $cluster_key = null,
-        public readonly ?string $cluster_value = null,
+        public readonly ?string $cluster_query = null,
         public readonly ?StringTypedCollection $document_ids = null,
     ) {}
 }

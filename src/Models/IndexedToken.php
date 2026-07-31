@@ -5,12 +5,23 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Models;
 
 use AndyDefer\LaravelIndexer\Enums\GramType;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string $document_id
+ * @property GramType $token_type
+ * @property string $token
+ * @property string $field
+ * @property string $original_text
+ * @property int $frequency
+ * @property-read IndexedDocument $document
+ * @property-read bool $is_lexical
+ * @property-read bool $is_metaphone
+ */
 final class IndexedToken extends Model
 {
     use HasUuids;
@@ -36,43 +47,36 @@ final class IndexedToken extends Model
         'frequency' => 'integer',
     ];
 
+    // =============================================
+    // Relations
+    // =============================================
+
     public function document(): BelongsTo
     {
         return $this->belongsTo(IndexedDocument::class, 'document_id');
     }
 
-    public function getFingerPrint(): IndexableFingerPrintVO
+    // =============================================
+    // Cast Attributes
+    // =============================================
+
+    /**
+     * @return Attribute<bool, never>
+     */
+    protected function isLexical(): Attribute
     {
-        return $this->document->getFingerPrintVO();
+        return Attribute::make(
+            get: fn (mixed $value, array $attributes): bool => $this->token_type === GramType::LEXICAL,
+        );
     }
 
-    public function getNamespace(): string
+    /**
+     * @return Attribute<bool, never>
+     */
+    protected function isMetaphone(): Attribute
     {
-        return $this->document->getNamespace();
-    }
-
-    public function getCluster(): ClusterVO
-    {
-        return $this->document->getClusterVO();
-    }
-
-    public function getClusterValue(string $key): ?string
-    {
-        return $this->document->getClusterVO()->get($key);
-    }
-
-    public function getGramType(): GramType
-    {
-        return $this->token_type;
-    }
-
-    public function isLexical(): bool
-    {
-        return $this->token_type === GramType::LEXICAL;
-    }
-
-    public function isMetaphone(): bool
-    {
-        return $this->token_type === GramType::METAPHONE;
+        return Attribute::make(
+            get: fn (mixed $value, array $attributes): bool => $this->token_type === GramType::METAPHONE,
+        );
     }
 }

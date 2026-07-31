@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "916da908d1145b510e5da4aca6e19173",
+    "content-hash": "c14fef7d33c86c25332071fbbc0ceb74",
     "packages": [
         {
             "name": "andydefer/algo-kit",
@@ -161,6 +161,121 @@
                 "source": "https://github.com/andydefer/jsonl-cache/tree/v0.3.20"
             },
             "time": "2026-07-26T20:05:49+00:00"
+        },
+        {
+            "name": "andydefer/laravel-actions",
+            "version": "v2.10.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/andydefer/laravel-actions.git",
+                "reference": "6dad92886baf17445099c431d90c45e529a26279"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/andydefer/laravel-actions/zipball/6dad92886baf17445099c431d90c45e529a26279",
+                "reference": "6dad92886baf17445099c431d90c45e529a26279",
+                "shasum": ""
+            },
+            "require": {
+                "andydefer/php-client": "^0.6.1",
+                "andydefer/php-services": "^1.6.0",
+                "inertiajs/inertia-laravel": "^2.0|^3.0",
+                "laravel/framework": "^12.0|^13.0|^14.0|^15.0",
+                "php": ">=8.1",
+                "ramsey/uuid": "^4.7"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.29",
+                "mockery/mockery": "^1.6",
+                "orchestra/testbench": "^9.0|^10.0",
+                "phpunit/phpunit": "^10.5|^11.0|^12.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "AndyDefer\\Actions\\ActionServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "AndyDefer\\Actions\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Andy Defer",
+                    "email": "andykanidimbu@gmail.com"
+                }
+            ],
+            "description": "Action-oriented architecture for Laravel applications",
+            "support": {
+                "issues": "https://github.com/andydefer/laravel-actions/issues",
+                "source": "https://github.com/andydefer/laravel-actions/tree/v2.10.2"
+            },
+            "time": "2026-07-26T14:15:45+00:00"
+        },
+        {
+            "name": "andydefer/laravel-cluster",
+            "version": "v0.5.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/andydefer/laravel-cluster.git",
+                "reference": "8e5d2fc1a44cf2b43e1f0ff8b9a6cbedc4e9ce04"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/andydefer/laravel-cluster/zipball/8e5d2fc1a44cf2b43e1f0ff8b9a6cbedc4e9ce04",
+                "reference": "8e5d2fc1a44cf2b43e1f0ff8b9a6cbedc4e9ce04",
+                "shasum": ""
+            },
+            "require": {
+                "andydefer/laravel-actions": "^2.10.2",
+                "andydefer/php-services": "^1.6.0",
+                "laravel/framework": "^12.0|^13.0|^14.0|^15.0",
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.29",
+                "laravel/tinker": "^2.11",
+                "mockery/mockery": "^1.6",
+                "orchestra/testbench": "^9.0|^10.0",
+                "phpunit/phpunit": "^10.5|^11.0|^12.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "AndyDefer\\LaravelCluster\\Providers\\ClusterServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "AndyDefer\\LaravelCluster\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "authors": [
+                {
+                    "name": "Andy Kani",
+                    "email": "andykanidimbu@gmail.com"
+                }
+            ],
+            "description": "A powerful cluster query parser and filter for Laravel with JSON column support",
+            "support": {
+                "issues": "https://github.com/andydefer/laravel-cluster/issues",
+                "source": "https://github.com/andydefer/laravel-cluster/tree/v0.5.0"
+            },
+            "time": "2026-07-31T09:44:40+00:00"
         },
         {
             "name": "andydefer/laravel-directive",
@@ -346,19 +461,20 @@
         },
         {
             "name": "andydefer/laravel-repository",
-            "version": "v2.10.12",
+            "version": "v2.11.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/andydefer/laravel-repository.git",
-                "reference": "83bc8ac2f9fe18b229084920afe6d0bc99f81ffa"
+                "reference": "4f2846c7fbb8cd4ed49b8522d1192874c7c5024a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/andydefer/laravel-repository/zipball/83bc8ac2f9fe18b229084920afe6d0bc99f81ffa",
-                "reference": "83bc8ac2f9fe18b229084920afe6d0bc99f81ffa",
+                "url": "https://api.github.com/repos/andydefer/laravel-repository/zipball/4f2846c7fbb8cd4ed49b8522d1192874c7c5024a",
+                "reference": "4f2846c7fbb8cd4ed49b8522d1192874c7c5024a",
                 "shasum": ""
             },
             "require": {
+                "andydefer/laravel-cluster": "^0.5.0",
                 "andydefer/php-vo": "^0.19.0",
                 "laravel/framework": "^12.0|^13.0|^14.0|^15.0",
                 "php": "^8.1"
@@ -395,28 +511,28 @@
             "description": "A lightweight, type-safe repository pattern implementation for Laravel",
             "support": {
                 "issues": "https://github.com/andydefer/laravel-repository/issues",
-                "source": "https://github.com/andydefer/laravel-repository/tree/v2.10.12"
+                "source": "https://github.com/andydefer/laravel-repository/tree/v2.11.1"
             },
-            "time": "2026-07-25T18:28:52+00:00"
+            "time": "2026-07-31T09:48:47+00:00"
         },
         {
             "name": "andydefer/laravel-task",
-            "version": "v4.10.28",
+            "version": "v4.10.30",
             "source": {
                 "type": "git",
                 "url": "https://github.com/andydefer/laravel-task.git",
-                "reference": "582d78fe42947ccaa5ac825bd3926f78cce42ea8"
+                "reference": "baef7ebc4d8b6eb99f78b86542e8cffca0f41120"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/andydefer/laravel-task/zipball/582d78fe42947ccaa5ac825bd3926f78cce42ea8",
-                "reference": "582d78fe42947ccaa5ac825bd3926f78cce42ea8",
+                "url": "https://api.github.com/repos/andydefer/laravel-task/zipball/baef7ebc4d8b6eb99f78b86542e8cffca0f41120",
+                "reference": "baef7ebc4d8b6eb99f78b86542e8cffca0f41120",
                 "shasum": ""
             },
             "require": {
                 "andydefer/laravel-directive": "^3.59.2",
                 "andydefer/laravel-logger": "^3.9.12",
-                "andydefer/laravel-repository": "^2.10.12",
+                "andydefer/laravel-repository": "^2.11.0",
                 "laravel/framework": "^12.0|^13.0|^14.0|^15.0",
                 "php": ">=8.1",
                 "ramsey/uuid": "^4.7"
@@ -454,9 +570,9 @@
             "description": "A lightweight, file-based task system for Laravel with async execution, recurring tasks, and JSONL storage",
             "support": {
                 "issues": "https://github.com/andydefer/laravel-task/issues",
-                "source": "https://github.com/andydefer/laravel-task/tree/v4.10.28"
+                "source": "https://github.com/andydefer/laravel-task/tree/v4.10.30"
             },
-            "time": "2026-07-26T21:55:13+00:00"
+            "time": "2026-07-31T09:48:33+00:00"
         },
         {
             "name": "andydefer/php-client",
@@ -1851,6 +1967,78 @@
                 }
             ],
             "time": "2026-07-17T13:53:03+00:00"
+        },
+        {
+            "name": "inertiajs/inertia-laravel",
+            "version": "v3.2.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/inertiajs/inertia-laravel.git",
+                "reference": "e6ad31fbafb3c8d1c269c93ab12da3712c077744"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/inertiajs/inertia-laravel/zipball/e6ad31fbafb3c8d1c269c93ab12da3712c077744",
+                "reference": "e6ad31fbafb3c8d1c269c93ab12da3712c077744",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "laravel/framework": "^11.35|^12.0|^13.0",
+                "php": "^8.2.0",
+                "symfony/console": "^7.0|^8.0"
+            },
+            "conflict": {
+                "laravel/boost": "<2.2.0"
+            },
+            "require-dev": {
+                "guzzlehttp/guzzle": "^7.15.2|^8.0",
+                "larastan/larastan": "^3.0",
+                "laravel/pint": "^1.16",
+                "mockery/mockery": "^1.3.3",
+                "orchestra/testbench": "^9.2|^10.0|^11.0",
+                "phpunit/phpunit": "^11.5|^12.0"
+            },
+            "suggest": {
+                "ext-pcntl": "Recommended when running the Inertia SSR server via the `inertia:start-ssr` artisan command."
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Inertia\\ServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "./helpers.php"
+                ],
+                "psr-4": {
+                    "Inertia\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jonathan Reinink",
+                    "email": "jonathan@reinink.ca",
+                    "homepage": "https://reinink.ca"
+                }
+            ],
+            "description": "The Laravel adapter for Inertia.js.",
+            "keywords": [
+                "inertia",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/inertiajs/inertia-laravel/issues",
+                "source": "https://github.com/inertiajs/inertia-laravel/tree/v3.2.1"
+            },
+            "time": "2026-07-29T09:10:23+00:00"
         },
         {
             "name": "laravel/framework",

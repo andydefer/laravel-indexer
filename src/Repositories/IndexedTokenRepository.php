@@ -5,28 +5,28 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Repositories;
 
 use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
+use AndyDefer\LaravelCluster\ClusterQuery;
+use AndyDefer\LaravelCluster\Enums\DatabaseDriver;
 use AndyDefer\LaravelIndexer\Contracts\IndexedTokenRepositoryInterface;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\Models\IndexedToken;
 use AndyDefer\LaravelIndexer\Records\IndexedTokenFiltersRecord;
 use AndyDefer\LaravelIndexer\Records\IndexedTokenRecord;
-use AndyDefer\LaravelIndexer\Services\Composants\ClusterFilterApplier;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Repository\AbstractRepository;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 final class IndexedTokenRepository extends AbstractRepository implements IndexedTokenRepositoryInterface
 {
-    private ClusterFilterApplier $clusterFilterApplier;
+    private ClusterQuery $clusterQuery;
 
     public function __construct()
     {
         parent::__construct(IndexedToken::class, IndexedTokenRecord::class);
-        $this->clusterFilterApplier = new ClusterFilterApplier;
+        $this->clusterQuery = new ClusterQuery;
     }
 
     protected function applyFilters(Builder $query, AbstractRecord $filters): void
@@ -40,8 +40,11 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
         $this->applyTokenTypeFilter($query, $filters);
         $this->applyFieldFilter($query, $filters);
         $this->applyNamespaceFilter($query, $filters);
-        $this->applyClusterFilter($query, $filters);
         $this->applyDocumentIdsFilter($query, $filters);
+
+        if ($filters->cluster_query !== null) {
+            $this->applyClusterQueryOnRelation($query, $filters->cluster_query);
+        }
     }
 
     public function getModel(): Model
@@ -54,6 +57,84 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
         return $this->model->newQuery()
             ->where('token', $token)
             ->get();
+    }
+
+    public function findByTokenAndField(string $token, string $field): Collection
+    {
+        return $this->model->newQuery()
+            ->where('token', $token)
+            ->where('field', $field)
+            ->get();
+    }
+
+    public function findByTokenAndType(string $token, GramType $type): Collection
+    {
+        return $this->model->newQuery()
+            ->where('token', $token)
+            ->where('token_type', $type)
+            ->get();
+    }
+
+    public function findByTokenAndNamespace(string $token, string $namespace): Collection
+    {
+        return $this->model->newQuery()
+            ->where('token', $token)
+            ->whereHas('document', function (Builder $query) use ($namespace): void {
+                $query->where('fingerprint', 'LIKE', $namespace.'|%');
+            })
+            ->get();
+    }
+
+    public function findByTokenAndClusterQuery(
+        string $token,
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): Collection {
+        $builder = $this->model->newQuery()->where('token', $token);
+        $this->applyClusterQueryOnRelation($builder, $query, $column, $driver);
+
+        return $builder->get();
+    }
+
+    public function findByTokenFieldAndNamespace(string $token, string $field, string $namespace): Collection
+    {
+        return $this->model->newQuery()
+            ->where('token', $token)
+            ->where('field', $field)
+            ->whereHas('document', function (Builder $query) use ($namespace): void {
+                $query->where('fingerprint', 'LIKE', $namespace.'|%');
+            })
+            ->get();
+    }
+
+    public function findByTokenFieldAndClusterQuery(
+        string $token,
+        string $field,
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): Collection {
+        $builder = $this->model->newQuery()
+            ->where('token', $token)
+            ->where('field', $field);
+        $this->applyClusterQueryOnRelation($builder, $query, $column, $driver);
+
+        return $builder->get();
+    }
+
+    public function findByTokenFieldAndDocument(
+        string $token,
+        string $field,
+        string $documentId,
+        GramType $tokenType
+    ): ?IndexedToken {
+        return $this->model->newQuery()
+            ->where('token', $token)
+            ->where('field', $field)
+            ->where('document_id', $documentId)
+            ->where('token_type', $tokenType)
+            ->first();
     }
 
     public function findByType(GramType $type): Collection
@@ -95,86 +176,15 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->get();
     }
 
-    public function findByCluster(ClusterVO $cluster): Collection
-    {
-        $clusters = new ClusterVOCollection;
-        $clusters->add($cluster);
+    public function findByClusterQuery(
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): Collection {
+        $builder = $this->model->newQuery();
+        $this->applyClusterQueryOnRelation($builder, $query, $column, $driver);
 
-        return $this->findByClusters($clusters, $cluster->getMode() ?? 'AND');
-    }
-
-    public function findByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): Collection
-    {
-        $query = $this->model->newQuery();
-        $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $operator);
-
-        return $query->get();
-    }
-
-    public function findByClusterKeyValue(string $key, string $value): Collection
-    {
-        $searchPattern = $key.':'.$value;
-
-        return $this->model->newQuery()
-            ->whereHas('document', function (Builder $query) use ($searchPattern): void {
-                $query->where('cluster', 'LIKE', '%'.$searchPattern.'%');
-            })
-            ->get();
-    }
-
-    public function findByTokenAndField(string $token, string $field): Collection
-    {
-        return $this->model->newQuery()
-            ->where('token', $token)
-            ->where('field', $field)
-            ->get();
-    }
-
-    public function findByTokenAndType(string $token, GramType $type): Collection
-    {
-        return $this->model->newQuery()
-            ->where('token', $token)
-            ->where('token_type', $type)
-            ->get();
-    }
-
-    public function findByTokenAndNamespace(string $token, string $namespace): Collection
-    {
-        return $this->model->newQuery()
-            ->where('token', $token)
-            ->whereHas('document', function (Builder $query) use ($namespace): void {
-                $query->where('fingerprint', 'LIKE', $namespace.'|%');
-            })
-            ->get();
-    }
-
-    public function findByTokenAndCluster(string $token, ClusterVO $cluster): Collection
-    {
-        $clusters = new ClusterVOCollection;
-        $clusters->add($cluster);
-
-        return $this->findByTokenAndClusters($token, $clusters, $cluster->getMode() ?? 'AND');
-    }
-
-    public function findByTokenAndClusters(string $token, ClusterVOCollection $clusters, string $operator = 'AND'): Collection
-    {
-        $query = $this->model->newQuery()
-            ->where('token', $token);
-
-        $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $operator);
-
-        return $query->get();
-    }
-
-    public function findByTokenFieldAndNamespace(string $token, string $field, string $namespace): Collection
-    {
-        return $this->model->newQuery()
-            ->where('token', $token)
-            ->where('field', $field)
-            ->whereHas('document', function (Builder $query) use ($namespace): void {
-                $query->where('fingerprint', 'LIKE', $namespace.'|%');
-            })
-            ->get();
+        return $builder->get();
     }
 
     public function autocomplete(string $prefix, ?int $limit = 10): Collection
@@ -222,59 +232,36 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->pluck('document_id');
     }
 
-    public function getDocumentIdsForTokenAndCluster(string $token, ClusterVO $cluster): Collection
-    {
-        $clusters = new ClusterVOCollection;
-        $clusters->add($cluster);
-
-        return $this->getDocumentIdsForTokenAndClusters($token, $clusters, $cluster->getMode() ?? 'AND');
-    }
-
-    public function getDocumentIdsForTokenAndClusters(string $token, ClusterVOCollection $clusters, string $operator = 'AND'): Collection
-    {
-        $query = $this->model->newQuery()
+    public function getDocumentIdsForTokenAndClusterQuery(
+        string $token,
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): Collection {
+        $builder = $this->model->newQuery()
             ->where('token', $token)
             ->select('document_id')
             ->distinct();
+        $this->applyClusterQueryOnRelation($builder, $query, $column, $driver);
 
-        $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $operator);
-
-        return $query->pluck('document_id');
+        return $builder->pluck('document_id');
     }
 
-    public function getDocumentIdsForTokenFieldAndCluster(string $token, string $field, ClusterVO $cluster): Collection
-    {
-        $clusters = new ClusterVOCollection;
-        $clusters->add($cluster);
-
-        return $this->getDocumentIdsForTokenFieldAndClusters($token, $field, $clusters, $cluster->getMode() ?? 'AND');
-    }
-
-    public function getDocumentIdsForTokenFieldAndClusters(string $token, string $field, ClusterVOCollection $clusters, string $operator = 'AND'): Collection
-    {
-        $query = $this->model->newQuery()
-            ->where('token', $token)
-            ->where('field', $field)
-            ->select('document_id')
-            ->distinct();
-
-        $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $operator);
-
-        return $query->pluck('document_id');
-    }
-
-    public function findByTokenFieldAndDocument(
+    public function getDocumentIdsForTokenFieldAndClusterQuery(
         string $token,
         string $field,
-        string $documentId,
-        GramType $tokenType
-    ): ?IndexedToken {
-        return $this->model->newQuery()
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): Collection {
+        $builder = $this->model->newQuery()
             ->where('token', $token)
             ->where('field', $field)
-            ->where('document_id', $documentId)
-            ->where('token_type', $tokenType)
-            ->first();
+            ->select('document_id')
+            ->distinct();
+        $this->applyClusterQueryOnRelation($builder, $query, $column, $driver);
+
+        return $builder->pluck('document_id');
     }
 
     public function countDistinctTokens(): int
@@ -307,6 +294,17 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->count();
     }
 
+    public function countByClusterQuery(
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): int {
+        $builder = $this->model->newQuery();
+        $this->applyClusterQueryOnRelation($builder, $query, $column, $driver);
+
+        return $builder->count();
+    }
+
     public function deleteByDocumentId(string $documentId): int
     {
         return $this->model->newQuery()
@@ -332,31 +330,15 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->delete();
     }
 
-    public function deleteByCluster(ClusterVO $cluster): int
-    {
-        $clusters = new ClusterVOCollection;
-        $clusters->add($cluster);
+    public function deleteByClusterQuery(
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): int {
+        $builder = $this->model->newQuery();
+        $this->applyClusterQueryOnRelation($builder, $query, $column, $driver);
 
-        return $this->deleteByClusters($clusters, $cluster->getMode() ?? 'AND');
-    }
-
-    public function deleteByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): int
-    {
-        $query = $this->model->newQuery();
-        $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $operator);
-
-        return $query->delete();
-    }
-
-    public function deleteByClusterKeyValue(string $key, string $value): int
-    {
-        $searchPattern = $key.':'.$value;
-
-        return $this->model->newQuery()
-            ->whereHas('document', function (Builder $query) use ($searchPattern): void {
-                $query->where('cluster', 'LIKE', '%'.$searchPattern.'%');
-            })
-            ->delete();
+        return $builder->delete();
     }
 
     public function deleteByToken(string $token): int
@@ -398,6 +380,8 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
             ->increment('frequency');
     }
 
+    // ==================== PRIVATE METHODS ====================
+
     private function applyIdFilter(Builder $query, IndexedTokenFiltersRecord $filters): void
     {
         if ($filters->id !== null) {
@@ -435,21 +419,42 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
         }
     }
 
-    private function applyClusterFilter(Builder $query, IndexedTokenFiltersRecord $filters): void
-    {
-        if ($filters->cluster_key !== null && $filters->cluster_value !== null) {
-            $searchPattern = $filters->cluster_key.':'.$filters->cluster_value;
-
-            $query->whereHas('document', function (Builder $query) use ($searchPattern): void {
-                $query->where('cluster', 'LIKE', '%'.$searchPattern.'%');
-            });
-        }
-    }
-
     private function applyDocumentIdsFilter(Builder $query, IndexedTokenFiltersRecord $filters): void
     {
         if ($filters->document_ids !== null && ! $filters->document_ids->isEmpty()) {
             $query->whereIn('document_id', $filters->document_ids->toArray());
         }
+    }
+
+    private function applyClusterQueryOnRelation(
+        Builder $query,
+        string $queryString,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): void {
+        if ($driver === null) {
+            $driver = $this->detectDriver();
+        }
+
+        $query->whereHas('document', function ($subQuery) use ($column, $queryString, $driver) {
+            $this->clusterQuery->applyToEloquent(
+                $subQuery,
+                $column,
+                $queryString,
+                $driver
+            );
+        });
+    }
+
+    private function detectDriver(): DatabaseDriver
+    {
+        $driverName = DB::connection()->getDriverName();
+
+        return match ($driverName) {
+            'mysql' => DatabaseDriver::MYSQL,
+            'pgsql' => DatabaseDriver::PGSQL,
+            'sqlite' => DatabaseDriver::SQLITE,
+            default => DatabaseDriver::SQLITE,
+        };
     }
 }

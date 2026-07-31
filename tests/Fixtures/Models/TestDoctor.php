@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 
 class TestDoctor extends Model implements Indexable
@@ -66,8 +66,6 @@ class TestDoctor extends Model implements Indexable
             'postal_code' => $this->postal_code,
             'hospital' => $this->hospital,
             'is_active' => $this->is_active,
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ]);
     }
 
@@ -83,10 +81,12 @@ class TestDoctor extends Model implements Indexable
 
     public function getIndexableCluster(): ClusterVO
     {
-        return ClusterVO::make('type', 'doctor')
-            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
-            ->whenNotEmpty('specialty', $this->specialty)
-            ->whenNotEmpty('city', $this->city)
-            ->whenNotEmpty('hospital', $this->hospital);
+        return new ClusterVO([
+            'type' => 'doctor',
+            'status' => $this->is_active,
+            'specialty' => $this->specialty,
+            'city' => $this->city,
+            'hospital' => $this->hospital,
+        ]);
     }
 }

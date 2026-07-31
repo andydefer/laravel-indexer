@@ -6,6 +6,7 @@ namespace AndyDefer\LaravelIndexer\Providers;
 
 use AndyDefer\DomainStructures\Normalizers\Core\NormalizerInterface;
 use AndyDefer\DomainStructures\Normalizers\NormalizerChain;
+use AndyDefer\LaravelCluster\Services\ClusterService;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
@@ -124,6 +125,7 @@ final class IndexerServiceProvider extends ServiceProvider
                 tokenRepository: $app->make(IndexedTokenRepositoryInterface::class),
                 textNormalizer: $app->make(TextNormalizerInterface::class),
                 config: $app->make(IndexerConfigInterface::class),
+                clusterService: $app->make(ClusterService::class),
             );
         });
 

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Services\Composants;
 
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
+use AndyDefer\LaravelCluster\Collections\ClusterVOCollection;
+use AndyDefer\LaravelCluster\Enums\DatabaseDriver;
+use AndyDefer\LaravelCluster\Services\ClusterService;
 use AndyDefer\LaravelIndexer\Collections\IndexableSearchResultCollection;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Enums\GramType;
@@ -15,20 +17,18 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 final class IndexSearcher
 {
-    private ClusterFilterApplier $clusterFilterApplier;
-
     public function __construct(
         private readonly IndexedDocumentRepository $documentRepository,
         private readonly IndexedTokenRepository $tokenRepository,
         private readonly TextNormalizerInterface $textNormalizer,
         private readonly IndexerConfigInterface $config,
-    ) {
-        $this->clusterFilterApplier = new ClusterFilterApplier;
-    }
+        private readonly ClusterService $clusterService,
+    ) {}
 
     public function exists(IndexableFingerPrintVO $fingerprint): bool
     {
@@ -51,7 +51,6 @@ final class IndexSearcher
                 $normalizedNgram,
                 $fields,
                 $query->clusters,
-                $query->clustersOperator,
                 GramType::LEXICAL,
                 $minSize,
                 $maxSize
@@ -61,7 +60,6 @@ final class IndexSearcher
                 $normalizedNgram,
                 $fields,
                 $query->clusters,
-                $query->clustersOperator,
                 GramType::METAPHONE,
                 $minSize,
                 $maxSize
@@ -128,8 +126,7 @@ final class IndexSearcher
     private function searchTokens(
         string $ngram,
         array $fields,
-        ClusterVOCollection $clusters,
-        ?string $clustersOperator,
+        ?ClusterVOCollection $clusters,
         GramType $type,
         int $minSize,
         int $maxSize
@@ -155,10 +152,33 @@ final class IndexSearcher
         }
 
         if ($clusters !== null && ! $clusters->isEmpty()) {
-            $this->clusterFilterApplier->applyClustersOnRelation($query, $clusters, $clustersOperator);
+            $this->applyClusterQueryOnTokenQuery($query, $clusters);
         }
 
         return $query->pluck('document_id')->unique()->values();
+    }
+
+    private function applyClusterQueryOnTokenQuery(Builder $query, ClusterVOCollection $clusters): void
+    {
+        $query->whereHas('document', function ($subQuery) use ($clusters) {
+            foreach ($clusters as $cluster) {
+                $conditions = [];
+                $flattened = $cluster->toArray();
+
+                foreach ($flattened as $key => $value) {
+                    $conditions[] = $key.'='.$value;
+                }
+
+                $clusterQuery = implode(' & ', $conditions);
+
+                $this->clusterService->applyToEloquent(
+                    $subQuery,
+                    'cluster',
+                    $clusterQuery,
+                    DatabaseDriver::MYSQL
+                );
+            }
+        });
     }
 
     private function intersectResults(array $results): Collection

@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Contracts;
 
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
+use AndyDefer\LaravelCluster\Enums\DatabaseDriver;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\Models\IndexedToken;
 use AndyDefer\LaravelIndexer\Records\IndexedTokenRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Repository\AbstractRepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -21,23 +20,9 @@ use Illuminate\Support\Collection;
  */
 interface IndexedTokenRepositoryInterface extends AbstractRepositoryInterface
 {
+    // ==================== FIND BY TOKEN ====================
+
     public function findByToken(string $token): Collection;
-
-    public function findByType(GramType $type): Collection;
-
-    public function findByField(string $field): Collection;
-
-    public function findByDocumentId(string $documentId): Collection;
-
-    public function findByDocumentFingerPrint(IndexableFingerPrintVO $fingerPrint): Collection;
-
-    public function findByNamespace(string $namespace): Collection;
-
-    public function findByCluster(ClusterVO $cluster): Collection;
-
-    public function findByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): Collection;
-
-    public function findByClusterKeyValue(string $key, string $value): Collection;
 
     public function findByTokenAndField(string $token, string $field): Collection;
 
@@ -45,27 +30,126 @@ interface IndexedTokenRepositoryInterface extends AbstractRepositoryInterface
 
     public function findByTokenAndNamespace(string $token, string $namespace): Collection;
 
-    public function findByTokenAndCluster(string $token, ClusterVO $cluster): Collection;
-
-    public function findByTokenAndClusters(string $token, ClusterVOCollection $clusters, string $operator = 'AND'): Collection;
+    /**
+     * Find tokens by token value and cluster query.
+     *
+     * @param  string  $token  The token value
+     * @param  string  $query  The cluster query expression
+     * @param  string  $column  The column containing cluster data
+     * @param  DatabaseDriver|null  $driver  The database driver
+     * @return Collection<IndexedToken>
+     */
+    public function findByTokenAndClusterQuery(
+        string $token,
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): Collection;
 
     public function findByTokenFieldAndNamespace(string $token, string $field, string $namespace): Collection;
+
+    /**
+     * Find tokens by token, field and cluster query.
+     *
+     * @param  string  $token  The token value
+     * @param  string  $field  The field name
+     * @param  string  $query  The cluster query expression
+     * @param  string  $column  The column containing cluster data
+     * @param  DatabaseDriver|null  $driver  The database driver
+     * @return Collection<IndexedToken>
+     */
+    public function findByTokenFieldAndClusterQuery(
+        string $token,
+        string $field,
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): Collection;
+
+    public function findByTokenFieldAndDocument(
+        string $token,
+        string $field,
+        string $documentId,
+        GramType $tokenType
+    ): ?IndexedToken;
+
+    // ==================== FIND BY TYPE ====================
+
+    public function findByType(GramType $type): Collection;
+
+    public function findByField(string $field): Collection;
+
+    // ==================== FIND BY DOCUMENT ====================
+
+    public function findByDocumentId(string $documentId): Collection;
+
+    public function findByDocumentFingerPrint(IndexableFingerPrintVO $fingerPrint): Collection;
+
+    public function findByNamespace(string $namespace): Collection;
+
+    // ==================== FIND BY CLUSTER ====================
+
+    /**
+     * Find tokens matching a cluster query expression.
+     *
+     * @param  string  $query  The cluster query expression
+     * @param  string  $column  The column containing cluster data
+     * @param  DatabaseDriver|null  $driver  The database driver
+     * @return Collection<IndexedToken>
+     */
+    public function findByClusterQuery(
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): Collection;
+
+    // ==================== AUTOCOMPLETE ====================
 
     public function autocomplete(string $prefix, ?int $limit = 10): Collection;
 
     public function startingWith(string $letter, ?int $limit = null): Collection;
 
+    // ==================== DOCUMENT IDS ====================
+
     public function getDocumentIdsForToken(string $token): Collection;
 
     public function getDocumentIdsForTokenAndField(string $token, string $field): Collection;
 
-    public function getDocumentIdsForTokenAndCluster(string $token, ClusterVO $cluster): Collection;
+    /**
+     * Get document IDs for a token matching a cluster query.
+     *
+     * @param  string  $token  The token value
+     * @param  string  $query  The cluster query expression
+     * @param  string  $column  The column containing cluster data
+     * @param  DatabaseDriver|null  $driver  The database driver
+     * @return Collection<string> Document IDs
+     */
+    public function getDocumentIdsForTokenAndClusterQuery(
+        string $token,
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): Collection;
 
-    public function getDocumentIdsForTokenAndClusters(string $token, ClusterVOCollection $clusters, string $operator = 'AND'): Collection;
+    /**
+     * Get document IDs for a token, field and cluster query.
+     *
+     * @param  string  $token  The token value
+     * @param  string  $field  The field name
+     * @param  string  $query  The cluster query expression
+     * @param  string  $column  The column containing cluster data
+     * @param  DatabaseDriver|null  $driver  The database driver
+     * @return Collection<string> Document IDs
+     */
+    public function getDocumentIdsForTokenFieldAndClusterQuery(
+        string $token,
+        string $field,
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): Collection;
 
-    public function getDocumentIdsForTokenFieldAndCluster(string $token, string $field, ClusterVO $cluster): Collection;
-
-    public function getDocumentIdsForTokenFieldAndClusters(string $token, string $field, ClusterVOCollection $clusters, string $operator = 'AND'): Collection;
+    // ==================== COUNT ====================
 
     public function countDistinctTokens(): int;
 
@@ -75,32 +159,53 @@ interface IndexedTokenRepositoryInterface extends AbstractRepositoryInterface
 
     public function countByNamespace(string $namespace): int;
 
+    /**
+     * Count tokens matching a cluster query expression.
+     *
+     * @param  string  $query  The cluster query expression
+     * @param  string  $column  The column containing cluster data
+     * @param  DatabaseDriver|null  $driver  The database driver
+     * @return int Number of matching tokens
+     */
+    public function countByClusterQuery(
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): int;
+
+    // ==================== DELETE ====================
+
     public function deleteByDocumentId(string $documentId): int;
 
     public function deleteByDocumentFingerPrint(IndexableFingerPrintVO $fingerPrint): int;
 
     public function deleteByNamespace(string $namespace): int;
 
-    public function deleteByCluster(ClusterVO $cluster): int;
-
-    public function deleteByClusters(ClusterVOCollection $clusters, string $operator = 'AND'): int;
-
-    public function deleteByClusterKeyValue(string $key, string $value): int;
+    /**
+     * Delete tokens matching a cluster query expression.
+     *
+     * @param  string  $query  The cluster query expression
+     * @param  string  $column  The column containing cluster data
+     * @param  DatabaseDriver|null  $driver  The database driver
+     * @return int Number of deleted tokens
+     */
+    public function deleteByClusterQuery(
+        string $query,
+        string $column = 'cluster',
+        ?DatabaseDriver $driver = null
+    ): int;
 
     public function deleteByToken(string $token): int;
 
     public function deleteByTokenAndField(string $token, string $field): int;
 
+    // ==================== DISTINCT ====================
+
     public function getDistinctTokens(): Collection;
 
     public function getDistinctFields(): Collection;
 
-    public function findByTokenFieldAndDocument(
-        string $token,
-        string $field,
-        string $documentId,
-        GramType $tokenType
-    ): ?IndexedToken;
+    // ==================== UTILITY ====================
 
     public function incrementFrequency(string $id): int;
 

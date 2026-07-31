@@ -6,6 +6,7 @@ namespace AndyDefer\LaravelIndexer\Collections;
 
 use AndyDefer\DomainStructures\Collections\Core\TypedCollection;
 use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
+use AndyDefer\LaravelCluster\Collections\ClusterVOCollection;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 
 /**
@@ -350,25 +351,5 @@ final class IndexableRecordCollection extends TypedCollection
         }
 
         return null;
-    }
-
-    /**
-     * Récupère les enregistrements qui contiennent toutes les clés de cluster
-     */
-    public function withClusterKeys(array $keys): self
-    {
-        return $this->filter(
-            fn (IndexedDocumentRecord $record) => $record->cluster->hasAll($keys)
-        );
-    }
-
-    /**
-     * Récupère les enregistrements qui contiennent au moins une clé de cluster
-     */
-    public function withAnyClusterKeys(array $keys): self
-    {
-        return $this->filter(
-            fn (IndexedDocumentRecord $record) => $record->cluster->hasAny($keys)
-        );
     }
 }

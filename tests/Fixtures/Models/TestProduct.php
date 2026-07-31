@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 
 class TestProduct extends Model implements Indexable
@@ -27,7 +27,7 @@ class TestProduct extends Model implements Indexable
 
     public function shouldBeIndexed(): bool
     {
-        return (bool) $this->is_published;
+        return $this->is_published;
     }
 
     public function getIndexableData(): StrictAssociative
@@ -47,8 +47,6 @@ class TestProduct extends Model implements Indexable
             'reference' => $this->reference,
             'description' => $this->description,
             'is_published' => $this->is_published,
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ]);
     }
 
@@ -64,8 +62,10 @@ class TestProduct extends Model implements Indexable
 
     public function getIndexableCluster(): ClusterVO
     {
-        return ClusterVO::make('type', 'product')
-            ->withTernary('status', (bool) $this->is_published, 'published', 'unpublished')
-            ->whenNotEmpty('reference', $this->reference);
+        return new ClusterVO([
+            'type' => 'product',
+            'status' => $this->is_published,
+            'reference' => $this->reference,
+        ]);
     }
 }

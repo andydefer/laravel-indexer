@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
@@ -53,6 +53,8 @@ class TestPharmacy extends Model implements Indexable
 
     public function getSearchResultFormat(): StrictAssociative
     {
+        $this->loadMissing('medications');
+
         return StrictAssociative::from([
             'id' => $this->id,
             'name' => $this->name,
@@ -63,8 +65,6 @@ class TestPharmacy extends Model implements Indexable
             'email' => $this->email,
             'is_active' => $this->is_active,
             'medications_count' => $this->medications->count(),
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ]);
     }
 
@@ -80,8 +80,17 @@ class TestPharmacy extends Model implements Indexable
 
     public function getIndexableCluster(): ClusterVO
     {
-        return ClusterVO::make('type', 'pharmacy')
-            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
-            ->whenNotEmpty('city', $this->city);
+        $this->loadMissing('medications');
+
+        return new ClusterVO([
+            'type' => 'pharmacy',
+            'status' => $this->is_active,
+            'city' => $this->city,
+            'medications' => $this->medications->map(fn ($m) => [
+                'name' => $m->name,
+                'laboratory' => $m->laboratory,
+                'active_substance' => $m->active_substance,
+            ])->values()->toArray(),
+        ]);
     }
 }
