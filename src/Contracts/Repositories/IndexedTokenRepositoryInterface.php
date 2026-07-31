@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AndyDefer\LaravelIndexer\Contracts;
+namespace AndyDefer\LaravelIndexer\Contracts\Repositories;
 
 use AndyDefer\LaravelCluster\Enums\DatabaseDriver;
 use AndyDefer\LaravelIndexer\Enums\GramType;
@@ -83,7 +83,7 @@ interface IndexedTokenRepositoryInterface extends AbstractRepositoryInterface
 
     public function findByDocumentId(string $documentId): Collection;
 
-    public function findByDocumentFingerPrint(IndexableFingerPrintVO $fingerPrint): Collection;
+    public function findByDocumentFingerPrint(IndexableFingerPrintVO $fingerprint): Collection;
 
     public function findByNamespace(string $namespace): Collection;
 
@@ -177,7 +177,7 @@ interface IndexedTokenRepositoryInterface extends AbstractRepositoryInterface
 
     public function deleteByDocumentId(string $documentId): int;
 
-    public function deleteByDocumentFingerPrint(IndexableFingerPrintVO $fingerPrint): int;
+    public function deleteByDocumentFingerPrint(IndexableFingerPrintVO $fingerprint): int;
 
     public function deleteByNamespace(string $namespace): int;
 

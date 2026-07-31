@@ -14,19 +14,18 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\PhpServices\Contracts\Services\NGramGeneratorInterface;
 use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
 use AndyDefer\PhpServices\Enums\NormalizationMode;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 final class IndexWriter
 {
-    private int $fullTextMaxLength;
-
-    private int $maxTextLength;
-
     /** @var array<string, array<string, mixed>> */
     private array $tokenBuffer = [];
 
     /** @var array<string, int> */
     private array $incrementBuffer = [];
+
+    private ?string $currentDocumentId = null;
 
     private int $bufferSize = 5000;
 
@@ -44,15 +43,13 @@ final class IndexWriter
     {
         $this->resetBuffers();
 
-        $documentRecord = new IndexedDocumentRecord(
-            fingerprint: $entity->fingerprint,
-            cluster: $entity->cluster,
-            data: $entity->data
-        );
+        $document = $this->createDocument($entity);
+        $this->currentDocumentId = $document->id;
 
-        $document = $this->documentRepository->create($documentRecord);
         $this->indexDocumentData($document, $entity->data->toArray());
-        $this->flushTokens($document->id);
+
+        $this->flushTokens();
+        $this->currentDocumentId = null;
     }
 
     public function indexMany(IndexableRecordCollection $records): void
@@ -60,17 +57,25 @@ final class IndexWriter
         $this->resetBuffers();
 
         foreach ($records as $record) {
-            $documentRecord = new IndexedDocumentRecord(
-                fingerprint: $record->fingerprint,
-                cluster: $record->cluster,
-                data: $record->data
-            );
+            $document = $this->createDocument($record);
+            $this->currentDocumentId = $document->id;
 
-            $document = $this->documentRepository->create($documentRecord);
             $this->indexDocumentData($document, $record->data->toArray());
         }
 
-        $this->flushTokens(null);
+        $this->flushTokens();
+        $this->currentDocumentId = null;
+    }
+
+    private function createDocument(IndexedDocumentRecord $record): IndexedDocument
+    {
+        $documentRecord = new IndexedDocumentRecord(
+            fingerprint: $record->fingerprint,
+            cluster: $record->cluster,
+            data: $record->data,
+        );
+
+        return $this->documentRepository->create($documentRecord);
     }
 
     private function resetBuffers(): void
@@ -86,11 +91,20 @@ final class IndexWriter
 
             if (is_array($value)) {
                 if ($this->isAssociativeArray($value)) {
+                    // ✅ Traitement récursif pour les tableaux associatifs
                     $this->indexDocumentData($document, $value, $field);
                 } else {
+                    // ✅ Tableau indexé : concaténer les valeurs
                     $concatenated = implode('; ', $value);
                     $this->extractAndBufferTokens($document->id, $field, $concatenated);
                 }
+
+                continue;
+            }
+
+            if (is_numeric($value) || is_bool($value)) {
+                // ✅ Convertir les valeurs non-string en string
+                $this->extractAndBufferTokens($document->id, $field, (string) $value);
 
                 continue;
             }
@@ -113,6 +127,10 @@ final class IndexWriter
         $minSize = $this->config->getNgramMinSize();
         $maxSize = $this->config->getNgramMaxSize();
 
+        if (empty($value)) {
+            return;
+        }
+
         if (strlen($value) > $this->config->getMaxTextLength()) {
             $value = substr($value, 0, $this->config->getMaxTextLength());
         }
@@ -133,12 +151,20 @@ final class IndexWriter
         int $minSize,
         int $maxSize
     ): void {
-        $originalWords = $this->extractWordsPreserveCase($value);
+        $words = $this->extractWordsWithOriginalCase($value);
         $normalizedValue = $this->textNormalizer->normalize($value);
         $normalizedWords = $this->textNormalizer->extractWords($normalizedValue);
 
-        foreach ($normalizedWords as $index => $normalizedWord) {
-            $originalWord = $originalWords[$index] ?? $normalizedWord;
+        $count = min(count($words), count($normalizedWords));
+
+        for ($i = 0; $i < $count; $i++) {
+            $originalWord = $words[$i] ?? $normalizedWords[$i];
+            $normalizedWord = $normalizedWords[$i] ?? '';
+
+            if (empty($normalizedWord)) {
+                continue;
+            }
+
             $this->processWord($documentId, $field, $normalizedWord, $originalWord, $minSize, $maxSize);
         }
     }
@@ -152,7 +178,7 @@ final class IndexWriter
     ): void {
         $normalizedValue = $this->textNormalizer->normalize($value);
         $normalizedWords = $this->textNormalizer->extractWords($normalizedValue);
-        $originalWords = $this->extractWordsPreserveCase($value);
+        $words = $this->extractWordsWithOriginalCase($value);
 
         $index = 0;
         $totalWords = count($normalizedWords);
@@ -164,9 +190,15 @@ final class IndexWriter
             $chunkLength = 0;
 
             while ($index < $totalWords) {
-                $word = $normalizedWords[$index];
-                $originalWord = $originalWords[$index] ?? $word;
+                $word = $normalizedWords[$index] ?? '';
+                $originalWord = $words[$index] ?? $word;
                 $wordLength = strlen($word);
+
+                if (empty($word)) {
+                    $index++;
+
+                    continue;
+                }
 
                 $newLength = $chunkLength + ($chunkLength > 0 ? 1 : 0) + $wordLength;
 
@@ -198,8 +230,16 @@ final class IndexWriter
                 $chunkWords = explode(' ', $chunkNormalized);
                 $chunkOriginalWords = explode(' ', $chunkOriginal);
 
-                foreach ($chunkWords as $idx => $normalizedWord) {
-                    $originalWord = $chunkOriginalWords[$idx] ?? $normalizedWord;
+                $count = min(count($chunkWords), count($chunkOriginalWords));
+
+                for ($i = 0; $i < $count; $i++) {
+                    $normalizedWord = $chunkWords[$i] ?? '';
+                    $originalWord = $chunkOriginalWords[$i] ?? $normalizedWord;
+
+                    if (empty($normalizedWord)) {
+                        continue;
+                    }
+
                     $this->processWord($documentId, $field, $normalizedWord, $originalWord, $minSize, $maxSize);
                 }
             }
@@ -214,17 +254,33 @@ final class IndexWriter
         int $minSize,
         int $maxSize
     ): void {
-        $phoneticMinSize = $minSize - 1;
+        $phoneticMinSize = max(1, $minSize - 1);
 
-        $ngrams = $this->ngramGenerator->generate($normalizedWord, $minSize, $maxSize, NormalizationMode::WITH_NORMALIZATION);
+        // ✅ Génération des n-grams lexicaux
+        $ngrams = $this->ngramGenerator->generate(
+            $normalizedWord,
+            $minSize,
+            $maxSize,
+            NormalizationMode::WITH_NORMALIZATION
+        );
+
         foreach ($ngrams as $ngram) {
             $this->addToBuffer($documentId, $ngram, $field, GramType::LEXICAL, $originalWord);
         }
 
+        // ✅ Génération des n-grams phonétiques
         $metaphone = metaphone($normalizedWord);
-        $metaphoneNgrams = $this->ngramGenerator->generate($metaphone, $phoneticMinSize, $maxSize, NormalizationMode::WITH_NORMALIZATION);
-        foreach ($metaphoneNgrams as $metaphoneNgram) {
-            $this->addToBuffer($documentId, $metaphoneNgram, $field, GramType::METAPHONE, $originalWord);
+        if ($metaphone !== false && ! empty($metaphone)) {
+            $metaphoneNgrams = $this->ngramGenerator->generate(
+                $metaphone,
+                $phoneticMinSize,
+                $maxSize,
+                NormalizationMode::WITH_NORMALIZATION
+            );
+
+            foreach ($metaphoneNgrams as $metaphoneNgram) {
+                $this->addToBuffer($documentId, $metaphoneNgram, $field, GramType::METAPHONE, $originalWord);
+            }
         }
     }
 
@@ -258,40 +314,54 @@ final class IndexWriter
         ];
 
         if ((count($this->tokenBuffer) + count($this->incrementBuffer)) >= $this->bufferSize) {
-            $this->flushTokens($documentId);
+            $this->flushTokens();
         }
     }
 
-    private function flushTokens(?string $documentId = null): void
+    private function flushTokens(): void
     {
         if (empty($this->tokenBuffer) && empty($this->incrementBuffer)) {
             return;
         }
 
-        $toCreate = array_values($this->tokenBuffer);
+        try {
+            DB::beginTransaction();
 
-        if (! empty($toCreate)) {
-            foreach (array_chunk($toCreate, $this->insertChunkSize) as $chunk) {
-                $this->tokenRepository->getModel()->newQuery()->insert($chunk);
-            }
-        }
+            // ✅ Créer les nouveaux tokens
+            if (! empty($this->tokenBuffer)) {
+                $toCreate = array_values($this->tokenBuffer);
 
-        if (! empty($this->incrementBuffer)) {
-            foreach ($this->incrementBuffer as $key => $count) {
-                $parts = explode('|', $key);
-                $this->tokenRepository->getModel()->newQuery()
-                    ->where('document_id', $parts[0])
-                    ->where('token', $parts[1])
-                    ->where('field', $parts[2])
-                    ->where('token_type', $parts[3])
-                    ->increment('frequency', $count);
+                foreach (array_chunk($toCreate, $this->insertChunkSize) as $chunk) {
+                    $this->tokenRepository->getModel()->newQuery()->insert($chunk);
+                }
             }
+
+            // ✅ Mettre à jour les tokens existants
+            if (! empty($this->incrementBuffer)) {
+                foreach ($this->incrementBuffer as $key => $count) {
+                    $parts = explode('|', $key);
+                    if (count($parts) === 4) {
+                        [$docId, $token, $field, $type] = $parts;
+                        $this->tokenRepository->getModel()->newQuery()
+                            ->where('document_id', $docId)
+                            ->where('token', $token)
+                            ->where('field', $field)
+                            ->where('token_type', $type)
+                            ->increment('frequency', $count);
+                    }
+                }
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw new \RuntimeException('Failed to flush tokens: '.$e->getMessage(), 0, $e);
         }
 
         $this->resetBuffers();
     }
 
-    private function extractWordsPreserveCase(string $text): array
+    private function extractWordsWithOriginalCase(string $text): array
     {
         $words = preg_split('/[\s\-_\/]+/', $text, -1, PREG_SPLIT_NO_EMPTY);
 

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Services\Composants;
 
-use AndyDefer\LaravelCluster\Collections\ClusterVOCollection;
-use AndyDefer\LaravelCluster\Enums\DatabaseDriver;
 use AndyDefer\LaravelCluster\Services\ClusterService;
 use AndyDefer\LaravelIndexer\Collections\IndexableSearchResultCollection;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
@@ -17,7 +15,7 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
-use Illuminate\Database\Eloquent\Builder;
+use AndyDefer\Repository\ValueObjects\ClusterQueries;
 use Illuminate\Support\Collection;
 
 final class IndexSearcher
@@ -50,7 +48,7 @@ final class IndexSearcher
             $lexicalIds = $this->searchTokens(
                 $normalizedNgram,
                 $fields,
-                $query->clusters,
+                $query->cluster_queries,
                 GramType::LEXICAL,
                 $minSize,
                 $maxSize
@@ -59,7 +57,7 @@ final class IndexSearcher
             $metaphoneIds = $this->searchTokens(
                 $normalizedNgram,
                 $fields,
-                $query->clusters,
+                $query->cluster_queries,
                 GramType::METAPHONE,
                 $minSize,
                 $maxSize
@@ -126,7 +124,7 @@ final class IndexSearcher
     private function searchTokens(
         string $ngram,
         array $fields,
-        ?ClusterVOCollection $clusters,
+        ?ClusterQueries $clusterQueries,
         GramType $type,
         int $minSize,
         int $maxSize
@@ -151,34 +149,16 @@ final class IndexSearcher
             $query->whereIn('field', $fields);
         }
 
-        if ($clusters !== null && ! $clusters->isEmpty()) {
-            $this->applyClusterQueryOnTokenQuery($query, $clusters);
+        // Appliquer les filtres cluster sur la relation document
+        if ($clusterQueries !== null && ! $clusterQueries->isEmpty()) {
+            $query->whereHas('document', function ($subQuery) use ($clusterQueries) {
+                foreach ($clusterQueries->all() as $column => $queryExpression) {
+                    $subQuery->whereCluster($column, $queryExpression);
+                }
+            });
         }
 
         return $query->pluck('document_id')->unique()->values();
-    }
-
-    private function applyClusterQueryOnTokenQuery(Builder $query, ClusterVOCollection $clusters): void
-    {
-        $query->whereHas('document', function ($subQuery) use ($clusters) {
-            foreach ($clusters as $cluster) {
-                $conditions = [];
-                $flattened = $cluster->toArray();
-
-                foreach ($flattened as $key => $value) {
-                    $conditions[] = $key.'='.$value;
-                }
-
-                $clusterQuery = implode(' & ', $conditions);
-
-                $this->clusterService->applyToEloquent(
-                    $subQuery,
-                    'cluster',
-                    $clusterQuery,
-                    DatabaseDriver::MYSQL
-                );
-            }
-        });
     }
 
     private function intersectResults(array $results): Collection

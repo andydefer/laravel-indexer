@@ -71,6 +71,7 @@ class TestDoctor extends Model implements Indexable
 
     public function getMorphClass()
     {
+
         return self::class;
     }
 

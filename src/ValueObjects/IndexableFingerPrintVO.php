@@ -10,14 +10,13 @@ use InvalidArgumentException;
 /**
  * Value Object représentant un fingerprint d'entité indexable.
  *
- * Format: "{namespace}|{id}"
- * où namespace est le FQCN avec les \ remplacés par .
+ * Format: "{namespace}|{id}" où namespace est le FQCN avec des backslashes.
  *
  * @example
- * $id = new IndexableFingerPrintVO('App.Models.User|123');
- * $id->getId(); // '123'
- * $id->getNamespace(); // 'App.Models.User'
- * $id->getValue(); // 'App.Models.User|123'
+ * $fingerprint = new IndexableFingerPrintVO('App\Models\User|123');
+ * $fingerprint->getId(); // '123'
+ * $fingerprint->getNamespace(); // 'App\Models\User'
+ * $fingerprint->getValue(); // 'App\Models\User|123'
  */
 final class IndexableFingerPrintVO extends AbstractValueObject
 {
@@ -63,15 +62,13 @@ final class IndexableFingerPrintVO extends AbstractValueObject
             throw new InvalidArgumentException('Namespace cannot be empty');
         }
 
-        // ✅ Conversion automatique des \ en .
-        $this->namespace = str_replace('\\', '.', $namespace);
+        $this->namespace = $namespace;
         $this->id = $id;
     }
 
     private function parse(string $value): void
     {
-        [$namespace, $this->id] = explode(self::SEPARATOR, $value, 2);
-        $this->namespace = str_replace('\\', '.', $namespace);
+        [$this->namespace, $this->id] = explode(self::SEPARATOR, $value, 2);
     }
 
     public function getId(): string
@@ -99,15 +96,8 @@ final class IndexableFingerPrintVO extends AbstractValueObject
         return in_array($this->namespace, $namespaces, true);
     }
 
-    public function getOriginalNamespace(): string
-    {
-        return str_replace('.', '\\', $this->namespace);
-    }
-
     public static function fromParts(string $namespace, string $id): self
     {
-        $normalized = str_replace('\\', '.', $namespace);
-
-        return new self($normalized.self::SEPARATOR.$id);
+        return new self($namespace.self::SEPARATOR.$id);
     }
 }

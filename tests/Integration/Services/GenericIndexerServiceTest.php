@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Tests\Integration\Services;
 
+use AndyDefer\LaravelCluster\Services\ClusterService;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
-use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
-use AndyDefer\LaravelIndexer\Contracts\IndexedTokenRepositoryInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
+use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedDocumentRepositoryInterface;
+use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedTokenRepositoryInterface;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexDeleter;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexSearcher;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
@@ -57,6 +58,8 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
                 tokenRepository: $app->make(IndexedTokenRepositoryInterface::class),
                 textNormalizer: $app->make(TextNormalizerInterface::class),
                 config: $app->make(IndexerConfigInterface::class),
+                clusterService: $app->make(ClusterService::class),
+
             );
         });
 

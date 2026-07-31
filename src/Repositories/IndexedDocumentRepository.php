@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Repositories;
 
 use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
-use AndyDefer\LaravelCluster\ClusterQuery;
 use AndyDefer\LaravelCluster\Enums\DatabaseDriver;
-use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
-use AndyDefer\LaravelIndexer\Helpers\ClassHelper;
+use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentFiltersRecord;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
@@ -17,7 +15,6 @@ use AndyDefer\Repository\AbstractRepository;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -25,12 +22,9 @@ use Illuminate\Support\Str;
  */
 final class IndexedDocumentRepository extends AbstractRepository implements IndexedDocumentRepositoryInterface
 {
-    private ClusterQuery $clusterQuery;
-
     public function __construct()
     {
         parent::__construct(IndexedDocument::class, IndexedDocumentRecord::class);
-        $this->clusterQuery = new ClusterQuery;
     }
 
     // ==================== PUBLIC METHODS ====================
@@ -40,10 +34,10 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         return $this->model;
     }
 
-    public function findByFingerPrint(IndexableFingerPrintVO $fingerPrint): ?IndexedDocument
+    public function findByFingerPrint(IndexableFingerPrintVO $fingerprint): ?IndexedDocument
     {
         return $this->model->newQuery()
-            ->where('fingerprint', $fingerPrint->getValue())
+            ->where('fingerprint', $fingerprint->getValue())
             ->first();
     }
 
@@ -56,10 +50,8 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
 
     public function findByNamespace(string $namespace): Collection
     {
-        $normalized = ClassHelper::classToDot($namespace);
-
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $normalized.'|%')
+            ->where('fingerprint', 'LIKE', $namespace.'|%')
             ->get();
     }
 
@@ -68,10 +60,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         string $column = 'cluster',
         ?DatabaseDriver $driver = null
     ): Collection {
-        $builder = $this->model->newQuery();
-        $this->applyClusterQuery($builder, $query, $column, $driver);
-
-        return $builder->get();
+        return $this->model->newQuery()
+            ->whereCluster($column, $query)
+            ->get();
     }
 
     public function findByIds(array $ids): Collection
@@ -85,10 +76,10 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->get();
     }
 
-    public function deleteByFingerPrint(IndexableFingerPrintVO $fingerPrint): int
+    public function deleteByFingerPrint(IndexableFingerPrintVO $fingerprint): int
     {
         return $this->model->newQuery()
-            ->where('fingerprint', $fingerPrint->getValue())
+            ->where('fingerprint', $fingerprint->getValue())
             ->delete();
     }
 
@@ -101,10 +92,8 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
 
     public function deleteByNamespace(string $namespace): int
     {
-        $normalized = ClassHelper::classToDot($namespace);
-
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $normalized.'|%')
+            ->where('fingerprint', 'LIKE', $namespace.'|%')
             ->delete();
     }
 
@@ -112,18 +101,15 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         string $query,
         string $column = 'cluster'
     ): int {
-        $builder = $this->model->newQuery();
-        $this->applyClusterQuery($builder, $query, $column);
-
-        return $builder->delete();
+        return $this->model->newQuery()
+            ->whereCluster($column, $query)
+            ->delete();
     }
 
     public function countByNamespace(string $namespace): int
     {
-        $normalized = ClassHelper::classToDot($namespace);
-
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $normalized.'|%')
+            ->where('fingerprint', 'LIKE', $namespace.'|%')
             ->count();
     }
 
@@ -131,25 +117,22 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         string $query,
         string $column = 'cluster'
     ): int {
-        $builder = $this->model->newQuery();
-        $this->applyClusterQuery($builder, $query, $column);
-
-        return $builder->count();
+        return $this->model->newQuery()
+            ->whereCluster($column, $query)
+            ->count();
     }
 
-    public function existsByFingerPrint(IndexableFingerPrintVO $fingerPrint): bool
+    public function existsByFingerPrint(IndexableFingerPrintVO $fingerprint): bool
     {
         return $this->model->newQuery()
-            ->where('fingerprint', $fingerPrint->getValue())
+            ->where('fingerprint', $fingerprint->getValue())
             ->exists();
     }
 
     public function existsByNamespace(string $namespace): bool
     {
-        $normalized = ClassHelper::classToDot($namespace);
-
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $normalized.'|%')
+            ->where('fingerprint', 'LIKE', $namespace.'|%')
             ->exists();
     }
 
@@ -157,10 +140,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         string $query,
         string $column = 'cluster'
     ): bool {
-        $builder = $this->model->newQuery();
-        $this->applyClusterQuery($builder, $query, $column);
-
-        return $builder->exists();
+        return $this->model->newQuery()
+            ->whereCluster($column, $query)
+            ->exists();
     }
 
     public function getDistinctNamespaces(): Collection
@@ -172,10 +154,10 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         $namespaces = collect();
 
         foreach ($documents as $document) {
-            $parts = explode('|', $document->fingerprint);
+            $namespace = $document->fingerprint->getNamespace();
 
-            if (isset($parts[0]) && ! $namespaces->contains($parts[0])) {
-                $namespaces->add($parts[0]);
+            if (! $namespaces->contains($namespace)) {
+                $namespaces->add($namespace);
             }
         }
 
@@ -252,71 +234,29 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             return;
         }
 
-        $this->applyIdFilter($query, $filters);
-        $this->applyFingerprintFilter($query, $filters);
-        $this->applyNamespaceFilter($query, $filters);
-        $this->applyEntityIdFilter($query, $filters);
-        $this->applyDocumentIdsFilter($query, $filters);
-
-        if ($filters->cluster_query !== null) {
-            $this->applyClusterQuery($query, $filters->cluster_query);
-        }
-    }
-
-    // ==================== PRIVATE METHODS - FILTERS ====================
-
-    private function applyIdFilter(Builder $query, IndexedDocumentFiltersRecord $filters): void
-    {
         if ($filters->id !== null) {
             $query->where('id', $filters->id);
         }
-    }
 
-    private function applyFingerprintFilter(Builder $query, IndexedDocumentFiltersRecord $filters): void
-    {
         if ($filters->fingerprint !== null) {
-            $query->where('fingerprint', $filters->fingerprint);
+            $query->where('fingerprint', $filters->fingerprint->getValue());
         }
-    }
 
-    private function applyNamespaceFilter(Builder $query, IndexedDocumentFiltersRecord $filters): void
-    {
         if ($filters->namespace !== null) {
-            $normalized = ClassHelper::classToDot($filters->namespace);
-            $query->where('fingerprint', 'LIKE', $normalized.'|%');
+            $query->where('fingerprint', 'LIKE', $filters->namespace.'|%');
         }
-    }
 
-    private function applyEntityIdFilter(Builder $query, IndexedDocumentFiltersRecord $filters): void
-    {
         if ($filters->entity_id !== null) {
             $query->where('fingerprint', 'LIKE', '%|'.$filters->entity_id);
         }
-    }
 
-    private function applyDocumentIdsFilter(Builder $query, IndexedDocumentFiltersRecord $filters): void
-    {
         if ($filters->document_ids !== null && ! $filters->document_ids->isEmpty()) {
             $query->whereIn('id', $filters->document_ids->toArray());
         }
-    }
 
-    private function applyClusterQuery(
-        Builder $query,
-        string $queryString,
-        string $column = 'cluster',
-        ?DatabaseDriver $driver = null
-    ): void {
-        if ($driver === null) {
-            $driver = $this->detectDriver();
+        if ($filters->cluster_query !== null) {
+            $query->whereCluster('cluster', $filters->cluster_query);
         }
-
-        $this->clusterQuery->applyToEloquent(
-            $query,
-            $column,
-            $queryString,
-            $driver
-        );
     }
 
     // ==================== PRIVATE METHODS - DISTINCT KEYS ====================
@@ -433,29 +373,6 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             is_array($value) => json_encode($value),
             is_null($value) => '',
             default => (string) $value,
-        };
-    }
-
-    // ==================== PRIVATE METHODS - UTILITY ====================
-
-    private function safeDecodeJson(string $json): ?array
-    {
-        $data = json_decode($json, true);
-
-        return json_last_error() === JSON_ERROR_NONE ? $data : null;
-    }
-
-    private function detectDriver(): DatabaseDriver
-    {
-        $driverName = DB::connection()->getDriverName();
-
-        return match ($driverName) {
-            'mysql' => DatabaseDriver::MYSQL,
-            'pgsql' => DatabaseDriver::PGSQL,
-            'sqlite' => DatabaseDriver::SQLITE,
-            default => throw new \RuntimeException(
-                sprintf('Unsupported database driver: "%s". Supported drivers: mysql, pgsql, sqlite', $driverName)
-            ),
         };
     }
 }

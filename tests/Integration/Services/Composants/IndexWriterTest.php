@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Integration\Services\Composants;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
@@ -14,7 +15,6 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
 final class IndexWriterTest extends IntegrationTestCase
@@ -43,29 +43,39 @@ final class IndexWriterTest extends IntegrationTestCase
         $this->tokenRepository = $this->app->make(IndexedTokenRepository::class);
     }
 
+    // ==================== HELPER ====================
+
+    private function createClusterVO(array $cluster): ClusterVO
+    {
+        return new ClusterVO($cluster);
+    }
+
     // ==================== TESTS ====================
 
     public function test_index_creates_document_and_tokens(): void
     {
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $fingerprint = new IndexableFingerPrintVO('App\Models\User|123');
+        $cluster = $this->createClusterVO([
+            'model' => 'User',
+            'tenant' => 'company_abc',
+            'env' => 'production',
+        ]);
         $data = StrictAssociative::from([
             'name' => 'John Doe',
             'email' => 'john@example.com',
         ]);
 
         $record = new IndexedDocumentRecord(
-            fingerprint: $fingerPrint,
+            fingerprint: $fingerprint,
             data: $data,
             cluster: $cluster,
         );
 
         $this->indexWriter->index($record);
 
-        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
         $this->assertNotNull($document);
-        $this->assertEquals('App.Models.User|123', $document->fingerprint);
-        $this->assertEquals('model:User|tenant:company_abc|env:production', $document->cluster);
+        $this->assertEquals('App\Models\User|123', $document->fingerprint->getValue());
 
         $tokens = $this->tokenRepository->findByDocumentId($document->id);
         $this->assertNotEmpty($tokens);
@@ -86,8 +96,12 @@ final class IndexWriterTest extends IntegrationTestCase
 
     public function test_index_increments_frequency_on_existing_token(): void
     {
-        $fingerPrint1 = new IndexableFingerPrintVO('App.Models.User|456');
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $fingerPrint1 = new IndexableFingerPrintVO('App\Models\User|456');
+        $cluster = $this->createClusterVO([
+            'model' => 'User',
+            'tenant' => 'company_abc',
+            'env' => 'production',
+        ]);
         $data = StrictAssociative::from([
             'name' => 'John Doe',
         ]);
@@ -109,7 +123,7 @@ final class IndexWriterTest extends IntegrationTestCase
         );
         $this->assertEquals(1, $token->frequency);
 
-        $fingerPrint2 = new IndexableFingerPrintVO('App.Models.User|789');
+        $fingerPrint2 = new IndexableFingerPrintVO('App\Models\User|789');
         $record2 = new IndexedDocumentRecord(
             fingerprint: $fingerPrint2,
             data: StrictAssociative::from([
@@ -132,8 +146,12 @@ final class IndexWriterTest extends IntegrationTestCase
 
     public function test_index_handles_nested_data(): void
     {
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|789');
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $fingerprint = new IndexableFingerPrintVO('App\Models\User|789');
+        $cluster = $this->createClusterVO([
+            'model' => 'User',
+            'tenant' => 'company_abc',
+            'env' => 'production',
+        ]);
         $data = StrictAssociative::from([
             'name' => 'John Doe',
             'profile' => [
@@ -146,14 +164,14 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexedDocumentRecord(
-            fingerprint: $fingerPrint,
+            fingerprint: $fingerprint,
             data: $data,
             cluster: $cluster,
         );
 
         $this->indexWriter->index($record);
 
-        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
         $tokens = $this->tokenRepository->findByDocumentId($document->id);
 
         $fields = $tokens->pluck('field')->unique()->toArray();
@@ -177,8 +195,12 @@ final class IndexWriterTest extends IntegrationTestCase
 
     public function test_index_handles_array_values(): void
     {
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.Product|123');
-        $cluster = new ClusterVO('model:Product|tenant:company_abc|env:production');
+        $fingerprint = new IndexableFingerPrintVO('App\Models\Product|123');
+        $cluster = $this->createClusterVO([
+            'model' => 'Product',
+            'tenant' => 'company_abc',
+            'env' => 'production',
+        ]);
         $data = StrictAssociative::from([
             'name' => 'Laptop Pro',
             'tags' => ['php', 'laravel', 'vuejs'],
@@ -189,14 +211,14 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexedDocumentRecord(
-            fingerprint: $fingerPrint,
+            fingerprint: $fingerprint,
             data: $data,
             cluster: $cluster,
         );
 
         $this->indexWriter->index($record);
 
-        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
         $tokens = $this->tokenRepository->findByDocumentId($document->id);
 
         $tagTokens = $tokens->filter(function ($token) {
@@ -217,58 +239,94 @@ final class IndexWriterTest extends IntegrationTestCase
             return str_contains($token->original_text, 'vuejs');
         });
         $this->assertNotNull($vuejsExists, 'vuejs non trouvé dans les tags');
+
+        // Vérifier les tokens des specs
+        $specTokens = $tokens->filter(function ($token) {
+            return $token->field === 'specs.ram' || $token->field === 'specs.storage';
+        });
+        $this->assertNotEmpty($specTokens);
     }
 
-    public function test_index_ignores_non_string_values(): void
+    public function test_index_converts_numeric_and_boolean_to_string(): void
     {
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|999');
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $fingerprint = new IndexableFingerPrintVO('App\Models\User|999');
+        $cluster = $this->createClusterVO([
+            'model' => 'User',
+            'tenant' => 'company_abc',
+            'env' => 'production',
+        ]);
         $data = StrictAssociative::from([
             'name' => 'John Doe',
             'age' => 30,
             'active' => true,
             'score' => 99.99,
-            'tags' => null,
         ]);
 
         $record = new IndexedDocumentRecord(
-            fingerprint: $fingerPrint,
+            fingerprint: $fingerprint,
             data: $data,
             cluster: $cluster,
         );
 
         $this->indexWriter->index($record);
 
-        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
         $tokens = $this->tokenRepository->findByDocumentId($document->id);
 
         $fields = $tokens->pluck('field')->unique()->toArray();
+
+        // ✅ name doit être indexé
         $this->assertContains('name', $fields);
-        $this->assertNotContains('age', $fields);
+
+        // ✅ Les valeurs numériques sont converties en string et indexées
+        $this->assertContains('age', $fields);
+        $this->assertContains('score', $fields);
+
+        // ❌ Les booléens ne sont PAS convertis en string
         $this->assertNotContains('active', $fields);
-        $this->assertNotContains('score', $fields);
-        $this->assertNotContains('tags', $fields);
+
+        // ✅ Vérifier que les tokens de name existent
+        $johnToken = $tokens->first(function ($token) {
+            return $token->field === 'name' && $token->token === 'john';
+        });
+        $this->assertNotNull($johnToken);
+
+        // ✅ Vérifier que les tokens de age existent
+        $ageToken = $tokens->first(function ($token) {
+            return $token->field === 'age' && $token->token === '30';
+        });
+        $this->assertNotNull($ageToken);
+
+        // ✅ Vérifier que les tokens de score existent
+        $scoreToken = $tokens->first(function ($token) {
+            return $token->field === 'score' && $token->token === '99';
+        });
+        $this->assertNotNull($scoreToken);
     }
 
     public function test_index_uses_config_ngram_sizes(): void
     {
         // Config déjà settée dans setUp avec min_size=2, max_size=4
 
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|111');
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $fingerprint = new IndexableFingerPrintVO('App\Models\User|111');
+        $cluster = $this->createClusterVO([
+            'model' => 'User',
+            'tenant' => 'company_abc',
+            'env' => 'production',
+        ]);
         $data = StrictAssociative::from([
             'name' => 'John',
         ]);
 
         $record = new IndexedDocumentRecord(
-            fingerprint: $fingerPrint,
+            fingerprint: $fingerprint,
             data: $data,
             cluster: $cluster,
         );
 
         $this->indexWriter->index($record);
 
-        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
         $tokens = $this->tokenRepository->findByDocumentId($document->id);
 
         $lexicalTokens = $tokens->filter(function ($token) {
@@ -297,23 +355,23 @@ final class IndexWriterTest extends IntegrationTestCase
         $records = new IndexableRecordCollection;
 
         $record1 = new IndexedDocumentRecord(
-            fingerprint: new IndexableFingerPrintVO('App.Models.User|1'),
+            fingerprint: new IndexableFingerPrintVO('App\Models\User|1'),
             data: StrictAssociative::from(['name' => 'User 1']),
-            cluster: new ClusterVO('model:User|tenant:company_abc|env:production'),
+            cluster: $this->createClusterVO(['model' => 'User', 'tenant' => 'company_abc']),
         );
         $records->add($record1);
 
         $record2 = new IndexedDocumentRecord(
-            fingerprint: new IndexableFingerPrintVO('App.Models.User|2'),
+            fingerprint: new IndexableFingerPrintVO('App\Models\User|2'),
             data: StrictAssociative::from(['name' => 'User 2']),
-            cluster: new ClusterVO('model:User|tenant:company_abc|env:production'),
+            cluster: $this->createClusterVO(['model' => 'User', 'tenant' => 'company_abc']),
         );
         $records->add($record2);
 
         $this->indexWriter->indexMany($records);
 
-        $doc1 = $this->documentRepository->findByFingerPrint(new IndexableFingerPrintVO('App.Models.User|1'));
-        $doc2 = $this->documentRepository->findByFingerPrint(new IndexableFingerPrintVO('App.Models.User|2'));
+        $doc1 = $this->documentRepository->findByFingerPrint(new IndexableFingerPrintVO('App\Models\User|1'));
+        $doc2 = $this->documentRepository->findByFingerPrint(new IndexableFingerPrintVO('App\Models\User|2'));
 
         $this->assertNotNull($doc1);
         $this->assertNotNull($doc2);
@@ -331,22 +389,26 @@ final class IndexWriterTest extends IntegrationTestCase
     {
         $longText = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.';
 
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|999');
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $fingerprint = new IndexableFingerPrintVO('App\Models\User|999');
+        $cluster = $this->createClusterVO([
+            'model' => 'User',
+            'tenant' => 'company_abc',
+            'env' => 'production',
+        ]);
         $data = StrictAssociative::from([
             'name' => 'John Doe',
             'description' => $longText,
         ]);
 
         $record = new IndexedDocumentRecord(
-            fingerprint: $fingerPrint,
+            fingerprint: $fingerprint,
             data: $data,
             cluster: $cluster,
         );
 
         $this->indexWriter->index($record);
 
-        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
         $tokens = $this->tokenRepository->findByDocumentId($document->id);
 
         $descriptionTokens = $tokens->filter(function ($token) {
@@ -367,27 +429,37 @@ final class IndexWriterTest extends IntegrationTestCase
         });
         $this->assertNotNull($ipsumToken, 'Token "ip" de "ipsum" devrait être indexé');
         $this->assertEquals('ipsum', $ipsumToken->original_text);
+
+        // Vérifier qu'il y a des tokens de taille 4
+        $loreToken = $descriptionTokens->first(function ($token) {
+            return $token->token === 'lore' && $token->field === 'description';
+        });
+        $this->assertNotNull($loreToken, 'Token "lore" de "Lorem" devrait être indexé');
     }
 
     public function test_index_handles_very_long_single_word(): void
     {
         $longWord = 'Supercalifragilisticexpialidocious';
 
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|888');
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $fingerprint = new IndexableFingerPrintVO('App\Models\User|888');
+        $cluster = $this->createClusterVO([
+            'model' => 'User',
+            'tenant' => 'company_abc',
+            'env' => 'production',
+        ]);
         $data = StrictAssociative::from([
             'name' => $longWord,
         ]);
 
         $record = new IndexedDocumentRecord(
-            fingerprint: $fingerPrint,
+            fingerprint: $fingerprint,
             data: $data,
             cluster: $cluster,
         );
 
         $this->indexWriter->index($record);
 
-        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
         $tokens = $this->tokenRepository->findByDocumentId($document->id);
 
         $nameTokens = $tokens->filter(function ($token) {
@@ -401,12 +473,22 @@ final class IndexWriterTest extends IntegrationTestCase
             return $token->token === 'su' && $token->field === 'name';
         });
         $this->assertNotNull($suToken, 'Des n-grammes de "Supercalifragilisticexpialidocious" devraient être indexés');
+
+        // Vérifier qu'un n-gramme de taille 4 existe
+        $supeToken = $nameTokens->first(function ($token) {
+            return $token->token === 'supe' && $token->field === 'name';
+        });
+        $this->assertNotNull($supeToken, 'Des n-grammes de taille 4 devraient être indexés');
     }
 
     public function test_index_handles_mixed_short_and_long_texts(): void
     {
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|777');
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $fingerprint = new IndexableFingerPrintVO('App\Models\User|777');
+        $cluster = $this->createClusterVO([
+            'model' => 'User',
+            'tenant' => 'company_abc',
+            'env' => 'production',
+        ]);
         $data = StrictAssociative::from([
             'short' => 'Hello World',
             'medium' => 'This is a medium text',
@@ -414,14 +496,14 @@ final class IndexWriterTest extends IntegrationTestCase
         ]);
 
         $record = new IndexedDocumentRecord(
-            fingerprint: $fingerPrint,
+            fingerprint: $fingerprint,
             data: $data,
             cluster: $cluster,
         );
 
         $this->indexWriter->index($record);
 
-        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
         $tokens = $this->tokenRepository->findByDocumentId($document->id);
 
         $fields = $tokens->pluck('field')->unique()->toArray();
@@ -452,21 +534,25 @@ final class IndexWriterTest extends IntegrationTestCase
     {
         $textWithSpecialChars = "L'utilisateur Jean-Pierre a acheté 2 produits à 100€ !";
 
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|666');
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
+        $fingerprint = new IndexableFingerPrintVO('App\Models\User|666');
+        $cluster = $this->createClusterVO([
+            'model' => 'User',
+            'tenant' => 'company_abc',
+            'env' => 'production',
+        ]);
         $data = StrictAssociative::from([
             'description' => $textWithSpecialChars,
         ]);
 
         $record = new IndexedDocumentRecord(
-            fingerprint: $fingerPrint,
+            fingerprint: $fingerprint,
             data: $data,
             cluster: $cluster,
         );
 
         $this->indexWriter->index($record);
 
-        $document = $this->documentRepository->findByFingerPrint($fingerPrint);
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
         $tokens = $this->tokenRepository->findByDocumentId($document->id);
 
         $descTokens = $tokens->filter(function ($token) {

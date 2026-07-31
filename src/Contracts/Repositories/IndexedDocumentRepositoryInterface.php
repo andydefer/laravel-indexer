@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AndyDefer\LaravelIndexer\Contracts;
+namespace AndyDefer\LaravelIndexer\Contracts\Repositories;
 
 use AndyDefer\LaravelCluster\Enums\DatabaseDriver;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
@@ -21,7 +21,7 @@ interface IndexedDocumentRepositoryInterface extends AbstractRepositoryInterface
 {
     // ==================== FIND BY FINGERPRINT ====================
 
-    public function findByFingerPrint(IndexableFingerPrintVO $fingerPrint): ?IndexedDocument;
+    public function findByFingerPrint(IndexableFingerPrintVO $fingerprint): ?IndexedDocument;
 
     public function findByFingerprintString(string $fingerprint): ?IndexedDocument;
 
@@ -75,7 +75,7 @@ interface IndexedDocumentRepositoryInterface extends AbstractRepositoryInterface
 
     // ==================== DELETE ====================
 
-    public function deleteByFingerPrint(IndexableFingerPrintVO $fingerPrint): int;
+    public function deleteByFingerPrint(IndexableFingerPrintVO $fingerprint): int;
 
     public function deleteByFingerprintString(string $fingerprint): int;
 
@@ -111,7 +111,7 @@ interface IndexedDocumentRepositoryInterface extends AbstractRepositoryInterface
 
     // ==================== EXISTS ====================
 
-    public function existsByFingerPrint(IndexableFingerPrintVO $fingerPrint): bool;
+    public function existsByFingerPrint(IndexableFingerPrintVO $fingerprint): bool;
 
     public function existsByNamespace(string $namespace): bool;
 

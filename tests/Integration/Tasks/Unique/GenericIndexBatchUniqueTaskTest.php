@@ -10,7 +10,7 @@ use AndyDefer\DomainStructures\Utils\StrictDataObject;
 use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
-use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
+use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Directives\GenericIndexModelsDirective;
 use AndyDefer\LaravelIndexer\Tasks\UniqueTasks\GenericIndexBatchUniqueTask;
 use AndyDefer\LaravelIndexer\Tests\Fixtures\Models\TestDoctor;

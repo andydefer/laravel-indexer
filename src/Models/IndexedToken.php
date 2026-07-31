@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Models;
 
 use AndyDefer\LaravelIndexer\Enums\GramType;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,8 +18,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $original_text
  * @property int $frequency
  * @property-read IndexedDocument $document
- * @property-read bool $is_lexical
- * @property-read bool $is_metaphone
  */
 final class IndexedToken extends Model
 {
@@ -54,29 +51,5 @@ final class IndexedToken extends Model
     public function document(): BelongsTo
     {
         return $this->belongsTo(IndexedDocument::class, 'document_id');
-    }
-
-    // =============================================
-    // Cast Attributes
-    // =============================================
-
-    /**
-     * @return Attribute<bool, never>
-     */
-    protected function isLexical(): Attribute
-    {
-        return Attribute::make(
-            get: fn (mixed $value, array $attributes): bool => $this->token_type === GramType::LEXICAL,
-        );
-    }
-
-    /**
-     * @return Attribute<bool, never>
-     */
-    protected function isMetaphone(): Attribute
-    {
-        return Attribute::make(
-            get: fn (mixed $value, array $attributes): bool => $this->token_type === GramType::METAPHONE,
-        );
     }
 }

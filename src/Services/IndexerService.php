@@ -52,9 +52,9 @@ final class IndexerService implements IndexerInterface
     /**
      * {@inheritDoc}
      */
-    public function delete(IndexableFingerPrintVO $fingerPrint): void
+    public function delete(IndexableFingerPrintVO $fingerprint): void
     {
-        $this->deleter->delete($fingerPrint);
+        $this->deleter->delete($fingerprint);
     }
 
     /**
@@ -76,9 +76,9 @@ final class IndexerService implements IndexerInterface
     /**
      * {@inheritDoc}
      */
-    public function exists(IndexableFingerPrintVO $fingerPrint): bool
+    public function exists(IndexableFingerPrintVO $fingerprint): bool
     {
-        return $this->searcher->exists($fingerPrint);
+        return $this->searcher->exists($fingerprint);
     }
 
     /**

@@ -26,9 +26,9 @@ final class IndexDeleter
      *
      * The associated tokens are automatically deleted via database cascade.
      */
-    public function delete(IndexableFingerPrintVO $fingerPrint): void
+    public function delete(IndexableFingerPrintVO $fingerprint): void
     {
-        $this->documentRepository->deleteByFingerPrint($fingerPrint);
+        $this->documentRepository->deleteByFingerPrint($fingerprint);
     }
 
     /**
@@ -36,8 +36,8 @@ final class IndexDeleter
      */
     public function deleteMany(IndexableFingerPrintVOCollection $fingerPrints): void
     {
-        foreach ($fingerPrints as $fingerPrint) {
-            $this->documentRepository->deleteByFingerPrint($fingerPrint);
+        foreach ($fingerPrints as $fingerprint) {
+            $this->documentRepository->deleteByFingerPrint($fingerprint);
         }
     }
 

@@ -8,8 +8,8 @@ use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
-use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
+use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use Illuminate\Database\Eloquent\Model;
@@ -59,8 +59,8 @@ final class GenericIndexerService implements GenericIndexerInterface
         $cluster = $model->getIndexableCluster();
         $record = IndexableRecordFactory::convert($model, $cluster);
 
-        $fingerPrint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
-        if ($this->documentRepository->existsByFingerPrint($fingerPrint)) {
+        $fingerprint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
+        if ($this->documentRepository->existsByFingerPrint($fingerprint)) {
             $this->indexer->refresh($record);
         } else {
             $this->indexer->index($record);
@@ -107,10 +107,10 @@ final class GenericIndexerService implements GenericIndexerInterface
                     continue;
                 }
 
-                $fingerPrint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
+                $fingerprint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
 
-                if ($this->documentRepository->existsByFingerPrint($fingerPrint)) {
-                    $this->documentRepository->deleteByFingerPrint($fingerPrint);
+                if ($this->documentRepository->existsByFingerPrint($fingerprint)) {
+                    $this->documentRepository->deleteByFingerPrint($fingerprint);
                 }
 
                 // ✅ Utiliser le cluster dynamique du modèle (OBLIGATOIRE)
@@ -142,12 +142,12 @@ final class GenericIndexerService implements GenericIndexerInterface
      */
     public function delete(Model&Indexable $model): void
     {
-        $fingerPrint = IndexableFingerPrintVO::fromParts(
+        $fingerprint = IndexableFingerPrintVO::fromParts(
             $model->getMorphClass(),
             (string) $model->getKey()
         );
 
-        $this->indexer->delete($fingerPrint);
+        $this->indexer->delete($fingerprint);
     }
 
     /**
@@ -170,8 +170,7 @@ final class GenericIndexerService implements GenericIndexerInterface
      */
     public function deleteAll(string $modelClass): void
     {
-        $namespace = $this->getNamespace($modelClass);
-        $this->documentRepository->deleteByNamespace($namespace);
+        $this->documentRepository->deleteByNamespace($modelClass);
     }
 
     /**
@@ -179,12 +178,12 @@ final class GenericIndexerService implements GenericIndexerInterface
      */
     public function refresh(Model&Indexable $model): void
     {
-        $fingerPrint = IndexableFingerPrintVO::fromParts(
+        $fingerprint = IndexableFingerPrintVO::fromParts(
             $model->getMorphClass(),
             (string) $model->getKey()
         );
 
-        $this->indexer->delete($fingerPrint);
+        $this->indexer->delete($fingerprint);
 
         if ($model->shouldBeIndexed()) {
             // ✅ Utiliser le cluster dynamique du modèle (OBLIGATOIRE)
@@ -214,9 +213,7 @@ final class GenericIndexerService implements GenericIndexerInterface
      */
     public function countIndexed(string $modelClass): int
     {
-        $namespace = $this->getNamespace($modelClass);
-
-        return $this->documentRepository->countByNamespace($namespace);
+        return $this->documentRepository->countByNamespace($modelClass);
     }
 
     /**
@@ -224,12 +221,12 @@ final class GenericIndexerService implements GenericIndexerInterface
      */
     public function exists(Model&Indexable $model): bool
     {
-        $fingerPrint = IndexableFingerPrintVO::fromParts(
+        $fingerprint = IndexableFingerPrintVO::fromParts(
             $model->getMorphClass(),
             (string) $model->getKey()
         );
 
-        return $this->documentRepository->existsByFingerPrint($fingerPrint);
+        return $this->documentRepository->existsByFingerPrint($fingerprint);
     }
 
     /**
@@ -237,20 +234,11 @@ final class GenericIndexerService implements GenericIndexerInterface
      */
     public function existsById(string $modelClass, int $id): bool
     {
-        $fingerPrint = IndexableFingerPrintVO::fromParts(
+        $fingerprint = IndexableFingerPrintVO::fromParts(
             $modelClass,
             (string) $id
         );
 
-        return $this->documentRepository->existsByFingerPrint($fingerPrint);
-    }
-
-    // ============================================================
-    // PRIVATE METHODS
-    // ============================================================
-
-    private function getNamespace(string $modelClass): string
-    {
-        return str_replace('\\', '.', $modelClass);
+        return $this->documentRepository->existsByFingerPrint($fingerprint);
     }
 }

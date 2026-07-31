@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Tests\Integration\Models;
 
+use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
@@ -24,7 +25,7 @@ class IndexedDocumentTest extends IntegrationTestCase
         $this->document = IndexedDocument::create([
             'id' => '550e8400-e29b-41d4-a716-446655440000',
             'fingerprint' => 'App\Models\User|123',
-            'cluster' => ([
+            'cluster' => [
                 'type' => 'user',
                 'status' => true,
                 'email' => 'john@example.com',
@@ -36,13 +37,13 @@ class IndexedDocumentTest extends IntegrationTestCase
                         'street' => 'Rue de la Paix',
                     ],
                     [
-                        'city' => 'Kinshase',
+                        'city' => 'Kinshasa',
                         'country' => 'RDC',
                         'postal_code' => '458890',
                         'street' => 'Rue de la Joie',
                     ],
                 ],
-            ]),
+            ],
             'data' => [
                 'name' => 'John Doe',
                 'email' => 'john@example.com',
@@ -55,17 +56,17 @@ class IndexedDocumentTest extends IntegrationTestCase
     {
         $this->assertInstanceOf(IndexedDocument::class, $this->document);
         $this->assertEquals('550e8400-e29b-41d4-a716-446655440000', $this->document->id);
-        $this->assertEquals('App\Models\User|123', $this->document->fingerprint);
+        $this->assertEquals('App\Models\User|123', $this->document->fingerprint->getValue());
     }
 
     public function test_finger_print_attribute(): void
     {
-        $fingerPrint = $this->document->finger_print;
+        $fingerprint = $this->document->fingerprint;
 
-        $this->assertInstanceOf(IndexableFingerPrintVO::class, $fingerPrint);
-        $this->assertEquals('App\Models\User', $fingerPrint->getNamespace());
-        $this->assertEquals('123', $fingerPrint->getId());
-        $this->assertEquals('App\Models\User|123', $fingerPrint->getValue());
+        $this->assertInstanceOf(IndexableFingerPrintVO::class, $fingerprint);
+        $this->assertEquals('App\Models\User', $fingerprint->getNamespace());
+        $this->assertEquals('123', $fingerprint->getId());
+        $this->assertEquals('App\Models\User|123', $fingerprint->getValue());
     }
 
     public function test_cluster_attribute(): void
@@ -74,12 +75,15 @@ class IndexedDocumentTest extends IntegrationTestCase
 
         $this->assertInstanceOf(ClusterVO::class, $cluster);
         $this->assertEquals('user', $cluster->get('type'));
-        $this->assertTrue($cluster->get('status'));
+        $this->assertTrue((bool) $cluster->get('status'));
         $this->assertEquals('john@example.com', $cluster->get('email'));
-        $this->assertEquals('Paris', $cluster->get('addresses_0_city'));
-        $this->assertEquals('France', $cluster->get('addresses_0_country'));
-        $this->assertEquals('75000', $cluster->get('addresses_0_postal_code'));
-        $this->assertEquals('Rue de la Paix', $cluster->get('addresses_0_street'));
+
+        $nestedData = $cluster->getNestedData();
+
+        $this->assertEquals('Paris', $nestedData['addresses'][0]['city']);
+        $this->assertEquals('France', $nestedData['addresses'][0]['country']);
+        $this->assertEquals('75000', $nestedData['addresses'][0]['postal_code']);
+        $this->assertEquals('Rue de la Paix', $nestedData['addresses'][0]['street']);
     }
 
     public function test_namespace_attribute(): void
@@ -109,7 +113,7 @@ class IndexedDocumentTest extends IntegrationTestCase
         $emptyDocument = IndexedDocument::create([
             'id' => '550e8400-e29b-41d4-a716-446655440001',
             'fingerprint' => 'App\Models\User|124',
-            'cluster' => json_encode(['type' => 'user']),
+            'cluster' => ['type' => 'user'],
             'data' => [],
         ]);
 
@@ -128,7 +132,7 @@ class IndexedDocumentTest extends IntegrationTestCase
         $record = $this->document->toIndexableRecord();
 
         $this->assertInstanceOf(IndexedDocumentRecord::class, $record);
-        $this->assertEquals($this->document->finger_print->getValue(), $record->fingerprint->getValue());
+        $this->assertEquals($this->document->fingerprint->getValue(), $record->fingerprint->getValue());
         $this->assertInstanceOf(ClusterVO::class, $record->cluster);
         $this->assertEquals('user', $record->cluster->get('type'));
         $this->assertEquals('John Doe', $record->data->get('name'));
@@ -155,13 +159,16 @@ class IndexedDocumentTest extends IntegrationTestCase
     {
         $this->assertInstanceOf(ClusterVO::class, $this->document->cluster);
         $this->assertEquals('user', $this->document->cluster->get('type'));
-        $this->assertTrue($this->document->cluster->get('status'));
+        $this->assertTrue((bool) $this->document->cluster->get('status'));
     }
 
-    public function test_data_is_stored_as_array(): void
+    public function test_data_is_stored_as_strict_associative(): void
     {
-        $this->assertIsArray($this->document->data);
-        $this->assertEquals('John Doe', $this->document->data['name']);
-        $this->assertEquals('john@example.com', $this->document->data['email']);
+        $data = $this->document->data;
+
+        $this->assertInstanceOf(StrictAssociative::class, $data);
+        $this->assertEquals('John Doe', $data->get('name'));
+        $this->assertEquals('john@example.com', $data->get('email'));
+        $this->assertEquals('Test user', $data->get('description'));
     }
 }

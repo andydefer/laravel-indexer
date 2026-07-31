@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\Casts\ClusterCast;
 use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
@@ -16,10 +17,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string $id
- * @property array<array-key, mixed> $data
+ * @property StrictAssociative $data
  * @property-read Collection<int, IndexedToken> $tokens
  * @property-read int|null $tokens_count
- * @property-read IndexableFingerPrintVO $finger_print
+ * @property-read IndexableFingerPrintVO $fingerprint
  * @property-read ClusterVO $cluster
  * @property-read string $namespace
  * @property-read string $entity_id
@@ -44,7 +45,7 @@ final class IndexedDocument extends Model
     ];
 
     protected $casts = [
-        'cluster' => 'array',
+        'cluster' => ClusterCast::class,
         'data' => 'array',
     ];
 
@@ -61,75 +62,47 @@ final class IndexedDocument extends Model
     // Cast Attributes
     // =============================================
 
-    /**
-     * Get the fingerprint as a value object.
-     *
-     * @return Attribute<IndexableFingerPrintVO, never>
-     */
-    protected function fingerPrint(): Attribute
+    protected function fingerprint(): Attribute
     {
         return Attribute::make(
             get: fn (mixed $value, array $attributes): IndexableFingerPrintVO => new IndexableFingerPrintVO($attributes['fingerprint']),
         );
     }
 
-    /**
-     * Get the cluster as a value object from the laravel-cluster package.
-     *
-     * @return Attribute<ClusterVO, never>
-     */
-    protected function cluster(): Attribute
+    protected function data(): Attribute
     {
         return Attribute::make(
-            get: fn (mixed $value, array $attributes): ClusterVO => new ClusterVO(json_decode($attributes['cluster'], true)),
+            get: fn (mixed $value, array $attributes): StrictAssociative => StrictAssociative::from(
+                json_decode($attributes['data'], true) ?? []
+            ),
         );
     }
 
-    /**
-     * Get the namespace from the fingerprint.
-     *
-     * @return Attribute<string, never>
-     */
     protected function namespace(): Attribute
     {
         return Attribute::make(
-            get: fn (mixed $value, array $attributes): string => $this->finger_print->getNamespace(),
+            get: fn (mixed $value, array $attributes): string => $this->fingerprint->getNamespace(),
         );
     }
 
-    /**
-     * Get the entity ID from the fingerprint.
-     *
-     * @return Attribute<string, never>
-     */
     protected function entityId(): Attribute
     {
         return Attribute::make(
-            get: fn (mixed $value, array $attributes): string => $this->finger_print->getId(),
+            get: fn (mixed $value, array $attributes): string => $this->fingerprint->getId(),
         );
     }
 
-    /**
-     * Get the fields from the data array.
-     *
-     * @return Attribute<array<string>, never>
-     */
     protected function fields(): Attribute
     {
         return Attribute::make(
-            get: fn (mixed $value, array $attributes): array => array_keys($this->data),
+            get: fn (mixed $value, array $attributes): array => $this->data->keys(),
         );
     }
 
-    /**
-     * Check if the document has fields.
-     *
-     * @return Attribute<bool, never>
-     */
     protected function hasFields(): Attribute
     {
         return Attribute::make(
-            get: fn (mixed $value, array $attributes): bool => ! empty($this->data),
+            get: fn (mixed $value, array $attributes): bool => ! $this->data->isEmpty(),
         );
     }
 
@@ -139,15 +112,20 @@ final class IndexedDocument extends Model
 
     public function hasField(string $field): bool
     {
-        return isset($this->data[$field]);
+        return $this->data->has($field);
+    }
+
+    public function getField(string $field, mixed $default = null): mixed
+    {
+        return $this->data->get($field, $default);
     }
 
     public function toIndexableRecord(): IndexedDocumentRecord
     {
         return new IndexedDocumentRecord(
-            fingerprint: $this->finger_print,
+            fingerprint: $this->fingerprint,
             cluster: $this->cluster,
-            data: StrictAssociative::from($this->data),
+            data: $this->data,
         );
     }
 }

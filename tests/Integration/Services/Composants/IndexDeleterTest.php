@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Integration\Services\Composants;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Collections\IndexableFingerPrintVOCollection;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
@@ -12,7 +13,6 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexDeleter;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
 final class IndexDeleterTest extends IntegrationTestCase
@@ -38,12 +38,12 @@ final class IndexDeleterTest extends IntegrationTestCase
     private function createAndIndexDocument(
         string $fingerprint,
         array $data,
-        string $cluster = 'model:User|tenant:company_abc|env:production'
+        array $cluster = ['model' => 'User', 'tenant' => 'company_abc', 'env' => 'production']
     ): void {
-        $fingerPrint = new IndexableFingerPrintVO($fingerprint);
+        $fingerprintVO = new IndexableFingerPrintVO($fingerprint);
         $clusterVO = new ClusterVO($cluster);
         $record = new IndexedDocumentRecord(
-            fingerprint: $fingerPrint,
+            fingerprint: $fingerprintVO,
             data: StrictAssociative::from($data),
             cluster: $clusterVO,
         );
@@ -55,28 +55,29 @@ final class IndexDeleterTest extends IntegrationTestCase
 
     public function test_delete_removes_document_and_tokens(): void
     {
-        $this->createAndIndexDocument('App.Models.User|123', ['name' => 'John Doe']);
+        $this->createAndIndexDocument(
+            'App\Models\User|123',
+            ['name' => 'John Doe'],
+            ['model' => 'User', 'status' => 'active', 'role' => 'admin']
+        );
 
-        $doc = $this->documentRepository->findByFingerprintString('App.Models.User|123');
+        $doc = $this->documentRepository->findByFingerprintString('App\Models\User|123');
         $this->assertNotNull($doc);
 
         $tokens = $this->tokenRepository->findByDocumentId($doc->id);
         $this->assertNotEmpty($tokens);
 
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-        $this->indexDeleter->delete($fingerPrint);
+        $fingerprint = new IndexableFingerPrintVO('App\Models\User|123');
+        $this->indexDeleter->delete($fingerprint);
 
-        $doc = $this->documentRepository->findByFingerprintString('App.Models.User|123');
+        $doc = $this->documentRepository->findByFingerprintString('App\Models\User|123');
         $this->assertNull($doc);
-
-        $tokens = $this->tokenRepository->findByDocumentId($doc?->id ?? '');
-        $this->assertEmpty($tokens);
     }
 
     public function test_delete_does_nothing_when_document_not_exists(): void
     {
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|999');
-        $this->indexDeleter->delete($fingerPrint);
+        $fingerprint = new IndexableFingerPrintVO('App\Models\User|999');
+        $this->indexDeleter->delete($fingerprint);
 
         $this->assertTrue(true);
     }
@@ -85,26 +86,38 @@ final class IndexDeleterTest extends IntegrationTestCase
 
     public function test_delete_many_removes_multiple_documents(): void
     {
-        $this->createAndIndexDocument('App.Models.User|123', ['name' => 'John Doe']);
-        $this->createAndIndexDocument('App.Models.User|456', ['name' => 'Jane Smith']);
-        $this->createAndIndexDocument('App.Models.Product|789', ['name' => 'Laptop']);
+        $this->createAndIndexDocument(
+            'App\Models\User|123',
+            ['name' => 'John Doe'],
+            ['model' => 'User', 'tenant' => 'company_abc', 'env' => 'production']
+        );
+        $this->createAndIndexDocument(
+            'App\Models\User|456',
+            ['name' => 'Jane Smith'],
+            ['model' => 'User', 'tenant' => 'company_abc', 'env' => 'production']
+        );
+        $this->createAndIndexDocument(
+            'App\Models\Product|789',
+            ['name' => 'Laptop'],
+            ['model' => 'Product', 'category' => 'electronics', 'env' => 'production']
+        );
 
-        $doc1 = $this->documentRepository->findByFingerprintString('App.Models.User|123');
-        $doc2 = $this->documentRepository->findByFingerprintString('App.Models.User|456');
-        $doc3 = $this->documentRepository->findByFingerprintString('App.Models.Product|789');
+        $doc1 = $this->documentRepository->findByFingerprintString('App\Models\User|123');
+        $doc2 = $this->documentRepository->findByFingerprintString('App\Models\User|456');
+        $doc3 = $this->documentRepository->findByFingerprintString('App\Models\Product|789');
         $this->assertNotNull($doc1);
         $this->assertNotNull($doc2);
         $this->assertNotNull($doc3);
 
         $collection = new IndexableFingerPrintVOCollection;
-        $collection->add(new IndexableFingerPrintVO('App.Models.User|123'));
-        $collection->add(new IndexableFingerPrintVO('App.Models.User|456'));
+        $collection->add(new IndexableFingerPrintVO('App\Models\User|123'));
+        $collection->add(new IndexableFingerPrintVO('App\Models\User|456'));
 
         $this->indexDeleter->deleteMany($collection);
 
-        $doc1 = $this->documentRepository->findByFingerprintString('App.Models.User|123');
-        $doc2 = $this->documentRepository->findByFingerprintString('App.Models.User|456');
-        $doc3 = $this->documentRepository->findByFingerprintString('App.Models.Product|789');
+        $doc1 = $this->documentRepository->findByFingerprintString('App\Models\User|123');
+        $doc2 = $this->documentRepository->findByFingerprintString('App\Models\User|456');
+        $doc3 = $this->documentRepository->findByFingerprintString('App\Models\Product|789');
 
         $this->assertNull($doc1);
         $this->assertNull($doc2);
@@ -123,9 +136,21 @@ final class IndexDeleterTest extends IntegrationTestCase
 
     public function test_clear_removes_all_documents_and_tokens(): void
     {
-        $this->createAndIndexDocument('App.Models.User|123', ['name' => 'John Doe']);
-        $this->createAndIndexDocument('App.Models.User|456', ['name' => 'Jane Smith']);
-        $this->createAndIndexDocument('App.Models.Product|789', ['name' => 'Laptop']);
+        $this->createAndIndexDocument(
+            'App\Models\User|123',
+            ['name' => 'John Doe'],
+            ['model' => 'User', 'status' => 'active']
+        );
+        $this->createAndIndexDocument(
+            'App\Models\User|456',
+            ['name' => 'Jane Smith'],
+            ['model' => 'User', 'status' => 'inactive']
+        );
+        $this->createAndIndexDocument(
+            'App\Models\Product|789',
+            ['name' => 'Laptop'],
+            ['model' => 'Product', 'category' => 'electronics']
+        );
 
         $count = $this->documentRepository->getModel()->newQuery()->count();
         $this->assertEquals(3, $count);

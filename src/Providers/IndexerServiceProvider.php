@@ -6,13 +6,14 @@ namespace AndyDefer\LaravelIndexer\Providers;
 
 use AndyDefer\DomainStructures\Normalizers\Core\NormalizerInterface;
 use AndyDefer\DomainStructures\Normalizers\NormalizerChain;
+use AndyDefer\LaravelCluster\ClusterQuery;
 use AndyDefer\LaravelCluster\Services\ClusterService;
 use AndyDefer\LaravelIndexer\Configs\IndexerConfig;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
-use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
-use AndyDefer\LaravelIndexer\Contracts\IndexedTokenRepositoryInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
+use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedDocumentRepositoryInterface;
+use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedTokenRepositoryInterface;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexDeleter;
@@ -42,64 +43,92 @@ final class IndexerServiceProvider extends ServiceProvider
         // CONFIGS
         // ============================================================
 
-        $this->app->singleton(IndexerConfigInterface::class, function ($app) {
+        $this->app->singleton(IndexerConfig::class, function ($app) {
             return new IndexerConfig($app->make(ConfigRepository::class));
         });
 
-        $this->app->singleton(TextNormalizerConfigInterface::class, function ($app) {
+        $this->app->singleton(IndexerConfigInterface::class, function ($app) {
+            return $app->make(IndexerConfig::class);
+        });
+
+        $this->app->singleton(TextNormalizerConfig::class, function ($app) {
             return new TextNormalizerConfig($app->make(ConfigRepository::class));
+        });
+
+        $this->app->singleton(TextNormalizerConfigInterface::class, function ($app) {
+            return $app->make(TextNormalizerConfig::class);
         });
 
         // ============================================================
         // NORMALIZER
         // ============================================================
 
-        $this->app->singleton(NormalizerInterface::class, function () {
+        $this->app->singleton(NormalizerChain::class, function () {
             return NormalizerChain::get();
+        });
+
+        $this->app->singleton(NormalizerInterface::class, function ($app) {
+            return $app->make(NormalizerChain::class);
         });
 
         // ============================================================
         // TEXT NORMALIZER
         // ============================================================
 
-        $this->app->singleton(TextNormalizerInterface::class, function ($app) {
+        $this->app->singleton(TextNormalizerService::class, function ($app) {
             return new TextNormalizerService(
                 $app->make(TextNormalizerConfigInterface::class)
             );
+        });
+
+        $this->app->singleton(TextNormalizerInterface::class, function ($app) {
+            return $app->make(TextNormalizerService::class);
         });
 
         // ============================================================
         // NGRAM GENERATOR
         // ============================================================
 
-        $this->app->singleton(NGramGeneratorInterface::class, function ($app) {
+        $this->app->singleton(NGramGeneratorService::class, function ($app) {
             return new NGramGeneratorService(
                 $app->make(TextNormalizerConfigInterface::class)
             );
+        });
+
+        $this->app->singleton(NGramGeneratorInterface::class, function ($app) {
+            return $app->make(NGramGeneratorService::class);
+        });
+
+        // ============================================================
+        // CLUSTER SERVICE
+        // ============================================================
+
+        $this->app->singleton(ClusterService::class, function ($app) {
+            return new ClusterService($app->make(ClusterQuery::class));
         });
 
         // ============================================================
         // REPOSITORIES
         // ============================================================
 
-        $this->app->singleton(IndexedDocumentRepositoryInterface::class, function () {
+        $this->app->singleton(IndexedDocumentRepository::class, function () {
             return new IndexedDocumentRepository;
         });
 
-        $this->app->singleton(IndexedTokenRepositoryInterface::class, function () {
+        $this->app->singleton(IndexedTokenRepository::class, function () {
             return new IndexedTokenRepository;
         });
 
-        $this->app->singleton(IndexedDocumentRepository::class, function ($app) {
-            return $app->make(IndexedDocumentRepositoryInterface::class);
+        $this->app->singleton(IndexedDocumentRepositoryInterface::class, function ($app) {
+            return $app->make(IndexedDocumentRepository::class);
         });
 
-        $this->app->singleton(IndexedTokenRepository::class, function ($app) {
-            return $app->make(IndexedTokenRepositoryInterface::class);
+        $this->app->singleton(IndexedTokenRepositoryInterface::class, function ($app) {
+            return $app->make(IndexedTokenRepository::class);
         });
 
         // ============================================================
-        // COMPOSANTS - AVEC PARAMÈTRES NOMMÉS
+        // COMPOSANTS
         // ============================================================
 
         $this->app->singleton(IndexWriter::class, function ($app) {
@@ -133,7 +162,7 @@ final class IndexerServiceProvider extends ServiceProvider
         // SERVICES
         // ============================================================
 
-        $this->app->singleton(IndexerInterface::class, function ($app) {
+        $this->app->singleton(IndexerService::class, function ($app) {
             return new IndexerService(
                 writer: $app->make(IndexWriter::class),
                 deleter: $app->make(IndexDeleter::class),
@@ -141,15 +170,15 @@ final class IndexerServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(IndexerService::class, function ($app) {
-            return $app->make(IndexerInterface::class);
+        $this->app->singleton(IndexerInterface::class, function ($app) {
+            return $app->make(IndexerService::class);
         });
 
         // ============================================================
         // GENERIC INDEXER SERVICE
         // ============================================================
 
-        $this->app->singleton(GenericIndexerInterface::class, function ($app) {
+        $this->app->singleton(GenericIndexerService::class, function ($app) {
             return new GenericIndexerService(
                 indexer: $app->make(IndexerInterface::class),
                 documentRepository: $app->make(IndexedDocumentRepositoryInterface::class),
@@ -157,8 +186,8 @@ final class IndexerServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(GenericIndexerService::class, function ($app) {
-            return $app->make(GenericIndexerInterface::class);
+        $this->app->singleton(GenericIndexerInterface::class, function ($app) {
+            return $app->make(GenericIndexerService::class);
         });
 
         // ============================================================

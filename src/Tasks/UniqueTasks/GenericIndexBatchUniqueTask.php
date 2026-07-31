@@ -7,8 +7,8 @@ namespace AndyDefer\LaravelIndexer\Tasks\UniqueTasks;
 use AndyDefer\ConsoleWriter\Console\Contracts\ConsoleInterface;
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
 use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
-use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
+use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Task\Abstract\AbstractUniqueTask;
@@ -74,11 +74,11 @@ final class GenericIndexBatchUniqueTask extends AbstractUniqueTask
                 continue;
             }
 
-            $fingerPrint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
+            $fingerprint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
 
-            if ($documentRepository->existsByFingerPrint($fingerPrint)) {
+            if ($documentRepository->existsByFingerPrint($fingerprint)) {
                 $this->info(new DescriptionVO("Item {$id} already indexed, deleting and re-indexing"));
-                $documentRepository->deleteByFingerPrint($fingerPrint);
+                $documentRepository->deleteByFingerPrint($fingerprint);
             }
 
             $cluster = $model->getIndexableCluster();

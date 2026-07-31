@@ -107,7 +107,9 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
     public function test_index_all_models(): void
     {
         $this->createDoctor();
+
         $this->createPharmacy();
+
         $this->createProduct();
 
         $response = $this->service->run('index:models ['.TestDoctor::class.','.TestPharmacy::class.','.TestProduct::class.']');

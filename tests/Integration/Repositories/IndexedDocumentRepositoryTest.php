@@ -4,17 +4,25 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Tests\Integration\Repositories;
 
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
+use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
+use AndyDefer\DomainStructures\Utils\EmptyRecord;
+use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentFiltersRecord;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
+use AndyDefer\LaravelIndexer\Tests\Fixtures\Models\TestProduct;
+use AndyDefer\LaravelIndexer\Tests\Fixtures\Models\TestUser;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Repository\Records\FindByRecord;
+use AndyDefer\Repository\Records\PaginateRecord;
+use AndyDefer\Repository\ValueObjects\ClusterQueries;
+use AndyDefer\Repository\ValueObjects\SelectColumns;
 use AndyDefer\Repository\ValueObjects\SortColumns;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 final class IndexedDocumentRepositoryTest extends IntegrationTestCase
 {
@@ -26,763 +34,572 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->repository = new IndexedDocumentRepository;
     }
 
+    // ============================================================================
+    // HELPERS
+    // ============================================================================
+
+    private function createDocument(array $data = []): IndexedDocument
+    {
+        $id = $data['id'] ?? (string) Str::uuid();
+        $namespace = $data['namespace'] ?? TestUser::class;
+        $fingerprint = $namespace.'|'.$id;
+
+        return IndexedDocument::create([
+            'id' => $id,
+            'fingerprint' => $fingerprint,
+            'cluster' => $data['cluster'] ?? ['status' => 'active', 'role' => 'admin'],
+            'data' => $data['data'] ?? ['name' => 'John Doe', 'email' => 'john@example.com'],
+        ]);
+    }
+
+    private function createDocuments(int $count, array $data = []): Collection
+    {
+        $documents = [];
+        for ($i = 0; $i < $count; $i++) {
+            $documents[] = $this->createDocument($data);
+        }
+
+        return collect($documents);
+    }
+
     private function createUserDocument(string $id, string $name, string $email): IndexedDocument
     {
-        $fingerprint = 'App.Models.User|'.$id;
-        $record = IndexedDocumentRecord::from([
-            'fingerprint' => $fingerprint,
-            'cluster' => 'model:User|tenant:company_abc|env:production',
-            'data' => [
-                'name' => $name,
-                'email' => $email,
-            ],
-        ]);
+        $fingerprint = TestUser::class.'|'.$id;
 
-        return $this->repository->create($record);
+        return IndexedDocument::create([
+            'id' => $id,
+            'fingerprint' => $fingerprint,
+            'cluster' => ['model' => 'User', 'tenant' => 'company_abc', 'env' => 'production', 'role' => 'admin'],
+            'data' => ['name' => $name, 'email' => $email],
+        ]);
     }
 
     private function createProductDocument(string $id, string $name, float $price): IndexedDocument
     {
-        $fingerprint = 'App.Models.Product|'.$id;
-        $record = IndexedDocumentRecord::from([
-            'fingerprint' => $fingerprint,
-            'cluster' => 'model:Product|category:electronics|env:production',
-            'data' => [
-                'name' => $name,
-                'price' => $price,
-            ],
-        ]);
+        $fingerprint = TestProduct::class.'|'.$id;
 
-        return $this->repository->create($record);
+        return IndexedDocument::create([
+            'id' => $id,
+            'fingerprint' => $fingerprint,
+            'cluster' => ['model' => 'Product', 'category' => 'electronics', 'env' => 'production'],
+            'data' => ['name' => $name, 'price' => $price],
+        ]);
     }
 
-    // ==================== TESTS CREATE ====================
+    // ============================================================================
+    // TESTS - Create
+    // ============================================================================
 
     public function test_create_persists_document(): void
     {
-        $fingerprint = 'App.Models.User|123';
-        $cluster = 'model:User|tenant:company_abc';
-        $data = [
-            'name' => 'John Doe',
-            'email' => 'john@example.com',
-        ];
+        $id = '123';
+        $fingerprint = TestUser::class.'|'.$id;
+        $cluster = ['model' => 'User', 'tenant' => 'company_abc', 'role' => 'admin'];
+        $data = ['name' => 'John Doe', 'email' => 'john@example.com'];
 
-        $record = IndexedDocumentRecord::from([
-            'fingerprint' => $fingerprint,
-            'cluster' => $cluster,
-            'data' => $data,
-        ]);
+        $record = new IndexedDocumentRecord(
+            fingerprint: new IndexableFingerPrintVO($fingerprint),
+            cluster: new ClusterVO($cluster),
+            data: StrictAssociative::from($data),
+        );
 
         $document = $this->repository->create($record);
 
         $this->assertInstanceOf(IndexedDocument::class, $document);
         $this->assertNotNull($document->id);
-        $this->assertEquals($fingerprint, $document->fingerprint);
-        $this->assertEquals($cluster, $document->cluster);
-        $this->assertEquals($data, $document->data);
+        $this->assertSame($fingerprint, $document->fingerprint->getValue());
+        $this->assertSame('admin', $document->cluster->get('role'));
+        $this->assertSame('john@example.com', $document->data->get('email'));
 
         $found = $this->repository->find($document->id);
         $this->assertNotNull($found);
-        $this->assertInstanceOf(IndexedDocument::class, $found);
-        $this->assertEquals($fingerprint, $found->fingerprint);
+        $this->assertSame($fingerprint, $found->fingerprint->getValue());
     }
 
-    public function test_create_raw_persists_document(): void
+    // ============================================================================
+    // TESTS - Find Methods
+    // ============================================================================
+
+    public function test_find_by_finger_print_returns_document(): void
     {
-        $fingerprint = 'App.Models.User|456';
-        $data = [
-            'fingerprint' => $fingerprint,
-            'cluster' => 'model:User|tenant:company_xyz',
-            'data' => json_encode(['name' => 'Jane Doe']),
-        ];
+        $id = '123';
+        $document = $this->createDocument(['id' => $id, 'namespace' => TestUser::class]);
 
-        $document = $this->repository->createRaw($data);
+        $result = $this->repository->findByFingerPrint(
+            new IndexableFingerPrintVO(TestUser::class.'|'.$id)
+        );
 
-        $this->assertInstanceOf(IndexedDocument::class, $document);
-        $this->assertNotNull($document->id);
-        $this->assertEquals($fingerprint, $document->fingerprint);
-        $this->assertEquals('model:User|tenant:company_xyz', $document->cluster);
+        $this->assertNotNull($result);
+        $this->assertSame($document->id, $result->id);
     }
 
-    // ==================== TESTS FIND ====================
-
-    public function test_find_returns_document(): void
+    public function test_find_by_finger_print_returns_null_when_not_found(): void
     {
-        $created = $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $result = $this->repository->findByFingerPrint(
+            new IndexableFingerPrintVO(TestUser::class.'|999')
+        );
 
-        $found = $this->repository->find($created->id);
-
-        $this->assertNotNull($found);
-        $this->assertInstanceOf(IndexedDocument::class, $found);
-        $this->assertEquals($created->id, $found->id);
-        $this->assertEquals('App.Models.User|123', $found->fingerprint);
-    }
-
-    public function test_find_returns_null_when_not_found(): void
-    {
-        $found = $this->repository->find('non-existent-id');
-        $this->assertNull($found);
-    }
-
-    // ==================== TESTS FIND BY FINGERPRINT ====================
-
-    public function test_find_by_fingerprint_returns_document(): void
-    {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-        $found = $this->repository->findByFingerPrint($fingerPrint);
-
-        $this->assertNotNull($found);
-        $this->assertInstanceOf(IndexedDocument::class, $found);
-        $this->assertEquals('App.Models.User|123', $found->fingerprint);
-    }
-
-    public function test_find_by_fingerprint_returns_null_when_not_found(): void
-    {
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|999');
-        $found = $this->repository->findByFingerPrint($fingerPrint);
-        $this->assertNull($found);
+        $this->assertNull($result);
     }
 
     public function test_find_by_fingerprint_string_returns_document(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $id = '123';
+        $document = $this->createDocument(['id' => $id, 'namespace' => TestUser::class]);
 
-        $found = $this->repository->findByFingerprintString('App.Models.User|123');
+        $result = $this->repository->findByFingerprintString(TestUser::class.'|'.$id);
 
-        $this->assertNotNull($found);
-        $this->assertInstanceOf(IndexedDocument::class, $found);
-        $this->assertEquals('App.Models.User|123', $found->fingerprint);
+        $this->assertNotNull($result);
+        $this->assertSame($document->id, $result->id);
     }
 
-    // ==================== TESTS FIND BY NAMESPACE ====================
-
-    public function test_find_by_namespace_returns_collection(): void
+    public function test_find_by_namespace_returns_documents(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $this->createDocument(['id' => '1', 'namespace' => TestUser::class]);
+        $this->createDocument(['id' => '2', 'namespace' => TestUser::class]);
+        $this->createDocument(['id' => '3', 'namespace' => TestProduct::class]);
 
-        $results = $this->repository->findByNamespace('App.Models.User');
+        $results = $this->repository->findByNamespace(TestUser::class);
 
-        $this->assertInstanceOf(Collection::class, $results);
         $this->assertCount(2, $results);
-
-        foreach ($results as $doc) {
-            $this->assertInstanceOf(IndexedDocument::class, $doc);
-            $this->assertStringStartsWith('App.Models.User|', $doc->fingerprint);
-        }
+        $this->assertStringContainsString('User', $results->first()->fingerprint->getValue());
     }
 
-    public function test_find_by_namespace_returns_empty_collection_when_none(): void
+    public function test_find_by_cluster_query_returns_filtered_documents(): void
     {
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $this->createDocument(['cluster' => ['status' => 'active', 'role' => 'admin']]);
+        $this->createDocument(['cluster' => ['status' => 'inactive', 'role' => 'doctor']]);
+        $this->createDocument(['cluster' => ['status' => 'active', 'role' => 'doctor']]);
 
-        $results = $this->repository->findByNamespace('App.Models.User');
+        $results = $this->repository->findByClusterQuery('status=active & role=admin');
 
-        $this->assertInstanceOf(Collection::class, $results);
-        $this->assertCount(0, $results);
+        $this->assertCount(1, $results);
+        $this->assertSame('admin', $results->first()->cluster->get('role'));
     }
 
-    // ==================== TESTS FIND BY CLUSTER ====================
-
-    public function test_find_by_cluster_returns_collection(): void
+    public function test_find_by_cluster_query_with_role(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $this->createDocument(['cluster' => ['role' => 'admin', 'status' => 'active']]);
+        $this->createDocument(['cluster' => ['role' => 'doctor', 'status' => 'active']]);
+        $this->createDocument(['cluster' => ['role' => 'admin', 'status' => 'inactive']]);
 
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production@AND');
-        $results = $this->repository->findByCluster($cluster);
+        $results = $this->repository->findByClusterQuery('role=admin');
 
-        $this->assertInstanceOf(Collection::class, $results);
         $this->assertCount(2, $results);
-
-        foreach ($results as $doc) {
-            $this->assertInstanceOf(IndexedDocument::class, $doc);
-            $this->assertStringContainsString('model:User', $doc->cluster);
-            $this->assertStringContainsString('tenant:company_abc', $doc->cluster);
-            $this->assertStringContainsString('env:production', $doc->cluster);
-        }
+        $this->assertSame('admin', $results->first()->cluster->get('role'));
+        $this->assertSame('admin', $results->get(1)->cluster->get('role'));
     }
 
-    public function test_find_by_cluster_without_mode_throws_exception(): void
+    public function test_find_by_ids_returns_documents(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster must have a mode (AND, OR or NOT) to apply to query');
-
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
-        $this->repository->findByCluster($cluster);
-    }
-
-    public function test_find_by_cluster_key_value_returns_collection(): void
-    {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-
-        $results = $this->repository->findByClusterKeyValue('model', 'User');
-
-        $this->assertInstanceOf(Collection::class, $results);
-        $this->assertCount(2, $results);
-
-        foreach ($results as $doc) {
-            $this->assertInstanceOf(IndexedDocument::class, $doc);
-            $this->assertStringContainsString('model:User', $doc->cluster);
-        }
-    }
-
-    // ==================== TESTS FIND BY IDS ====================
-
-    public function test_find_by_ids_returns_collection(): void
-    {
-        $doc1 = $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $doc2 = $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $doc3 = $this->createProductDocument('789', 'Laptop', 999.99);
+        $doc1 = $this->createDocument();
+        $doc2 = $this->createDocument();
+        $this->createDocument();
 
         $results = $this->repository->findByIds([$doc1->id, $doc2->id]);
 
-        $this->assertInstanceOf(Collection::class, $results);
         $this->assertCount(2, $results);
-
-        foreach ($results as $doc) {
-            $this->assertInstanceOf(IndexedDocument::class, $doc);
-        }
-
-        $ids = $results->pluck('id')->toArray();
-        $this->assertContains($doc1->id, $ids);
-        $this->assertContains($doc2->id, $ids);
-        $this->assertNotContains($doc3->id, $ids);
+        $this->assertContains($doc1->id, $results->pluck('id')->toArray());
+        $this->assertContains($doc2->id, $results->pluck('id')->toArray());
     }
 
     public function test_find_by_ids_returns_empty_collection_when_empty_array(): void
     {
         $results = $this->repository->findByIds([]);
+
         $this->assertInstanceOf(Collection::class, $results);
         $this->assertCount(0, $results);
     }
 
-    // ==================== TESTS UPDATE ====================
+    // ============================================================================
+    // TESTS - Delete Methods
+    // ============================================================================
 
-    public function test_update_updates_document(): void
+    public function test_delete_by_finger_print_removes_document(): void
     {
-        $created = $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $id = '123';
+        $this->createDocument(['id' => $id, 'namespace' => TestUser::class]);
 
-        $updatedRecord = IndexedDocumentRecord::from([
-            'fingerprint' => 'App.Models.User|123',
-            'cluster' => 'model:User|tenant:company_xyz|env:production',
-            'data' => [
-                'name' => 'John Updated',
-                'email' => 'john.updated@example.com',
-            ],
-        ]);
-
-        $updated = $this->repository->update($created->id, $updatedRecord);
-
-        $this->assertInstanceOf(IndexedDocument::class, $updated);
-        $this->assertEquals($created->id, $updated->id);
-        $this->assertEquals('App.Models.User|123', $updated->fingerprint);
-        $this->assertEquals('model:User|tenant:company_xyz|env:production', $updated->cluster);
-        $this->assertEquals(
-            ['name' => 'John Updated', 'email' => 'john.updated@example.com'],
-            $updated->data
+        $deleted = $this->repository->deleteByFingerPrint(
+            new IndexableFingerPrintVO(TestUser::class.'|'.$id)
         );
-    }
 
-    public function test_update_raw_updates_document(): void
-    {
-        $created = $this->createUserDocument('123', 'John Doe', 'john@example.com');
-
-        $data = [
-            'data' => ['name' => 'John Raw Updated'],
-        ];
-
-        $updated = $this->repository->updateRaw($created->id, $data);
-
-        $this->assertInstanceOf(IndexedDocument::class, $updated);
-        $this->assertEquals($created->id, $updated->id);
-        $this->assertEquals(['name' => 'John Raw Updated'], $updated->data);
-    }
-
-    // ==================== TESTS DELETE ====================
-
-    public function test_delete_removes_document(): void
-    {
-        $created = $this->createUserDocument('123', 'John Doe', 'john@example.com');
-
-        $result = $this->repository->delete($created->id);
-        $this->assertTrue($result);
-
-        $found = $this->repository->find($created->id);
-        $this->assertNull($found);
-    }
-
-    public function test_delete_returns_false_when_not_found(): void
-    {
-        $result = $this->repository->delete('non-existent-id');
-        $this->assertFalse($result);
-    }
-
-    public function test_delete_by_fingerprint_removes_document(): void
-    {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-        $count = $this->repository->deleteByFingerPrint($fingerPrint);
-        $this->assertEquals(1, $count);
-
-        $found = $this->repository->findByFingerPrint($fingerPrint);
-        $this->assertNull($found);
+        $this->assertSame(1, $deleted);
+        $this->assertDatabaseMissing('indexed_documents', ['id' => $id]);
     }
 
     public function test_delete_by_fingerprint_string_removes_document(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $id = '123';
+        $this->createDocument(['id' => $id, 'namespace' => TestUser::class]);
 
-        $count = $this->repository->deleteByFingerprintString('App.Models.User|123');
-        $this->assertEquals(1, $count);
+        $deleted = $this->repository->deleteByFingerprintString(TestUser::class.'|'.$id);
 
-        $found = $this->repository->findByFingerprintString('App.Models.User|123');
-        $this->assertNull($found);
+        $this->assertSame(1, $deleted);
+        $this->assertDatabaseMissing('indexed_documents', ['id' => $id]);
     }
 
-    public function test_delete_by_namespace_removes_all_documents(): void
+    public function test_delete_by_namespace_removes_documents(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $this->createDocument(['id' => '1', 'namespace' => TestUser::class]);
+        $this->createDocument(['id' => '2', 'namespace' => TestUser::class]);
+        $this->createDocument(['id' => '3', 'namespace' => TestProduct::class]);
 
-        $count = $this->repository->deleteByNamespace('App.Models.User');
-        $this->assertEquals(2, $count);
+        $deleted = $this->repository->deleteByNamespace(TestUser::class);
 
-        $userResults = $this->repository->findByNamespace('App.Models.User');
-        $this->assertCount(0, $userResults);
-
-        $productResults = $this->repository->findByNamespace('App.Models.Product');
-        $this->assertCount(1, $productResults);
+        $this->assertSame(2, $deleted);
+        $this->assertDatabaseCount('indexed_documents', 1);
     }
 
-    public function test_delete_by_cluster_removes_documents(): void
+    public function test_delete_by_cluster_query_removes_matching_documents(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $this->createDocument(['cluster' => ['status' => 'active', 'role' => 'admin']]);
+        $this->createDocument(['cluster' => ['status' => 'inactive', 'role' => 'doctor']]);
+        $this->createDocument(['cluster' => ['status' => 'active', 'role' => 'doctor']]);
 
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production@AND');
-        $count = $this->repository->deleteByCluster($cluster);
-        $this->assertEquals(2, $count);
+        $deleted = $this->repository->deleteByClusterQuery('status=active & role=admin');
 
-        $userResults = $this->repository->findByNamespace('App.Models.User');
-        $this->assertCount(0, $userResults);
-
-        $productResults = $this->repository->findByNamespace('App.Models.Product');
-        $this->assertCount(1, $productResults);
+        $this->assertSame(1, $deleted);
+        $this->assertDatabaseCount('indexed_documents', 2);
     }
 
-    public function test_delete_by_cluster_without_mode_throws_exception(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster must have a mode (AND, OR or NOT) to apply to query');
+    // ============================================================================
+    // TESTS - Count Methods
+    // ============================================================================
 
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
-        $this->repository->deleteByCluster($cluster);
+    public function test_count_by_namespace_returns_correct_count(): void
+    {
+        $this->createDocument(['id' => '1', 'namespace' => TestUser::class]);
+        $this->createDocument(['id' => '2', 'namespace' => TestUser::class]);
+        $this->createDocument(['id' => '3', 'namespace' => TestProduct::class]);
+
+        $count = $this->repository->countByNamespace(TestUser::class);
+
+        $this->assertSame(2, $count);
     }
 
-    public function test_delete_by_cluster_key_value_removes_documents(): void
+    public function test_count_by_cluster_query_returns_correct_count(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
+        $this->createDocument(['cluster' => ['status' => 'active', 'role' => 'admin']]);
+        $this->createDocument(['cluster' => ['status' => 'inactive', 'role' => 'doctor']]);
+        $this->createDocument(['cluster' => ['status' => 'active', 'role' => 'doctor']]);
 
-        $count = $this->repository->deleteByClusterKeyValue('model', 'User');
-        $this->assertEquals(2, $count);
+        $count = $this->repository->countByClusterQuery('status=active & role=admin');
 
-        $userResults = $this->repository->findByNamespace('App.Models.User');
-        $this->assertCount(0, $userResults);
+        $this->assertSame(1, $count);
     }
 
-    // ==================== TESTS COUNTS ====================
+    // ============================================================================
+    // TESTS - Exists Methods
+    // ============================================================================
 
-    public function test_count_by_namespace(): void
+    public function test_exists_by_finger_print_returns_true_when_exists(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $id = '123';
+        $this->createDocument(['id' => $id, 'namespace' => TestUser::class]);
 
-        $count = $this->repository->countByNamespace('App.Models.User');
-        $this->assertEquals(2, $count);
-
-        $count = $this->repository->countByNamespace('App.Models.Product');
-        $this->assertEquals(1, $count);
-    }
-
-    public function test_count_by_cluster(): void
-    {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
-
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production@AND');
-        $count = $this->repository->countByCluster($cluster);
-        $this->assertEquals(2, $count);
-    }
-
-    public function test_count_by_cluster_without_mode_throws_exception(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster must have a mode (AND, OR or NOT) to apply to query');
-
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
-        $this->repository->countByCluster($cluster);
-    }
-
-    public function test_count_with_filters(): void
-    {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
-
-        $filters = new IndexedDocumentFiltersRecord(
-            namespace: 'App.Models.User'
+        $exists = $this->repository->existsByFingerPrint(
+            new IndexableFingerPrintVO(TestUser::class.'|'.$id)
         );
 
-        $count = $this->repository->count($filters);
-        $this->assertEquals(2, $count);
-    }
-
-    // ==================== TESTS EXISTS ====================
-
-    public function test_exists_returns_true_when_found(): void
-    {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-
-        $filters = new IndexedDocumentFiltersRecord(
-            fingerprint: 'App.Models.User|123'
-        );
-
-        $exists = $this->repository->exists($filters);
         $this->assertTrue($exists);
     }
 
-    public function test_exists_returns_false_when_not_found(): void
+    public function test_exists_by_finger_print_returns_false_when_not_exists(): void
     {
-        $filters = new IndexedDocumentFiltersRecord(
-            fingerprint: 'App.Models.User|999'
+        $exists = $this->repository->existsByFingerPrint(
+            new IndexableFingerPrintVO(TestUser::class.'|999')
         );
 
-        $exists = $this->repository->exists($filters);
         $this->assertFalse($exists);
     }
 
-    public function test_exists_by_fingerprint_returns_true(): void
+    public function test_exists_by_namespace_returns_true_when_exists(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $this->createDocument(['id' => '1', 'namespace' => TestUser::class]);
 
-        $fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-        $exists = $this->repository->existsByFingerPrint($fingerPrint);
+        $exists = $this->repository->existsByNamespace(TestUser::class);
+
         $this->assertTrue($exists);
     }
 
-    public function test_exists_by_namespace_returns_true(): void
+    public function test_exists_by_namespace_returns_false_when_not_exists(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $exists = $this->repository->existsByNamespace('App\\Models\\Unknown');
 
-        $exists = $this->repository->existsByNamespace('App.Models.User');
+        $this->assertFalse($exists);
+    }
+
+    public function test_exists_by_cluster_query_returns_true_when_exists(): void
+    {
+        $this->createDocument(['cluster' => ['status' => 'active', 'role' => 'admin']]);
+
+        $exists = $this->repository->existsByClusterQuery('status=active & role=admin');
+
         $this->assertTrue($exists);
     }
 
-    public function test_exists_by_cluster_returns_true(): void
+    public function test_exists_by_cluster_query_returns_false_when_not_exists(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
+        $exists = $this->repository->existsByClusterQuery('status=inactive & role=admin');
 
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production@AND');
-        $exists = $this->repository->existsByCluster($cluster);
-        $this->assertTrue($exists);
+        $this->assertFalse($exists);
     }
 
-    public function test_exists_by_cluster_without_mode_throws_exception(): void
+    // ============================================================================
+    // TESTS - Distinct Methods
+    // ============================================================================
+
+    public function test_get_distinct_namespaces_returns_unique_namespaces(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cluster must have a mode (AND, OR or NOT) to apply to query');
-
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production');
-        $this->repository->existsByCluster($cluster);
-    }
-
-    // ==================== TESTS DISTINCT ====================
-
-    public function test_get_distinct_namespaces(): void
-    {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $this->createDocument(['id' => '1', 'namespace' => TestUser::class]);
+        $this->createDocument(['id' => '2', 'namespace' => TestUser::class]);
+        $this->createDocument(['id' => '3', 'namespace' => TestProduct::class]);
 
         $namespaces = $this->repository->getDistinctNamespaces();
 
-        $this->assertInstanceOf(Collection::class, $namespaces);
         $this->assertCount(2, $namespaces);
-        $this->assertContains('App.Models.User', $namespaces->toArray());
-        $this->assertContains('App.Models.Product', $namespaces->toArray());
+        $this->assertContains(TestUser::class, $namespaces->toArray());
+        $this->assertContains(TestProduct::class, $namespaces->toArray());
     }
 
-    public function test_get_distinct_cluster_keys(): void
+    // ============================================================================
+    // TESTS - CreateMany
+    // ============================================================================
+
+    public function test_create_many_inserts_multiple_documents(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $records = [
+            new IndexedDocumentRecord(
+                fingerprint: new IndexableFingerPrintVO(TestUser::class.'|1'),
+                cluster: new ClusterVO(['status' => 'active']),
+                data: StrictAssociative::from(['name' => 'John']),
+            ),
+            new IndexedDocumentRecord(
+                fingerprint: new IndexableFingerPrintVO(TestUser::class.'|2'),
+                cluster: new ClusterVO(['status' => 'inactive']),
+                data: StrictAssociative::from(['name' => 'Jane']),
+            ),
+        ];
 
-        $keys = $this->repository->getDistinctClusterKeys();
+        $documents = $this->repository->createMany($records);
 
-        $this->assertInstanceOf(Collection::class, $keys);
-        $this->assertContains('model', $keys->toArray());
-        $this->assertContains('tenant', $keys->toArray());
-        $this->assertContains('env', $keys->toArray());
-        $this->assertContains('category', $keys->toArray());
+        $this->assertCount(2, $documents);
+        $this->assertDatabaseCount('indexed_documents', 2);
     }
 
-    public function test_get_distinct_cluster_values(): void
+    public function test_create_many_returns_empty_array_when_empty(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
+        $documents = $this->repository->createMany([]);
 
-        $values = $this->repository->getDistinctClusterValues('model');
-
-        $this->assertInstanceOf(Collection::class, $values);
-        $this->assertContains('User', $values->toArray());
+        $this->assertEmpty($documents);
     }
 
-    // ==================== TESTS DELETE BULK ====================
+    // ============================================================================
+    // TESTS - AbstractRepository Methods
+    // ============================================================================
 
-    public function test_delete_bulk_removes_matching_documents(): void
+    public function test_find_by_with_filters(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $doc1 = $this->createDocument(['id' => '1', 'namespace' => TestUser::class]);
+        $doc2 = $this->createDocument(['id' => '2', 'namespace' => TestUser::class]);
+        $this->createDocument(['id' => '3', 'namespace' => TestProduct::class]);
 
         $filters = new IndexedDocumentFiltersRecord(
-            namespace: 'App.Models.User'
-        );
-
-        $count = $this->repository->deleteBulk($filters);
-        $this->assertEquals(2, $count);
-
-        $userResults = $this->repository->findByNamespace('App.Models.User');
-        $this->assertCount(0, $userResults);
-
-        $productResults = $this->repository->findByNamespace('App.Models.Product');
-        $this->assertCount(1, $productResults);
-    }
-
-    // ==================== TESTS FIND BY WITH FILTERS ====================
-
-    public function test_find_by_with_filters_and_sort(): void
-    {
-        $this->createUserDocument('123', 'Alice', 'alice@example.com');
-        $this->createUserDocument('456', 'Bob', 'bob@example.com');
-        $this->createUserDocument('789', 'Charlie', 'charlie@example.com');
-
-        $filters = new IndexedDocumentFiltersRecord(
-            namespace: 'App.Models.User'
+            namespace: TestUser::class
         );
 
         $findBy = new FindByRecord(
             filters: $filters,
-            limit: 2,
-            sortBy: new SortColumns('fingerprint:asc')
+            limit: 10,
+            sortBy: new SortColumns('fingerprint:asc'),
+            columns: SelectColumns::all(),
         );
 
         $results = $this->repository->findBy($findBy);
 
-        $this->assertInstanceOf(Collection::class, $results);
         $this->assertCount(2, $results);
-        $this->assertEquals('App.Models.User|123', $results->first()->fingerprint);
-
-        foreach ($results as $doc) {
-            $this->assertInstanceOf(IndexedDocument::class, $doc);
-        }
+        $this->assertContains($doc1->id, $results->pluck('id')->toArray());
+        $this->assertContains($doc2->id, $results->pluck('id')->toArray());
     }
 
-    public function test_find_by_with_cluster_filter(): void
+    public function test_find_by_with_cluster_query_filter(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $this->createDocument(['cluster' => ['status' => 'active', 'role' => 'admin']]);
+        $this->createDocument(['cluster' => ['status' => 'inactive', 'role' => 'doctor']]);
 
-        $cluster = new ClusterVO('model:User|tenant:company_abc|env:production@AND');
         $filters = new IndexedDocumentFiltersRecord(
-            cluster: $cluster
+            cluster_query: 'status=active & role=admin'
         );
 
         $findBy = new FindByRecord(
             filters: $filters,
-            limit: 10
+            limit: 10,
+            columns: SelectColumns::all(),
         );
 
         $results = $this->repository->findBy($findBy);
 
-        $this->assertInstanceOf(Collection::class, $results);
-        $this->assertCount(2, $results);
+        $this->assertCount(1, $results);
+        $this->assertSame('admin', $results->first()->cluster->get('role'));
+    }
 
-        foreach ($results as $doc) {
-            $this->assertInstanceOf(IndexedDocument::class, $doc);
-            $this->assertStringContainsString('model:User', $doc->cluster);
-            $this->assertStringContainsString('tenant:company_abc', $doc->cluster);
-            $this->assertStringContainsString('env:production', $doc->cluster);
+    public function test_find_by_with_cluster_queries_vo(): void
+    {
+        $this->createDocument([
+            'cluster' => ['status' => 'active', 'role' => 'admin'],
+            'data' => ['type' => 'document'],
+        ]);
+        $this->createDocument([
+            'cluster' => ['status' => 'inactive', 'role' => 'doctor'],
+            'data' => ['type' => 'document'],
+        ]);
+
+        $queries = new ClusterQueries([
+            'cluster' => 'status=active & role=admin',
+            'data' => 'type=document',
+        ]);
+
+        $findBy = new FindByRecord(
+            filters: new EmptyRecord,
+            limit: 10,
+            columns: SelectColumns::all(),
+            clusterQueries: $queries,
+        );
+
+        $results = $this->repository->findBy($findBy);
+
+        $this->assertCount(1, $results);
+        $this->assertSame('admin', $results->first()->cluster->get('role'));
+    }
+
+    public function test_paginate_with_filters(): void
+    {
+        for ($i = 1; $i <= 10; $i++) {
+            $this->createDocument([
+                'id' => (string) $i,
+                'namespace' => TestUser::class,
+                'cluster' => ['status' => $i <= 5 ? 'active' : 'inactive'],
+            ]);
         }
+
+        $filters = new IndexedDocumentFiltersRecord(
+            cluster_query: 'status=active'
+        );
+
+        $paginate = new PaginateRecord(
+            perPage: 3,
+            page: 1,
+            filters: $filters,
+            columns: SelectColumns::all(),
+            sortBy: 'fingerprint',
+        );
+
+        $results = $this->repository->paginate($paginate);
+
+        $this->assertCount(3, $results->items());
+        $this->assertSame(5, $results->total());
+        $this->assertSame(1, $results->currentPage());
     }
 
-    // ==================== TESTS FIND ALL WITH TOKENS ====================
+    // ============================================================================
+    // TESTS - applyFilters (protected method tested via findBy)
+    // ============================================================================
 
-    public function test_find_all_with_tokens_loads_relation(): void
+    public function test_apply_filters_with_id(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $id = '123';
+        $doc = $this->createDocument(['id' => $id, 'namespace' => TestUser::class]);
 
-        $results = $this->repository->findAllWithTokens();
+        $filters = new IndexedDocumentFiltersRecord(
+            id: $doc->id
+        );
 
-        $this->assertInstanceOf(Collection::class, $results);
-        $this->assertGreaterThanOrEqual(2, $results->count());
+        $findBy = new FindByRecord(
+            filters: $filters,
+            columns: SelectColumns::all(),
+        );
 
-        foreach ($results as $doc) {
-            $this->assertInstanceOf(IndexedDocument::class, $doc);
-            $this->assertTrue($doc->relationLoaded('tokens'));
-        }
+        $results = $this->repository->findBy($findBy);
+
+        $this->assertCount(1, $results);
+        $this->assertSame($doc->id, $results->first()->id);
     }
 
-    // ==================== TESTS FIND BY CLUSTERS ====================
-
-    public function test_find_by_clusters_with_or_operator(): void
+    public function test_apply_filters_with_fingerprint(): void
     {
-        $doc1 = $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $doc2 = $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $doc3 = $this->createProductDocument('789', 'Laptop', 999.99);
+        $id = '123';
+        $doc = $this->createDocument(['id' => $id, 'namespace' => TestUser::class]);
 
-        $clusters = new ClusterVOCollection;
-        $clusters->add(new ClusterVO('model:User@AND'));
-        $clusters->add(new ClusterVO('model:Product@AND'));
+        $filters = new IndexedDocumentFiltersRecord(
+            fingerprint: new IndexableFingerPrintVO(TestUser::class.'|'.$id)
+        );
 
-        $results = $this->repository->findByClusters($clusters, 'OR');
+        $findBy = new FindByRecord(
+            filters: $filters,
+            columns: SelectColumns::all(),
+        );
 
-        $this->assertInstanceOf(Collection::class, $results);
-        $this->assertCount(3, $results);
+        $results = $this->repository->findBy($findBy);
 
-        $ids = $results->pluck('id')->toArray();
-        $this->assertContains($doc1->id, $ids);
-        $this->assertContains($doc2->id, $ids);
-        $this->assertContains($doc3->id, $ids);
+        $this->assertCount(1, $results);
+        $this->assertSame($doc->id, $results->first()->id);
     }
 
-    public function test_find_by_clusters_throws_exception_for_invalid_operator(): void
+    public function test_apply_filters_with_entity_id(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid operator. Expected "AND", "OR" or "NOT", got "INVALID"');
+        $this->createDocument(['id' => '123', 'namespace' => TestUser::class]);
+        $this->createDocument(['id' => '456', 'namespace' => TestUser::class]);
 
-        $clusters = new ClusterVOCollection;
-        $clusters->add(new ClusterVO('model:User@AND'));
+        $filters = new IndexedDocumentFiltersRecord(
+            entity_id: '123'
+        );
 
-        $this->repository->findByClusters($clusters, 'INVALID');
+        $findBy = new FindByRecord(
+            filters: $filters,
+            columns: SelectColumns::all(),
+        );
+
+        $results = $this->repository->findBy($findBy);
+
+        $this->assertCount(1, $results);
+        $this->assertSame('123', $results->first()->fingerprint->getId());
     }
 
-    // ==================== TESTS COUNT BY CLUSTERS ====================
-
-    public function test_count_by_clusters(): void
+    public function test_apply_filters_with_document_ids(): void
     {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $this->createProductDocument('789', 'Laptop', 999.99);
+        $doc1 = $this->createDocument();
+        $doc2 = $this->createDocument();
+        $doc3 = $this->createDocument();
 
-        $clusters = new ClusterVOCollection;
-        $clusters->add(new ClusterVO('model:User@AND'));
+        $filters = new IndexedDocumentFiltersRecord(
+            document_ids: StringTypedCollection::from([
+                $doc1->id,
+                $doc2->id,
+            ])
+        );
 
-        $count = $this->repository->countByClusters($clusters, 'AND');
+        $findBy = new FindByRecord(
+            filters: $filters,
+            columns: SelectColumns::all(),
+        );
 
-        $this->assertEquals(2, $count);
-    }
+        $results = $this->repository->findBy($findBy);
 
-    // ==================== TESTS DELETE BY CLUSTERS ====================
-
-    public function test_delete_by_clusters(): void
-    {
-        $doc1 = $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $doc2 = $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $doc3 = $this->createProductDocument('789', 'Laptop', 999.99);
-
-        $clusters = new ClusterVOCollection;
-        $clusters->add(new ClusterVO('model:User@AND'));
-
-        $deleted = $this->repository->deleteByClusters($clusters, 'AND');
-
-        $this->assertEquals(2, $deleted);
-
-        $remaining = $this->repository->findBy(new FindByRecord(filters: new IndexedDocumentFiltersRecord));
-        $remainingIds = $remaining->pluck('id')->toArray();
-        $this->assertNotContains($doc1->id, $remainingIds);
-        $this->assertNotContains($doc2->id, $remainingIds);
-        $this->assertContains($doc3->id, $remainingIds);
-    }
-
-    // ==================== TESTS EXISTS BY CLUSTERS ====================
-
-    public function test_exists_by_clusters_returns_true_when_found(): void
-    {
-        $this->createUserDocument('123', 'John Doe', 'john@example.com');
-
-        $clusters = new ClusterVOCollection;
-        $clusters->add(new ClusterVO('model:User@AND'));
-
-        $exists = $this->repository->existsByClusters($clusters, 'AND');
-
-        $this->assertTrue($exists);
-    }
-
-    public function test_exists_by_clusters_returns_false_when_not_found(): void
-    {
-        $this->createProductDocument('789', 'Laptop', 999.99);
-
-        $clusters = new ClusterVOCollection;
-        $clusters->add(new ClusterVO('model:User@AND'));
-
-        $exists = $this->repository->existsByClusters($clusters, 'AND');
-
-        $this->assertFalse($exists);
-    }
-
-    public function test_find_by_clusters_with_and_operator(): void
-    {
-        $doc1 = $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $doc2 = $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $doc3 = $this->createProductDocument('789', 'Laptop', 999.99);
-
-        $clusters = new ClusterVOCollection;
-        $clusters->add(new ClusterVO('tenant:company_abc@AND'));
-        $clusters->add(new ClusterVO('env:production@AND'));
-
-        $results = $this->repository->findByClusters($clusters, 'AND');
-
-        $this->assertInstanceOf(Collection::class, $results);
         $this->assertCount(2, $results);
-
-        $ids = $results->pluck('id')->toArray();
-        $this->assertContains($doc1->id, $ids);
-        $this->assertContains($doc2->id, $ids);
-        $this->assertNotContains($doc3->id, $ids);
+        $this->assertContains($doc1->id, $results->pluck('id')->toArray());
+        $this->assertContains($doc2->id, $results->pluck('id')->toArray());
+        $this->assertNotContains($doc3->id, $results->pluck('id')->toArray());
     }
 
-    public function test_find_by_clusters_with_not_operator(): void
+    // ============================================================================
+    // TESTS - getModel
+    // ============================================================================
+
+    public function test_get_model_returns_model_instance(): void
     {
-        $doc1 = $this->createUserDocument('123', 'John Doe', 'john@example.com');
-        $doc2 = $this->createUserDocument('456', 'Jane Smith', 'jane@example.com');
-        $doc3 = $this->createProductDocument('789', 'Laptop', 999.99);
+        $model = $this->repository->getModel();
 
-        $clusters = new ClusterVOCollection;
-        $clusters->add(new ClusterVO('category:electronics@AND'));
-
-        $results = $this->repository->findByClusters($clusters, 'NOT');
-
-        $this->assertInstanceOf(Collection::class, $results);
-        $this->assertCount(2, $results);
-
-        $ids = $results->pluck('id')->toArray();
-        $this->assertContains($doc1->id, $ids);
-        $this->assertContains($doc2->id, $ids);
-        $this->assertNotContains($doc3->id, $ids);
+        $this->assertInstanceOf(IndexedDocument::class, $model);
     }
 }

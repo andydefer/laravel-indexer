@@ -6,6 +6,7 @@ namespace AndyDefer\LaravelIndexer\Tests;
 
 use AndyDefer\Directive\DirectiveServiceProvider;
 use AndyDefer\JsonlCache\JsonlCacheServiceProvider;
+use AndyDefer\LaravelCluster\Providers\ClusterServiceProvider;
 use AndyDefer\LaravelIndexer\Providers\IndexerServiceProvider;
 use AndyDefer\Logger\LoggerServiceProvider;
 use AndyDefer\Task\TaskServiceProvider;
@@ -24,6 +25,7 @@ abstract class IntegrationTestCase extends Orchestra
     {
         return [
             JsonlCacheServiceProvider::class,
+            ClusterServiceProvider::class,
             LoggerServiceProvider::class,
             DirectiveServiceProvider::class,
             TaskServiceProvider::class,

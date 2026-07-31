@@ -6,8 +6,8 @@ namespace AndyDefer\LaravelIndexer\Tests\Benchmark;
 
 use AndyDefer\DomainStructures\Normalizers\Core\NormalizerInterface;
 use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
-use AndyDefer\LaravelIndexer\Contracts\IndexedDocumentRepositoryInterface;
-use AndyDefer\LaravelIndexer\Contracts\IndexedTokenRepositoryInterface;
+use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedDocumentRepositoryInterface;
+use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedTokenRepositoryInterface;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
 use AndyDefer\LaravelIndexer\Services\IndexerService;
