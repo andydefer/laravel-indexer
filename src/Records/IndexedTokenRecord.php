@@ -7,6 +7,13 @@ namespace AndyDefer\LaravelIndexer\Records;
 use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 
+/**
+ * Record representing an indexed token.
+ *
+ * A data transfer object that holds all the data required to persist
+ * or transfer an indexed token, including its type, value, field,
+ * original text, and frequency.
+ */
 final class IndexedTokenRecord extends AbstractRecord
 {
     public function __construct(

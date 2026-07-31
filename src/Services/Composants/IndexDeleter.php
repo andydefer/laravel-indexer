@@ -25,6 +25,8 @@ final class IndexDeleter
      * Deletes a single document by its fingerprint.
      *
      * The associated tokens are automatically deleted via database cascade.
+     *
+     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint of the document to delete
      */
     public function delete(IndexableFingerPrintVO $fingerprint): void
     {
@@ -33,10 +35,12 @@ final class IndexDeleter
 
     /**
      * Deletes multiple documents by their fingerprints.
+     *
+     * @param  IndexableFingerPrintVOCollection  $fingerprints  The collection of fingerprints to delete
      */
-    public function deleteMany(IndexableFingerPrintVOCollection $fingerPrints): void
+    public function deleteMany(IndexableFingerPrintVOCollection $fingerprints): void
     {
-        foreach ($fingerPrints as $fingerprint) {
+        foreach ($fingerprints as $fingerprint) {
             $this->documentRepository->deleteByFingerPrint($fingerprint);
         }
     }

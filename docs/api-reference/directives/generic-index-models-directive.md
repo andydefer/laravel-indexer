@@ -31,7 +31,7 @@ Retourne la signature de la commande CLI.
 
 **Exemple :**
 ```bash
-bin/afya index:models [App.Models.User,App.Models.Hospital] --reindex
+bin/directive index:models [App.Models.User,App.Models.Hospital] --reindex
 ```
 
 ---
@@ -44,7 +44,7 @@ Retourne la description de la commande.
 
 **Exemple :**
 ```bash
-bin/afya index:models --help
+bin/directive index:models --help
 # Affiche : Index models from config (App.Models.User, App.Models.Hospital, etc.) with dynamic clusters
 ```
 
@@ -58,8 +58,8 @@ Retourne les alias de la commande.
 
 **Exemple :**
 ```bash
-bin/afya idx:models [App.Models.User]
-bin/afya indexer:models [App.Models.User]
+bin/directive idx:models [App.Models.User]
+bin/directive indexer:models [App.Models.User]
 ```
 
 ---
@@ -92,7 +92,7 @@ Point d'entrée de la directive. Parse les arguments et exécute l'action demand
 ### Cas 1 : Indexer tous les modèles configurés
 
 ```bash
-bin/afya index:models [App.Models.User,App.Models.Hospital,App.Models.Specialty]
+bin/directive index:models [App.Models.User,App.Models.Hospital,App.Models.Specialty]
 ```
 
 **Résultat :** Tous les modèles configurés sont indexés avec leurs clusters dynamiques respectifs.
@@ -102,7 +102,7 @@ bin/afya index:models [App.Models.User,App.Models.Hospital,App.Models.Specialty]
 ### Cas 2 : Réindexer avec un batch et une limite
 
 ```bash
-bin/afya index:models 20 100 [App.Models.User] --reindex
+bin/directive index:models 20 100 [App.Models.User] --reindex
 ```
 
 **Résultat :** Les utilisateurs sont réindexés par lots de 20, avec une limite de 100 éléments.
@@ -112,7 +112,7 @@ bin/afya index:models 20 100 [App.Models.User] --reindex
 ### Cas 3 : Compter les documents indexés
 
 ```bash
-bin/afya index:models [App.Models.User] --count
+bin/directive index:models [App.Models.User] --count
 ```
 
 **Résultat :** Affiche le nombre de documents indexés pour le modèle `User`.
@@ -128,7 +128,7 @@ bin/afya index:models [App.Models.User] --count
 ### Cas 4 : Supprimer tous les documents d'un modèle
 
 ```bash
-bin/afya index:models [App.Models.User] --delete
+bin/directive index:models [App.Models.User] --delete
 ```
 
 **Résultat :** Tous les documents indexés pour le modèle `User` sont supprimés.
@@ -203,25 +203,25 @@ Les clusters sont récupérés dynamiquement par `GenericIndexerService` via la 
 
 ```bash
 # 1. Indexer tous les modèles configurés
-bin/afya index:models [App.Models.User,App.Models.Hospital,App.Models.Specialty]
+bin/directive index:models [App.Models.User,App.Models.Hospital,App.Models.Specialty]
 
 # 2. Compter les documents indexés
-bin/afya index:models [App.Models.User] --count
+bin/directive index:models [App.Models.User] --count
 
 # 3. Indexer avec batch et limite
-bin/afya index:models 25 500 [App.Models.User,App.Models.Hospital]
+bin/directive index:models 25 500 [App.Models.User,App.Models.Hospital]
 
 # 4. Réindexer avec reindex
-bin/afya index:models [App.Models.User] --reindex
+bin/directive index:models [App.Models.User] --reindex
 
 # 5. Supprimer tout l'index d'un modèle
-bin/afya index:models [App.Models.Hospital] --delete
+bin/directive index:models [App.Models.Hospital] --delete
 
 # 6. Utiliser un alias
-bin/afya idx:models [App.Models.User]
+bin/directive idx:models [App.Models.User]
 
 # 7. Voir l'aide
-bin/afya index:models --help
+bin/directive index:models --help
 ```
 
 ---

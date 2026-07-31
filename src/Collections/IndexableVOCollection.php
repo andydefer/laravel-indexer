@@ -12,7 +12,10 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Collection spécialisée pour les IndexableVO.
+ * A typed collection for IndexableVO objects.
+ *
+ * Provides specialized filtering, grouping, and model retrieval methods
+ * for working with collections of indexable value objects.
  *
  * @method IndexableVO|null first()
  * @method IndexableVO|null last()
@@ -34,13 +37,14 @@ final class IndexableVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Récupère les IDs de tous les éléments.
+     * Extracts all entity IDs from the value objects in the collection.
      *
-     * @return array<int|string>
+     * @return array<int|string> An array of entity IDs
      */
     public function getIds(): array
     {
         $ids = [];
+
         foreach ($this->items as $item) {
             $ids[] = $item->getId();
         }
@@ -49,13 +53,14 @@ final class IndexableVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Récupère les classes de modèle de tous les éléments.
+     * Extracts all model class names from the value objects in the collection.
      *
-     * @return array<string>
+     * @return array<string> An array of fully-qualified class names
      */
     public function getModelClasses(): array
     {
         $classes = [];
+
         foreach ($this->items as $item) {
             $classes[] = $item->getModelClass();
         }
@@ -64,29 +69,37 @@ final class IndexableVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Récupère les instances des modèles pour tous les éléments en une seule requête par classe.
-     * Les modèles non trouvés sont ignorés silencieusement.
-     * Les instances sont retournées dans l'ordre de la collection.
+     * Retrieves the actual model instances for all value objects in a single query per class.
      *
-     * @return Collection<int, Model&Indexable>
+     * This method groups IDs by model class and executes one query per class,
+     * which is more efficient than retrieving each model individually.
+     *
+     * Missing models are silently ignored. Results are returned in the order
+     * of the original collection.
+     *
+     * @return Collection<int, Model&Indexable> A collection of model instances
      */
     public function getModelInstances(): Collection
     {
-        // Grouper les IDs par classe de modèle
         $groupedIds = [];
+
+        // Group IDs by model class
         foreach ($this->items as $item) {
             $class = $item->getModelClass();
             $id = $item->getId();
+
             if (! isset($groupedIds[$class])) {
                 $groupedIds[$class] = [];
             }
+
             $groupedIds[$class][] = $id;
         }
 
-        // Une seule requête par classe de modèle
+        // Execute one query per model class
         $models = [];
+
         foreach ($groupedIds as $class => $ids) {
-            /** @var Model&Indexable $class */
+            /** @var class-string<Model&Indexable> $class */
             $found = $class::whereIn('id', $ids)->get()->keyBy('id');
 
             foreach ($found as $model) {
@@ -94,31 +107,36 @@ final class IndexableVOCollection extends AbstractTypedCollection
             }
         }
 
-        // ✅ Retourner les modèles dans l'ordre de la collection
-        $result = [];
+        // Return models in the order of the original collection
+        $orderedModels = [];
+
         foreach ($this->items as $item) {
             $id = $item->getId();
+
             if (isset($models[$id])) {
-                $result[] = $models[$id];
+                $orderedModels[] = $models[$id];
             }
         }
 
-        return new Collection($result);
+        return new Collection($orderedModels);
     }
 
     /**
-     * Groupe les éléments par classe de modèle.
+     * Groups value objects by their model class.
      *
-     * @return array<string, self>
+     * @return array<string, self> An associative array mapping model class to a collection of value objects
      */
     public function groupByModelClass(): array
     {
         $groups = [];
+
         foreach ($this->items as $item) {
             $class = $item->getModelClass();
+
             if (! isset($groups[$class])) {
                 $groups[$class] = new self;
             }
+
             $groups[$class]->add($item);
         }
 
@@ -126,29 +144,36 @@ final class IndexableVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Filtre les éléments par classe de modèle.
+     * Returns a new collection containing value objects from the given model class.
+     *
+     * @param  string  $modelClass  The fully-qualified model class name
+     * @return self A new collection with matching items
      */
     public function filterByModelClass(string $modelClass): self
     {
         return $this->filter(
-            fn (IndexableVO $item) => $item->getModelClass() === $modelClass
+            fn (IndexableVO $item): bool => $item->getModelClass() === $modelClass
         );
     }
 
     /**
-     * Filtre les éléments par liste de classes de modèles.
+     * Returns a new collection containing value objects from any of the given model classes.
      *
-     * @param  array<string>  $modelClasses  Liste des FQCN
+     * @param  string[]  $modelClasses  List of fully-qualified class names
+     * @return self A new collection with matching items
      */
     public function filterByModelClasses(array $modelClasses): self
     {
         return $this->filter(
-            fn (IndexableVO $item) => in_array($item->getModelClass(), $modelClasses, true)
+            fn (IndexableVO $item): bool => in_array($item->getModelClass(), $modelClasses, true)
         );
     }
 
     /**
-     * Vérifie si un ID spécifique existe.
+     * Checks if any value object in the collection has the given entity ID.
+     *
+     * @param  int|string  $id  The entity ID to check for
+     * @return bool True if at least one value object matches
      */
     public function containsId(int|string $id): bool
     {
@@ -162,7 +187,10 @@ final class IndexableVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Vérifie si une classe de modèle spécifique existe.
+     * Checks if any value object in the collection belongs to the given model class.
+     *
+     * @param  string  $modelClass  The fully-qualified model class name
+     * @return bool True if at least one value object matches
      */
     public function containsModelClass(string $modelClass): bool
     {
@@ -176,7 +204,10 @@ final class IndexableVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Récupère un élément par son ID.
+     * Finds a value object by its entity ID.
+     *
+     * @param  int|string  $id  The entity ID to search for
+     * @return IndexableVO|null The matching value object, or null if not found
      */
     public function findById(int|string $id): ?IndexableVO
     {
@@ -190,15 +221,16 @@ final class IndexableVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Récupère les éléments par classe de modèle et IDs.
+     * Returns a new collection containing value objects matching the given model class and IDs.
      *
-     * @param  string  $modelClass  FQCN du modèle
-     * @param  array<int|string>  $ids  IDs à rechercher
+     * @param  string  $modelClass  The fully-qualified model class name
+     * @param  array<int|string>  $ids  The entity IDs to filter by
+     * @return self A new collection with matching items
      */
     public function filterByModelClassAndIds(string $modelClass, array $ids): self
     {
         return $this->filter(
-            fn (IndexableVO $item) => $item->getModelClass() === $modelClass && in_array($item->getId(), $ids, true)
+            fn (IndexableVO $item): bool => $item->getModelClass() === $modelClass && in_array($item->getId(), $ids, true)
         );
     }
 }

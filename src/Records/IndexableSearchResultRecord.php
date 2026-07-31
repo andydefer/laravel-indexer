@@ -8,7 +8,10 @@ use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 
 /**
- * Record représentant un résultat de recherche.
+ * Record representing a single search result.
+ *
+ * Contains the matched document, the field that was matched,
+ * the gram value that produced the match, and the gram type.
  */
 final class IndexableSearchResultRecord extends AbstractRecord
 {

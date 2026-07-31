@@ -13,9 +13,23 @@ use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use AndyDefer\Task\Abstract\AbstractUniqueTask;
 use AndyDefer\Task\ValueObjects\DescriptionVO;
+use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Unique task that processes a batch of models for indexing.
+ *
+ * This task receives a collection of IndexableVO items, retrieves the
+ * corresponding model instances, and indexes them. It handles deduplication
+ * by checking if a model is already indexed and re-indexing it if needed.
+ *
+ * Models that should not be indexed (according to shouldBeIndexed())
+ * are skipped. The task uses batch processing for optimal performance.
+ */
 final class GenericIndexBatchUniqueTask extends AbstractUniqueTask
 {
+    /**
+     * {@inheritDoc}
+     */
     protected function process(): void
     {
         $payload = $this->context->getPayload();
@@ -47,10 +61,8 @@ final class GenericIndexBatchUniqueTask extends AbstractUniqueTask
         $skipped = 0;
         $indexed = 0;
 
-        // ✅ Récupérer toutes les instances en une seule fois
         $instances = $items->getModelInstances();
 
-        // ✅ Créer un index des instances par ID pour un accès rapide
         $instancesById = [];
         foreach ($instances as $instance) {
             $instancesById[$instance->getKey()] = $instance;
@@ -74,7 +86,10 @@ final class GenericIndexBatchUniqueTask extends AbstractUniqueTask
                 continue;
             }
 
-            $fingerprint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
+            $fingerprint = IndexableFingerPrintVO::fromParts(
+                $model->getMorphClass(),
+                (string) $model->getKey()
+            );
 
             if ($documentRepository->existsByFingerPrint($fingerprint)) {
                 $this->info(new DescriptionVO("Item {$id} already indexed, deleting and re-indexing"));
@@ -94,6 +109,9 @@ final class GenericIndexBatchUniqueTask extends AbstractUniqueTask
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     protected function after(bool $success, ?DescriptionVO $error = null): void
     {
         if ($success) {

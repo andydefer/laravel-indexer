@@ -8,6 +8,12 @@ use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
 use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 
+/**
+ * Filter record for querying indexed tokens.
+ *
+ * Provides a typed DTO for filtering token queries with various criteria
+ * such as token value, type, field, namespace, and cluster conditions.
+ */
 final class IndexedTokenFiltersRecord extends AbstractRecord
 {
     public function __construct(

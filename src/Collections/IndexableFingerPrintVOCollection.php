@@ -10,7 +10,10 @@ use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
 /**
- * Collection spécialisée pour les IndexableFingerPrintVO.
+ * A specialized collection for IndexableFingerPrintVO objects.
+ *
+ * Provides convenient filtering, grouping, and querying methods for
+ * collections of entity fingerprints.
  *
  * @method IndexableFingerPrintVO|null first()
  * @method IndexableFingerPrintVO|null last()
@@ -32,90 +35,97 @@ final class IndexableFingerPrintVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Récupère les fingerprints par namespace
+     * Returns a new collection containing only fingerprints belonging to the given namespace.
+     *
+     * @param  string  $namespace  The namespace to filter by (e.g., 'App\Models\User')
+     * @return self A new collection with matching items
      */
     public function filterByNamespace(string $namespace): self
     {
         return $this->filter(
-            fn (IndexableFingerPrintVO $fp) => $fp->belongsTo($namespace)
+            fn (IndexableFingerPrintVO $fingerprint): bool => $fingerprint->belongsTo($namespace)
         );
     }
 
     /**
-     * Récupère les fingerprints par multiple namespaces
+     * Returns a new collection containing fingerprints belonging to any of the given namespaces.
+     *
+     * @param  string[]  $namespaces  List of namespaces to filter by
+     * @return self A new collection with matching items
      */
     public function filterByNamespaces(array $namespaces): self
     {
         return $this->filter(
-            fn (IndexableFingerPrintVO $fp) => $fp->belongsToAny($namespaces)
+            fn (IndexableFingerPrintVO $fingerprint): bool => $fingerprint->belongsToAny($namespaces)
         );
     }
 
     /**
-     * Récupère tous les IDs sous forme de StringTypedCollection
+     * Extracts all entity IDs from the fingerprints in the collection.
+     *
+     * @return StringTypedCollection A collection of entity IDs as strings
      */
     public function getIds(): StringTypedCollection
     {
         $ids = new StringTypedCollection;
-        foreach ($this->items as $fp) {
-            $ids->add($fp->getId());
+
+        foreach ($this->items as $fingerprint) {
+            $ids->add($fingerprint->getId());
         }
 
         return $ids;
     }
 
     /**
-     * Récupère tous les namespaces sous forme de StringTypedCollection
+     * Extracts all namespaces from the fingerprints in the collection.
+     *
+     * Namespaces are returned in their stored format (with backslashes).
+     *
+     * @return StringTypedCollection A collection of namespaces as strings
      */
     public function getNamespaces(): StringTypedCollection
     {
         $namespaces = new StringTypedCollection;
-        foreach ($this->items as $fp) {
-            $namespaces->add($fp->getNamespace());
+
+        foreach ($this->items as $fingerprint) {
+            $namespaces->add($fingerprint->getNamespace());
         }
 
         return $namespaces;
     }
 
     /**
-     * Récupère les namespaces originaux (avec \)
-     */
-    public function getOriginalNamespaces(): StringTypedCollection
-    {
-        $namespaces = new StringTypedCollection;
-        foreach ($this->items as $fp) {
-            $namespaces->add($fp->getOriginalNamespace());
-        }
-
-        return $namespaces;
-    }
-
-    /**
-     * Groupe les fingerprints par namespace
+     * Groups fingerprints by their namespace.
      *
-     * @return array<string, self>
+     * @return array<string, self> An associative array mapping namespace to a collection of fingerprints
      */
     public function groupByNamespace(): array
     {
         $groups = [];
-        foreach ($this->items as $fp) {
-            $namespace = $fp->getNamespace();
+
+        foreach ($this->items as $fingerprint) {
+            $namespace = $fingerprint->getNamespace();
+
             if (! isset($groups[$namespace])) {
                 $groups[$namespace] = new self;
             }
-            $groups[$namespace]->add($fp);
+
+            $groups[$namespace]->add($fingerprint);
         }
 
         return $groups;
     }
 
     /**
-     * Vérifie si un ID spécifique existe
+     * Checks if any fingerprint in the collection has the given entity ID.
+     *
+     * @param  string  $id  The entity ID to check for
+     * @return bool True if at least one fingerprint matches
      */
     public function containsId(string $id): bool
     {
-        foreach ($this->items as $item) {
-            if ($item->getId() === $id) {
+        foreach ($this->items as $fingerprint) {
+            if ($fingerprint->getId() === $id) {
                 return true;
             }
         }
@@ -124,12 +134,15 @@ final class IndexableFingerPrintVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Vérifie si un namespace spécifique existe
+     * Checks if any fingerprint in the collection belongs to the given namespace.
+     *
+     * @param  string  $namespace  The namespace to check for
+     * @return bool True if at least one fingerprint matches
      */
     public function containsNamespace(string $namespace): bool
     {
-        foreach ($this->items as $item) {
-            if ($item->belongsTo($namespace)) {
+        foreach ($this->items as $fingerprint) {
+            if ($fingerprint->belongsTo($namespace)) {
                 return true;
             }
         }
@@ -138,13 +151,16 @@ final class IndexableFingerPrintVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Récupère un fingerprint par sa valeur brute
+     * Finds a fingerprint by its raw string value.
+     *
+     * @param  string  $value  The raw fingerprint string (e.g., 'App\Models\User|123')
+     * @return IndexableFingerPrintVO|null The matching fingerprint, or null if not found
      */
     public function findByValue(string $value): ?IndexableFingerPrintVO
     {
-        foreach ($this->items as $item) {
-            if ($item->getValue() === $value) {
-                return $item;
+        foreach ($this->items as $fingerprint) {
+            if ($fingerprint->getValue() === $value) {
+                return $fingerprint;
             }
         }
 
@@ -152,13 +168,17 @@ final class IndexableFingerPrintVOCollection extends AbstractTypedCollection
     }
 
     /**
-     * Récupère un fingerprint par son ID et namespace
+     * Finds a fingerprint by its entity ID and namespace combination.
+     *
+     * @param  string  $id  The entity ID to match
+     * @param  string  $namespace  The namespace to match
+     * @return IndexableFingerPrintVO|null The matching fingerprint, or null if not found
      */
     public function findByIdAndNamespace(string $id, string $namespace): ?IndexableFingerPrintVO
     {
-        foreach ($this->items as $item) {
-            if ($item->getId() === $id && $item->belongsTo($namespace)) {
-                return $item;
+        foreach ($this->items as $fingerprint) {
+            if ($fingerprint->getId() === $id && $fingerprint->belongsTo($namespace)) {
+                return $fingerprint;
             }
         }
 

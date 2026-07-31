@@ -9,7 +9,7 @@ use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use InvalidArgumentException;
 
 /**
- * Value Object représentant une requête de recherche.
+ * Value Object representing a search query.
  *
  * Format: "ngram1=field1,field2|ngram2=field3|ngram3=field1,field4"
  *
@@ -34,6 +34,13 @@ final class SearchQueryVO extends AbstractValueObject
         $this->parse($value);
     }
 
+    /**
+     * Validates the search query format.
+     *
+     * @param  string  $value  The raw search query string
+     *
+     * @throws InvalidArgumentException If the format is invalid
+     */
     private function validate(string $value): void
     {
         if (empty($value)) {
@@ -70,6 +77,11 @@ final class SearchQueryVO extends AbstractValueObject
         }
     }
 
+    /**
+     * Parses the search query string into a structured array.
+     *
+     * @param  string  $value  The raw search query string
+     */
     private function parse(string $value): void
     {
         $parts = explode(self::SEPARATOR_GROUP, $value);
@@ -81,9 +93,9 @@ final class SearchQueryVO extends AbstractValueObject
     }
 
     /**
-     * Retourne la requête sous forme de StrictAssociative.
+     * Returns the parsed query as a StrictAssociative array.
      *
-     * @return StrictAssociative<string, string[]>
+     * @return StrictAssociative<string, string[]> The parsed query
      */
     public function getValue(): StrictAssociative
     {
@@ -91,9 +103,9 @@ final class SearchQueryVO extends AbstractValueObject
     }
 
     /**
-     * Récupère tous les n-grams de la requête.
+     * Returns all n-grams in the query.
      *
-     * @return string[]
+     * @return string[] The list of n-grams
      */
     public function getNgrams(): array
     {
@@ -101,9 +113,10 @@ final class SearchQueryVO extends AbstractValueObject
     }
 
     /**
-     * Récupère les champs pour un n-gram donné.
+     * Returns the fields associated with a specific n-gram.
      *
-     * @return string[]
+     * @param  string  $ngram  The n-gram to look up
+     * @return string[] The list of fields for the n-gram
      */
     public function getFieldsForNgram(string $ngram): array
     {
@@ -111,7 +124,10 @@ final class SearchQueryVO extends AbstractValueObject
     }
 
     /**
-     * Vérifie si un n-gram existe dans la requête.
+     * Checks if the query contains a specific n-gram.
+     *
+     * @param  string  $ngram  The n-gram to check
+     * @return bool True if the n-gram exists
      */
     public function hasNgram(string $ngram): bool
     {
@@ -119,7 +135,11 @@ final class SearchQueryVO extends AbstractValueObject
     }
 
     /**
-     * Vérifie si un champ est recherché pour un n-gram donné.
+     * Checks if a specific field is searched for a given n-gram.
+     *
+     * @param  string  $ngram  The n-gram to check
+     * @param  string  $field  The field to check
+     * @return bool True if the field is associated with the n-gram
      */
     public function hasFieldForNgram(string $ngram, string $field): bool
     {
@@ -131,7 +151,11 @@ final class SearchQueryVO extends AbstractValueObject
     }
 
     /**
-     * Vérifie si la requête contient un n-gram spécifique avec des champs.
+     * Checks if the query contains a specific n-gram with all given fields.
+     *
+     * @param  string  $ngram  The n-gram to check
+     * @param  string[]  $fields  The fields that must be present
+     * @return bool True if the n-gram exists with all fields
      */
     public function contains(string $ngram, array $fields): bool
     {
@@ -150,7 +174,9 @@ final class SearchQueryVO extends AbstractValueObject
     }
 
     /**
-     * Retourne le nombre total de conditions de recherche.
+     * Returns the total number of search conditions (n-grams).
+     *
+     * @return int The number of n-grams
      */
     public function count(): int
     {
@@ -158,9 +184,9 @@ final class SearchQueryVO extends AbstractValueObject
     }
 
     /**
-     * Retourne tous les champs uniques utilisés dans la requête.
+     * Returns all unique fields used in the query.
      *
-     * @return string[]
+     * @return string[] The list of unique fields
      */
     public function getAllFields(): array
     {
@@ -177,7 +203,9 @@ final class SearchQueryVO extends AbstractValueObject
     }
 
     /**
-     * Vérifie si la requête est vide.
+     * Checks if the query is empty.
+     *
+     * @return bool True if the query has no n-grams
      */
     public function isEmpty(): bool
     {
@@ -185,7 +213,9 @@ final class SearchQueryVO extends AbstractValueObject
     }
 
     /**
-     * Retourne la représentation brute.
+     * Returns the raw query string.
+     *
+     * @return string The raw query string
      */
     public function getRaw(): string
     {

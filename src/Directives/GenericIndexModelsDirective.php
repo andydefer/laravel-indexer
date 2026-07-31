@@ -11,8 +11,35 @@ use AndyDefer\LaravelIndexer\Contracts\Configs\IndexerConfigInterface;
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
 use Throwable;
 
+/**
+ * CLI directive for indexing Eloquent models.
+ *
+ * This directive provides a command-line interface to index, reindex, count,
+ * and delete indexed documents for configured model classes.
+ *
+ * Usage examples:
+ *   # Index models
+ *   bin/directive index:models [App.Models.User,App.Models.Hospital]
+ *
+ *   # Reindex all models (delete then reindex)
+ *   bin/directive index:models [App.Models.User,App.Models.Hospital] --reindex
+ *
+ *   # Count indexed documents
+ *   bin/directive index:models [App.Models.User] --count
+ *
+ *   # Delete all indexed documents
+ *   bin/directive index:models [App.Models.User] --delete
+ *
+ *   # Customize batch size and limit
+ *   bin/directive index:models 10 50 [App.Models.User]
+ *
+ * @see AbstractDirective
+ */
 final class GenericIndexModelsDirective extends AbstractDirective
 {
+    /**
+     * {@inheritDoc}
+     */
     public function getSignature(): string
     {
         return 'index:models 
@@ -24,11 +51,17 @@ final class GenericIndexModelsDirective extends AbstractDirective
                 {--delete}#"Delete all indexed documents"';
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getDescription(): string
     {
         return 'Index models from config (App.Models.User, App.Models.Hospital, etc.) with dynamic clusters';
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getAliases(): StringTypedCollection
     {
         $aliases = new StringTypedCollection;
@@ -38,11 +71,17 @@ final class GenericIndexModelsDirective extends AbstractDirective
         return $aliases;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function shouldBootLaravel(): bool
     {
         return true;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function execute(): ExitCode
     {
         try {
@@ -85,7 +124,6 @@ final class GenericIndexModelsDirective extends AbstractDirective
             }
 
             return $this->handleIndex($genericIndexer, $modelClasses, $batchSize, $limit);
-
         } catch (Throwable $e) {
             $this->error('❌ '.$e->getMessage());
 
@@ -93,6 +131,15 @@ final class GenericIndexModelsDirective extends AbstractDirective
         }
     }
 
+    /**
+     * Resolves dot-notation model names to fully-qualified class names.
+     *
+     * Validates that each class exists and is configured in the indexer config.
+     *
+     * @param  string[]  $models  The model names in dot notation
+     * @param  IndexerConfigInterface  $indexerConfig  The configuration instance
+     * @return string[] The resolved fully-qualified class names
+     */
     private function resolveModelClasses(array $models, IndexerConfigInterface $indexerConfig): array
     {
         $validClasses = $indexerConfig->getModelIndexables();
@@ -126,11 +173,24 @@ final class GenericIndexModelsDirective extends AbstractDirective
         return $resolved;
     }
 
+    /**
+     * Returns a human-readable label for a model class.
+     *
+     * @param  string  $modelClass  The fully-qualified model class name
+     * @return string The model label
+     */
     private function getModelLabel(string $modelClass): string
     {
         return $modelClass;
     }
 
+    /**
+     * Handles the count operation for one or more model classes.
+     *
+     * @param  GenericIndexerInterface  $genericIndexer  The indexer service
+     * @param  string[]  $modelClasses  The model classes to count
+     * @return ExitCode The exit code
+     */
     private function handleCount(GenericIndexerInterface $genericIndexer, array $modelClasses): ExitCode
     {
         $total = 0;
@@ -148,6 +208,13 @@ final class GenericIndexModelsDirective extends AbstractDirective
         return ExitCode::SUCCESS;
     }
 
+    /**
+     * Handles the delete operation for one or more model classes.
+     *
+     * @param  GenericIndexerInterface  $genericIndexer  The indexer service
+     * @param  string[]  $modelClasses  The model classes to delete
+     * @return ExitCode The exit code
+     */
     private function handleDelete(GenericIndexerInterface $genericIndexer, array $modelClasses): ExitCode
     {
         $total = 0;
@@ -165,8 +232,23 @@ final class GenericIndexModelsDirective extends AbstractDirective
         return ExitCode::SUCCESS;
     }
 
-    private function handleReindex(GenericIndexerInterface $genericIndexer, array $modelClasses, int $batchSize, ?int $limit): ExitCode
-    {
+    /**
+     * Handles the reindex operation for one or more model classes.
+     *
+     * Reindexing deletes all existing index entries and creates new ones.
+     *
+     * @param  GenericIndexerInterface  $genericIndexer  The indexer service
+     * @param  string[]  $modelClasses  The model classes to reindex
+     * @param  int  $batchSize  The batch size for chunking
+     * @param  int|null  $limit  The maximum number of items to index
+     * @return ExitCode The exit code
+     */
+    private function handleReindex(
+        GenericIndexerInterface $genericIndexer,
+        array $modelClasses,
+        int $batchSize,
+        ?int $limit
+    ): ExitCode {
         $totalIndexed = 0;
         $totalSkipped = 0;
 
@@ -174,12 +256,10 @@ final class GenericIndexModelsDirective extends AbstractDirective
             $genericIndexer->setBatchSize($batchSize);
             $genericIndexer->setLimit($limit);
 
-            // Compter avant réindexation
             $beforeCount = $genericIndexer->countIndexed($modelClass);
 
             $genericIndexer->reindexAll($modelClass);
 
-            // Compter après réindexation
             $afterCount = $genericIndexer->countIndexed($modelClass);
 
             $indexed = $afterCount;
@@ -200,20 +280,33 @@ final class GenericIndexModelsDirective extends AbstractDirective
         return ExitCode::SUCCESS;
     }
 
-    private function handleIndex(GenericIndexerInterface $genericIndexer, array $modelClasses, int $batchSize, ?int $limit): ExitCode
-    {
+    /**
+     * Handles the index operation for one or more model classes.
+     *
+     * Only new models that are not already indexed will be processed.
+     *
+     * @param  GenericIndexerInterface  $genericIndexer  The indexer service
+     * @param  string[]  $modelClasses  The model classes to index
+     * @param  int  $batchSize  The batch size for chunking
+     * @param  int|null  $limit  The maximum number of items to index
+     * @return ExitCode The exit code
+     */
+    private function handleIndex(
+        GenericIndexerInterface $genericIndexer,
+        array $modelClasses,
+        int $batchSize,
+        ?int $limit
+    ): ExitCode {
         $totalIndexed = 0;
         $totalSkipped = 0;
 
         foreach ($modelClasses as $modelClass) {
-            // Compter avant indexation
             $beforeCount = $genericIndexer->countIndexed($modelClass);
 
             $genericIndexer->setBatchSize($batchSize);
             $genericIndexer->setLimit($limit);
             $genericIndexer->indexAll($modelClass);
 
-            // Compter après indexation
             $afterCount = $genericIndexer->countIndexed($modelClass);
 
             $indexed = $afterCount - $beforeCount;

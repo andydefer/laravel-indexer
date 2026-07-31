@@ -18,9 +18,23 @@ use AndyDefer\Task\ValueObjects\Iso8601DateTimeVO;
 use AndyDefer\Task\ValueObjects\MaxFailedAttemptsVO;
 use AndyDefer\Task\ValueObjects\UniqueTaskFqcnVO;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
+/**
+ * Recurring task that orchestrates the indexing of multiple model classes.
+ *
+ * This task retrieves all configured model classes and dispatches batch
+ * tasks for each chunk of models. It acts as a coordinator that breaks
+ * down large indexing operations into manageable unique tasks.
+ *
+ * The task uses the configured batch size to determine chunk sizes and
+ * registers each chunk as a separate UniqueTask for processing.
+ */
 final class GenericOrchestratorRecurringTask extends AbstractRecurringTask
 {
+    /**
+     * {@inheritDoc}
+     */
     protected function process(): void
     {
         $this->info(new DescriptionVO('Starting generic orchestrator: finding models to index...'));
@@ -42,10 +56,7 @@ final class GenericOrchestratorRecurringTask extends AbstractRecurringTask
             $chunks = $this->getModelChunks($modelClass, $batchSize);
 
             foreach ($chunks as $chunk) {
-                $collection = new IndexableVOCollection;
-                foreach ($chunk as $id) {
-                    $collection->add(new IndexableVO($modelClass, $id));
-                }
+                $collection = $this->buildIndexableCollection($modelClass, $chunk);
 
                 $payload = StrictDataObject::from([
                     'items' => $collection,
@@ -74,12 +85,34 @@ final class GenericOrchestratorRecurringTask extends AbstractRecurringTask
         $this->info(new DescriptionVO("Orchestrator completed: {$totalDispatched} items dispatched in {$totalChunks} batch tasks"));
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    protected function after(bool $success, ?DescriptionVO $error = null): void
+    {
+        if ($success) {
+            $this->info(new DescriptionVO('Generic orchestrator task completed successfully'));
+        } else {
+            $this->error(new DescriptionVO("Generic orchestrator task failed: {$error->getValue()}"));
+        }
+    }
+
+    /**
+     * Retrieves chunks of model IDs for the given model class.
+     *
+     * Models that should not be indexed (according to shouldBeIndexed())
+     * are excluded from the chunks.
+     *
+     * @param  string  $modelClass  The fully-qualified model class name
+     * @param  int  $batchSize  The maximum size of each chunk
+     * @return array<int, array<int, int|string>> An array of ID chunks
+     */
     private function getModelChunks(string $modelClass, int $batchSize): array
     {
-        /** @var Model $modelClass */
+        /** @var class-string<Model> $modelClass */
         $chunks = [];
 
-        $modelClass::chunk($batchSize, function ($models) use (&$chunks) {
+        $modelClass::chunk($batchSize, function (Collection $models) use (&$chunks) {
             $ids = [];
 
             foreach ($models as $model) {
@@ -96,13 +129,21 @@ final class GenericOrchestratorRecurringTask extends AbstractRecurringTask
         return $chunks;
     }
 
-    protected function after(bool $success, ?DescriptionVO $error = null): void
+    /**
+     * Builds an IndexableVOCollection from a chunk of model IDs.
+     *
+     * @param  string  $modelClass  The model class name
+     * @param  array<int, int|string>  $chunk  The chunk of model IDs
+     * @return IndexableVOCollection The collection of indexable value objects
+     */
+    private function buildIndexableCollection(string $modelClass, array $chunk): IndexableVOCollection
     {
+        $collection = new IndexableVOCollection;
 
-        if ($success) {
-            $this->info(new DescriptionVO('Generic orchestrator task completed successfully'));
-        } else {
-            $this->error(new DescriptionVO("Generic orchestrator task failed: {$error->getValue()}"));
+        foreach ($chunk as $id) {
+            $collection->add(new IndexableVO($modelClass, $id));
         }
+
+        return $collection;
     }
 }

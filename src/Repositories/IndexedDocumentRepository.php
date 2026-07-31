@@ -18,6 +18,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
+ * Repository implementation for IndexedDocument models.
+ *
  * @extends AbstractRepository<IndexedDocument, IndexedDocumentRecord>
  */
 final class IndexedDocumentRepository extends AbstractRepository implements IndexedDocumentRepositoryInterface
@@ -27,13 +29,17 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         parent::__construct(IndexedDocument::class, IndexedDocumentRecord::class);
     }
 
-    // ==================== PUBLIC METHODS ====================
-
+    /**
+     * {@inheritDoc}
+     */
     public function getModel(): Model
     {
         return $this->model;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function findByFingerPrint(IndexableFingerPrintVO $fingerprint): ?IndexedDocument
     {
         return $this->model->newQuery()
@@ -41,6 +47,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->first();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function findByFingerprintString(string $fingerprint): ?IndexedDocument
     {
         return $this->model->newQuery()
@@ -48,6 +57,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->first();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function findByNamespace(string $namespace): Collection
     {
         return $this->model->newQuery()
@@ -55,6 +67,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->get();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function findByClusterQuery(
         string $query,
         string $column = 'cluster',
@@ -65,6 +80,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->get();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function findByIds(array $ids): Collection
     {
         if (empty($ids)) {
@@ -76,6 +94,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->get();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function deleteByFingerPrint(IndexableFingerPrintVO $fingerprint): int
     {
         return $this->model->newQuery()
@@ -83,6 +104,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->delete();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function deleteByFingerprintString(string $fingerprint): int
     {
         return $this->model->newQuery()
@@ -90,6 +114,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->delete();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function deleteByNamespace(string $namespace): int
     {
         return $this->model->newQuery()
@@ -97,6 +124,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->delete();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function deleteByClusterQuery(
         string $query,
         string $column = 'cluster'
@@ -106,6 +136,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->delete();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function countByNamespace(string $namespace): int
     {
         return $this->model->newQuery()
@@ -113,6 +146,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->count();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function countByClusterQuery(
         string $query,
         string $column = 'cluster'
@@ -122,6 +158,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->count();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function existsByFingerPrint(IndexableFingerPrintVO $fingerprint): bool
     {
         return $this->model->newQuery()
@@ -129,6 +168,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->exists();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function existsByNamespace(string $namespace): bool
     {
         return $this->model->newQuery()
@@ -136,6 +178,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->exists();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function existsByClusterQuery(
         string $query,
         string $column = 'cluster'
@@ -145,6 +190,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->exists();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getDistinctNamespaces(): Collection
     {
         $documents = $this->model->newQuery()
@@ -164,6 +212,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         return $namespaces;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getDistinctClusterKeys(): Collection
     {
         $driver = $this->detectDriver();
@@ -177,6 +228,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         return $this->normalizeKeys($rawKeys);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getDistinctClusterValues(string $key): Collection
     {
         $driver = $this->detectDriver();
@@ -190,6 +244,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         return $this->normalizeValues($rawValues);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function findAllWithTokens(): Collection
     {
         return $this->model->newQuery()
@@ -197,6 +254,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->get();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function createMany(array $records): array
     {
         if (empty($records)) {
@@ -226,8 +286,9 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             ->all();
     }
 
-    // ==================== PROTECTED METHODS ====================
-
+    /**
+     * {@inheritDoc}
+     */
     protected function applyFilters(Builder $query, AbstractRecord $filters): void
     {
         if (! $filters instanceof IndexedDocumentFiltersRecord) {

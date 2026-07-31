@@ -8,6 +8,13 @@ use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
 use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
 use AndyDefer\Repository\ValueObjects\ClusterQueries;
 
+/**
+ * Record representing a search query.
+ *
+ * Encapsulates all parameters of a search operation, including the
+ * search query itself, cluster filters, n-gram size constraints,
+ * and result limit.
+ */
 final class SearchQueryRecord extends AbstractRecord
 {
     public function __construct(

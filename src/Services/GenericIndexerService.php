@@ -15,10 +15,26 @@ use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
+/**
+ * Generic indexer service implementation.
+ *
+ * Provides a high-level API for indexing, refreshing, deleting, and
+ * querying Eloquent models that implement the Indexable contract.
+ *
+ * This service handles the orchestration between the underlying indexer
+ * and the repository, managing batch processing and fingerprint-based
+ * operations.
+ */
 final class GenericIndexerService implements GenericIndexerInterface
 {
+    /**
+     * The number of models to process per batch.
+     */
     private int $batchSize;
 
+    /**
+     * The maximum number of models to process, or null for no limit.
+     */
     private ?int $limit = null;
 
     public function __construct(
@@ -30,9 +46,12 @@ final class GenericIndexerService implements GenericIndexerInterface
     }
 
     // ============================================================
-    // PUBLIC METHODS
+    // Public Methods
     // ============================================================
 
+    /**
+     * {@inheritDoc}
+     */
     public function setBatchSize(int $batchSize): self
     {
         $this->batchSize = $batchSize;
@@ -40,6 +59,9 @@ final class GenericIndexerService implements GenericIndexerInterface
         return $this;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function setLimit(?int $limit): self
     {
         $this->limit = $limit;
@@ -59,7 +81,11 @@ final class GenericIndexerService implements GenericIndexerInterface
         $cluster = $model->getIndexableCluster();
         $record = IndexableRecordFactory::convert($model, $cluster);
 
-        $fingerprint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
+        $fingerprint = IndexableFingerPrintVO::fromParts(
+            $model->getMorphClass(),
+            (string) $model->getKey()
+        );
+
         if ($this->documentRepository->existsByFingerPrint($fingerprint)) {
             $this->indexer->refresh($record);
         } else {
@@ -107,13 +133,15 @@ final class GenericIndexerService implements GenericIndexerInterface
                     continue;
                 }
 
-                $fingerprint = IndexableFingerPrintVO::fromParts($model->getMorphClass(), (string) $model->getKey());
+                $fingerprint = IndexableFingerPrintVO::fromParts(
+                    $model->getMorphClass(),
+                    (string) $model->getKey()
+                );
 
                 if ($this->documentRepository->existsByFingerPrint($fingerprint)) {
                     $this->documentRepository->deleteByFingerPrint($fingerprint);
                 }
 
-                // ✅ Utiliser le cluster dynamique du modèle (OBLIGATOIRE)
                 $cluster = $model->getIndexableCluster();
                 $record = IndexableRecordFactory::convert($model, $cluster);
                 $records->add($record);
@@ -186,7 +214,6 @@ final class GenericIndexerService implements GenericIndexerInterface
         $this->indexer->delete($fingerprint);
 
         if ($model->shouldBeIndexed()) {
-            // ✅ Utiliser le cluster dynamique du modèle (OBLIGATOIRE)
             $cluster = $model->getIndexableCluster();
             $record = IndexableRecordFactory::convert($model, $cluster);
             $this->indexer->refresh($record);

@@ -6,11 +6,18 @@ namespace AndyDefer\LaravelIndexer\ValueObjects;
 
 use AndyDefer\DomainStructures\Abstracts\AbstractValueObject;
 use AndyDefer\DomainStructures\Utils\Associative;
+use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
 use AndyDefer\Repository\Exceptions\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 
+/**
+ * Value Object representing an indexable entity.
+ *
+ * Holds a model class name and its ID, providing methods to retrieve
+ * the model instance and to validate that the class implements Indexable.
+ */
 final class IndexableVO extends AbstractValueObject
 {
     private readonly string $modelClass;
@@ -26,6 +33,13 @@ final class IndexableVO extends AbstractValueObject
         $this->id = $id;
     }
 
+    /**
+     * Validates that the class exists and implements Indexable.
+     *
+     * @param  string  $modelClass  The model class name
+     *
+     * @throws InvalidArgumentException If the class is invalid
+     */
     private function validate(string $modelClass): void
     {
         if (! class_exists($modelClass)) {
@@ -39,21 +53,32 @@ final class IndexableVO extends AbstractValueObject
         }
     }
 
+    /**
+     * Returns the model class name.
+     *
+     * @return string The fully-qualified model class name
+     */
     public function getModelClass(): string
     {
         return $this->modelClass;
     }
 
+    /**
+     * Returns the entity ID.
+     *
+     * @return int|string The entity ID
+     */
     public function getId(): int|string
     {
         return $this->id;
     }
 
     /**
-     * Récupère l'instance du modèle.
+     * Retrieves the model instance.
      *
+     * @return Model&Indexable The model instance
      *
-     * @throws ModelNotFoundException
+     * @throws ModelNotFoundException If the model is not found
      */
     public function getInstance(): Model&Indexable
     {
@@ -69,10 +94,15 @@ final class IndexableVO extends AbstractValueObject
         return $model;
     }
 
-    public function getValue(): Associative
+    /**
+     * Returns the value as an associative array.
+     *
+     * @return StrictAssociative The value object as an associative array
+     */
+    public function getValue(): StrictAssociative
     {
-        return Associative::from([
-            'modelClass' => $this->modelClass,
+        return StrictAssociative::from([
+            'model_class' => $this->modelClass,
             'id' => $this->id,
         ]);
     }

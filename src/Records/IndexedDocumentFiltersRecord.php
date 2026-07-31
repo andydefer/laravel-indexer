@@ -8,6 +8,12 @@ use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
 use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
+/**
+ * Filter record for querying indexed documents.
+ *
+ * Provides a typed DTO for filtering document queries with various criteria
+ * such as ID, fingerprint, namespace, entity ID, and cluster conditions.
+ */
 final class IndexedDocumentFiltersRecord extends AbstractRecord
 {
     public function __construct(

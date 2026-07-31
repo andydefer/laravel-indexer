@@ -8,9 +8,9 @@ use AndyDefer\DomainStructures\Abstracts\AbstractValueObject;
 use InvalidArgumentException;
 
 /**
- * Value Object représentant un fingerprint d'entité indexable.
+ * Value Object representing an indexable entity fingerprint.
  *
- * Format: "{namespace}|{id}" où namespace est le FQCN avec des backslashes.
+ * Format: "{namespace}|{id}" where namespace is the FQCN with backslashes.
  *
  * @example
  * $fingerprint = new IndexableFingerPrintVO('App\Models\User|123');
@@ -32,6 +32,13 @@ final class IndexableFingerPrintVO extends AbstractValueObject
         $this->parse($value);
     }
 
+    /**
+     * Validates the fingerprint format.
+     *
+     * @param  string  $value  The raw fingerprint string
+     *
+     * @throws InvalidArgumentException If the format is invalid
+     */
     private function validate(string $value): void
     {
         if (empty($value)) {
@@ -66,36 +73,75 @@ final class IndexableFingerPrintVO extends AbstractValueObject
         $this->id = $id;
     }
 
+    /**
+     * Parses the fingerprint string into namespace and ID components.
+     *
+     * @param  string  $value  The raw fingerprint string
+     */
     private function parse(string $value): void
     {
         [$this->namespace, $this->id] = explode(self::SEPARATOR, $value, 2);
     }
 
+    /**
+     * Returns the entity ID.
+     *
+     * @return string The entity ID
+     */
     public function getId(): string
     {
         return $this->id;
     }
 
+    /**
+     * Returns the namespace.
+     *
+     * @return string The namespace (e.g., 'App\Models\User')
+     */
     public function getNamespace(): string
     {
         return $this->namespace;
     }
 
+    /**
+     * Returns the full fingerprint string.
+     *
+     * @return string The full fingerprint
+     */
     public function getValue(): string
     {
         return $this->namespace.self::SEPARATOR.$this->id;
     }
 
+    /**
+     * Checks if the fingerprint belongs to the given namespace.
+     *
+     * @param  string  $namespace  The namespace to check
+     * @return bool True if the fingerprint belongs to the namespace
+     */
     public function belongsTo(string $namespace): bool
     {
         return $this->namespace === $namespace;
     }
 
+    /**
+     * Checks if the fingerprint belongs to any of the given namespaces.
+     *
+     * @param  string[]  $namespaces  The namespaces to check
+     * @return bool True if the fingerprint belongs to any of the namespaces
+     */
     public function belongsToAny(array $namespaces): bool
     {
         return in_array($this->namespace, $namespaces, true);
     }
 
+    /**
+     * Creates a new instance from namespace and ID parts.
+     *
+     * @param  string  $namespace  The namespace
+     * @param  string  $id  The entity ID
+     * @return self A new fingerprint instance
+     */
     public static function fromParts(string $namespace, string $id): self
     {
         return new self($namespace.self::SEPARATOR.$id);

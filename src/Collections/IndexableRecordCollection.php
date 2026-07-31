@@ -10,7 +10,10 @@ use AndyDefer\LaravelCluster\Collections\ClusterVOCollection;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 
 /**
- * Collection spécialisée pour les IndexedDocumentRecord.
+ * A typed collection for IndexedDocumentRecord objects.
+ *
+ * Provides specialized filtering, grouping, and data extraction methods
+ * for working with collections of indexed document records.
  *
  * @method IndexedDocumentRecord|null first()
  * @method IndexedDocumentRecord|null last()
@@ -32,9 +35,10 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Découpe la collection en chunks de taille donnée.
+     * Splits the collection into chunks of the specified size.
      *
-     * @return array<int, self>
+     * @param  int  $size  The maximum size of each chunk
+     * @return array<int, self> An array of collection chunks
      */
     public function chunk(int $size): array
     {
@@ -43,61 +47,74 @@ final class IndexableRecordCollection extends TypedCollection
         }
 
         $chunks = [];
-        $chunk = new self;
+        $currentChunk = new self;
 
         foreach ($this->items as $item) {
-            $chunk->add($item);
+            $currentChunk->add($item);
 
-            if ($chunk->count() >= $size) {
-                $chunks[] = $chunk;
-                $chunk = new self;
+            if ($currentChunk->count() >= $size) {
+                $chunks[] = $currentChunk;
+                $currentChunk = new self;
             }
         }
 
-        if ($chunk->isNotEmpty()) {
-            $chunks[] = $chunk;
+        if ($currentChunk->isNotEmpty()) {
+            $chunks[] = $currentChunk;
         }
 
         return $chunks;
     }
 
     /**
-     * Filtre par namespace
+     * Returns a new collection containing only records belonging to the given namespace.
+     *
+     * @param  string  $namespace  The namespace to filter by
+     * @return self A new collection with matching items
      */
     public function filterByNamespace(string $namespace): self
     {
         return $this->filter(
-            fn (IndexedDocumentRecord $record) => $record->fingerprint->belongsTo($namespace)
+            fn (IndexedDocumentRecord $record): bool => $record->fingerprint->belongsTo($namespace)
         );
     }
 
     /**
-     * Filtre par multiple namespaces
+     * Returns a new collection containing records belonging to any of the given namespaces.
+     *
+     * @param  string[]  $namespaces  List of namespaces to filter by
+     * @return self A new collection with matching items
      */
     public function filterByNamespaces(array $namespaces): self
     {
         return $this->filter(
-            fn (IndexedDocumentRecord $record) => $record->fingerprint->belongsToAny($namespaces)
+            fn (IndexedDocumentRecord $record): bool => $record->fingerprint->belongsToAny($namespaces)
         );
     }
 
     /**
-     * Filtre par cluster
+     * Returns a new collection containing records matching the given cluster key/value pair.
+     *
+     * @param  string  $key  The cluster key to match
+     * @param  string  $value  The cluster value to match
+     * @return self A new collection with matching items
      */
     public function filterByCluster(string $key, string $value): self
     {
         return $this->filter(
-            fn (IndexedDocumentRecord $record) => $record->cluster->get($key) === $value
+            fn (IndexedDocumentRecord $record): bool => $record->cluster->get($key) === $value
         );
     }
 
     /**
-     * Filtre par multiple clusters
+     * Returns a new collection containing records matching all given cluster key/value pairs.
+     *
+     * @param  array<string, string>  $clusters  Associative array of key => value pairs
+     * @return self A new collection with matching items
      */
     public function filterByClusters(array $clusters): self
     {
         return $this->filter(
-            function (IndexedDocumentRecord $record) use ($clusters) {
+            function (IndexedDocumentRecord $record) use ($clusters): bool {
                 foreach ($clusters as $key => $value) {
                     if ($record->cluster->get($key) !== $value) {
                         return false;
@@ -110,34 +127,44 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Filtre par champ de données
+     * Returns a new collection containing records with a data field matching the given value.
+     *
+     * @param  string  $field  The data field name
+     * @param  mixed  $value  The expected value (strict comparison)
+     * @return self A new collection with matching items
      */
     public function filterByDataField(string $field, mixed $value): self
     {
         return $this->filter(
-            fn (IndexedDocumentRecord $record) => ($record->data[$field] ?? null) === $value
+            fn (IndexedDocumentRecord $record): bool => ($record->data[$field] ?? null) === $value
         );
     }
 
     /**
-     * Récupère tous les fingerprints
+     * Extracts all fingerprints from the records in the collection.
+     *
+     * @return IndexableFingerPrintVOCollection A collection of all fingerprints
      */
-    public function getFingerPrints(): IndexableFingerPrintVOCollection
+    public function getFingerprints(): IndexableFingerPrintVOCollection
     {
-        $fingerPrints = new IndexableFingerPrintVOCollection;
+        $fingerprints = new IndexableFingerPrintVOCollection;
+
         foreach ($this->items as $record) {
-            $fingerPrints->add($record->fingerprint);
+            $fingerprints->add($record->fingerprint);
         }
 
-        return $fingerPrints;
+        return $fingerprints;
     }
 
     /**
-     * Récupère tous les clusters
+     * Extracts all clusters from the records in the collection.
+     *
+     * @return ClusterVOCollection A collection of all clusters
      */
     public function getClusters(): ClusterVOCollection
     {
         $clusters = new ClusterVOCollection;
+
         foreach ($this->items as $record) {
             $clusters->add($record->cluster);
         }
@@ -146,11 +173,14 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Récupère les IDs sous forme de StringTypedCollection
+     * Extracts all entity IDs from the records in the collection.
+     *
+     * @return StringTypedCollection A collection of entity IDs as strings
      */
-    public function getIdValues(): StringTypedCollection
+    public function getIds(): StringTypedCollection
     {
         $ids = new StringTypedCollection;
+
         foreach ($this->items as $record) {
             $ids->add($record->fingerprint->getId());
         }
@@ -159,11 +189,14 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Récupère les noms de champs uniques présents dans les données
+     * Returns a collection of all unique data field names present in the records.
+     *
+     * @return StringTypedCollection A collection of unique field names
      */
     public function getUniqueDataFields(): StringTypedCollection
     {
         $fields = new StringTypedCollection;
+
         foreach ($this->items as $record) {
             foreach (array_keys($record->data->toArray()) as $field) {
                 if (! $fields->contains($field)) {
@@ -176,18 +209,21 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Groupe par namespace
+     * Groups records by their namespace.
      *
-     * @return array<string, self>
+     * @return array<string, self> An associative array mapping namespace to a collection of records
      */
     public function groupByNamespace(): array
     {
         $groups = [];
+
         foreach ($this->items as $record) {
             $namespace = $record->fingerprint->getNamespace();
+
             if (! isset($groups[$namespace])) {
                 $groups[$namespace] = new self;
             }
+
             $groups[$namespace]->add($record);
         }
 
@@ -195,18 +231,24 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Groupe par cluster
+     * Groups records by a specific cluster key's value.
      *
-     * @return array<string, self>
+     * Records with a null or missing value are grouped under the key 'null'.
+     *
+     * @param  string  $key  The cluster key to group by
+     * @return array<string, self> An associative array mapping value to a collection of records
      */
     public function groupByClusterKey(string $key): array
     {
         $groups = [];
+
         foreach ($this->items as $record) {
             $value = $record->cluster->get($key) ?? 'null';
+
             if (! isset($groups[$value])) {
                 $groups[$value] = new self;
             }
+
             $groups[$value]->add($record);
         }
 
@@ -214,25 +256,34 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Recherche dans les données avec un callback
+     * Filters records using a callback that operates on their data payload.
+     *
+     * @param  callable(StrictAssociative): bool  $callback  The filter callback
+     * @return self A new collection with matching items
      */
     public function searchData(callable $callback): self
     {
         return $this->filter(
-            fn (IndexedDocumentRecord $record) => $callback($record->data)
+            fn (IndexedDocumentRecord $record): bool => $callback($record->data)
         );
     }
 
     /**
-     * Recherche un texte dans tous les champs de données
+     * Filters records containing the given text in any of their data fields.
+     *
+     * The search is case-insensitive and only works on string values.
+     *
+     * @param  string  $search  The text to search for
+     * @return self A new collection with matching items
      */
     public function searchTextInData(string $search): self
     {
+        $searchLower = strtolower($search);
+
         return $this->filter(
-            function (IndexedDocumentRecord $record) use ($search) {
-                $search = strtolower($search);
+            function (IndexedDocumentRecord $record) use ($searchLower): bool {
                 foreach ($record->data->toArray() as $value) {
-                    if (is_string($value) && str_contains(strtolower($value), $search)) {
+                    if (is_string($value) && str_contains(strtolower($value), $searchLower)) {
                         return true;
                     }
                 }
@@ -243,35 +294,44 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Récupère les enregistrements qui contiennent un champ spécifique
+     * Returns a new collection containing records that have the specified data field.
+     *
+     * @param  string  $field  The data field name to check for
+     * @return self A new collection with matching items
      */
     public function hasDataField(string $field): self
     {
         return $this->filter(
-            fn (IndexedDocumentRecord $record) => isset($record->data[$field])
+            fn (IndexedDocumentRecord $record): bool => isset($record->data[$field])
         );
     }
 
     /**
-     * Trie par un champ de données
+     * Sorts the collection by a data field value.
+     *
+     * @param  string  $field  The data field to sort by
+     * @param  bool  $ascending  True for ascending order, false for descending
+     * @return self A new sorted collection
      */
     public function sortByDataField(string $field, bool $ascending = true): self
     {
         $sorted = $this->items;
-        usort($sorted, function (IndexedDocumentRecord $a, IndexedDocumentRecord $b) use ($field, $ascending) {
-            $valA = $a->data[$field] ?? null;
-            $valB = $b->data[$field] ?? null;
 
-            if ($valA === $valB) {
+        usort($sorted, function (IndexedDocumentRecord $a, IndexedDocumentRecord $b) use ($field, $ascending): int {
+            $valueA = $a->data[$field] ?? null;
+            $valueB = $b->data[$field] ?? null;
+
+            if ($valueA === $valueB) {
                 return 0;
             }
 
-            $comparison = $valA < $valB ? -1 : 1;
+            $comparison = $valueA < $valueB ? -1 : 1;
 
             return $ascending ? $comparison : -$comparison;
         });
 
         $newCollection = new self;
+
         foreach ($sorted as $item) {
             $newCollection->add($item);
         }
@@ -280,14 +340,21 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Récupère les valeurs d'un champ de données
+     * Extracts values from a specific data field across all records.
+     *
+     * Only scalar values are included in the result.
+     *
+     * @param  string  $field  The data field to pluck
+     * @return StringTypedCollection A collection of scalar values as strings
      */
     public function pluckDataField(string $field): StringTypedCollection
     {
         $values = new StringTypedCollection;
+
         foreach ($this->items as $record) {
             if (isset($record->data[$field])) {
                 $value = $record->data[$field];
+
                 if (is_scalar($value)) {
                     $values->add((string) $value);
                 }
@@ -298,7 +365,10 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Vérifie si un ID spécifique existe
+     * Checks if any record in the collection has the given entity ID.
+     *
+     * @param  string  $id  The entity ID to check for
+     * @return bool True if at least one record matches
      */
     public function containsId(string $id): bool
     {
@@ -312,7 +382,10 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Vérifie si un namespace spécifique existe
+     * Checks if any record in the collection belongs to the given namespace.
+     *
+     * @param  string  $namespace  The namespace to check for
+     * @return bool True if at least one record matches
      */
     public function containsNamespace(string $namespace): bool
     {
@@ -326,7 +399,10 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Récupère un enregistrement par ID
+     * Finds a record by its entity ID.
+     *
+     * @param  string  $id  The entity ID to search for
+     * @return IndexedDocumentRecord|null The matching record, or null if not found
      */
     public function findById(string $id): ?IndexedDocumentRecord
     {
@@ -340,7 +416,11 @@ final class IndexableRecordCollection extends TypedCollection
     }
 
     /**
-     * Récupère un enregistrement par ID et namespace
+     * Finds a record by its entity ID and namespace combination.
+     *
+     * @param  string  $id  The entity ID to search for
+     * @param  string  $namespace  The namespace to match
+     * @return IndexedDocumentRecord|null The matching record, or null if not found
      */
     public function findByIdAndNamespace(string $id, string $namespace): ?IndexedDocumentRecord
     {

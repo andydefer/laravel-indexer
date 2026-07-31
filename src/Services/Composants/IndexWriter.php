@@ -17,6 +17,12 @@ use AndyDefer\PhpServices\Enums\NormalizationMode;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
+/**
+ * Service for writing tokens to the index.
+ *
+ * Handles token generation, buffering, and batch insertion for efficient
+ * indexing of document content.
+ */
 final class IndexWriter
 {
     /** @var array<string, array<string, mixed>> */
@@ -39,6 +45,11 @@ final class IndexWriter
         private readonly IndexerConfigInterface $config,
     ) {}
 
+    /**
+     * Indexes a single document record.
+     *
+     * @param  IndexedDocumentRecord  $entity  The document record to index
+     */
     public function index(IndexedDocumentRecord $entity): void
     {
         $this->resetBuffers();
@@ -52,6 +63,11 @@ final class IndexWriter
         $this->currentDocumentId = null;
     }
 
+    /**
+     * Indexes multiple document records.
+     *
+     * @param  IndexableRecordCollection  $records  The collection of document records to index
+     */
     public function indexMany(IndexableRecordCollection $records): void
     {
         $this->resetBuffers();
@@ -67,6 +83,12 @@ final class IndexWriter
         $this->currentDocumentId = null;
     }
 
+    /**
+     * Creates a new document from a record.
+     *
+     * @param  IndexedDocumentRecord  $record  The document record
+     * @return IndexedDocument The created document
+     */
     private function createDocument(IndexedDocumentRecord $record): IndexedDocument
     {
         $documentRecord = new IndexedDocumentRecord(
@@ -78,12 +100,22 @@ final class IndexWriter
         return $this->documentRepository->create($documentRecord);
     }
 
+    /**
+     * Resets the token and increment buffers.
+     */
     private function resetBuffers(): void
     {
         $this->tokenBuffer = [];
         $this->incrementBuffer = [];
     }
 
+    /**
+     * Indexes document data recursively.
+     *
+     * @param  IndexedDocument  $document  The document being indexed
+     * @param  array<string, mixed>  $data  The data to index
+     * @param  string  $prefix  The field prefix for nested data
+     */
     private function indexDocumentData(IndexedDocument $document, array $data, string $prefix = ''): void
     {
         foreach ($data as $key => $value) {
@@ -91,10 +123,8 @@ final class IndexWriter
 
             if (is_array($value)) {
                 if ($this->isAssociativeArray($value)) {
-                    // ✅ Traitement récursif pour les tableaux associatifs
                     $this->indexDocumentData($document, $value, $field);
                 } else {
-                    // ✅ Tableau indexé : concaténer les valeurs
                     $concatenated = implode('; ', $value);
                     $this->extractAndBufferTokens($document->id, $field, $concatenated);
                 }
@@ -103,7 +133,6 @@ final class IndexWriter
             }
 
             if (is_numeric($value) || is_bool($value)) {
-                // ✅ Convertir les valeurs non-string en string
                 $this->extractAndBufferTokens($document->id, $field, (string) $value);
 
                 continue;
@@ -117,11 +146,24 @@ final class IndexWriter
         }
     }
 
+    /**
+     * Checks if an array is associative (not sequentially indexed).
+     *
+     * @param  array<int|string, mixed>  $array  The array to check
+     * @return bool True if the array is associative
+     */
     private function isAssociativeArray(array $array): bool
     {
         return array_keys($array) !== range(0, count($array) - 1);
     }
 
+    /**
+     * Extracts tokens from a text value and adds them to the buffer.
+     *
+     * @param  string  $documentId  The document ID
+     * @param  string  $field  The field name
+     * @param  string  $value  The text value to tokenize
+     */
     private function extractAndBufferTokens(string $documentId, string $field, string $value): void
     {
         $minSize = $this->config->getNgramMinSize();
@@ -144,6 +186,15 @@ final class IndexWriter
         $this->extractAndBufferTokensShort($documentId, $field, $value, $minSize, $maxSize);
     }
 
+    /**
+     * Extracts tokens from short text (under full text max length).
+     *
+     * @param  string  $documentId  The document ID
+     * @param  string  $field  The field name
+     * @param  string  $value  The text value to tokenize
+     * @param  int  $minSize  The minimum n-gram size
+     * @param  int  $maxSize  The maximum n-gram size
+     */
     private function extractAndBufferTokensShort(
         string $documentId,
         string $field,
@@ -169,6 +220,17 @@ final class IndexWriter
         }
     }
 
+    /**
+     * Extracts tokens from long text (over full text max length).
+     *
+     * Splits long text into chunks and processes each chunk separately.
+     *
+     * @param  string  $documentId  The document ID
+     * @param  string  $field  The field name
+     * @param  string  $value  The text value to tokenize
+     * @param  int  $minSize  The minimum n-gram size
+     * @param  int  $maxSize  The maximum n-gram size
+     */
     private function extractAndBufferTokensLong(
         string $documentId,
         string $field,
@@ -246,6 +308,16 @@ final class IndexWriter
         }
     }
 
+    /**
+     * Processes a single word to generate lexical and metaphone n-grams.
+     *
+     * @param  string  $documentId  The document ID
+     * @param  string  $field  The field name
+     * @param  string  $normalizedWord  The normalized word
+     * @param  string  $originalWord  The original word
+     * @param  int  $minSize  The minimum n-gram size
+     * @param  int  $maxSize  The maximum n-gram size
+     */
     private function processWord(
         string $documentId,
         string $field,
@@ -256,7 +328,6 @@ final class IndexWriter
     ): void {
         $phoneticMinSize = max(1, $minSize - 1);
 
-        // ✅ Génération des n-grams lexicaux
         $ngrams = $this->ngramGenerator->generate(
             $normalizedWord,
             $minSize,
@@ -268,7 +339,6 @@ final class IndexWriter
             $this->addToBuffer($documentId, $ngram, $field, GramType::LEXICAL, $originalWord);
         }
 
-        // ✅ Génération des n-grams phonétiques
         $metaphone = metaphone($normalizedWord);
         if ($metaphone !== false && ! empty($metaphone)) {
             $metaphoneNgrams = $this->ngramGenerator->generate(
@@ -284,6 +354,15 @@ final class IndexWriter
         }
     }
 
+    /**
+     * Adds a token to the buffer or increments its frequency.
+     *
+     * @param  string  $documentId  The document ID
+     * @param  string  $token  The token value
+     * @param  string  $field  The field name
+     * @param  GramType  $type  The token type
+     * @param  string  $originalText  The original text
+     */
     private function addToBuffer(string $documentId, string $token, string $field, GramType $type, string $originalText): void
     {
         $key = $documentId.'|'.$token.'|'.$field.'|'.$type->value;
@@ -318,6 +397,12 @@ final class IndexWriter
         }
     }
 
+    /**
+     * Flushes the token and increment buffers to the database.
+     *
+     *
+     * @throws \RuntimeException If the flush operation fails
+     */
     private function flushTokens(): void
     {
         if (empty($this->tokenBuffer) && empty($this->incrementBuffer)) {
@@ -327,7 +412,6 @@ final class IndexWriter
         try {
             DB::beginTransaction();
 
-            // ✅ Créer les nouveaux tokens
             if (! empty($this->tokenBuffer)) {
                 $toCreate = array_values($this->tokenBuffer);
 
@@ -336,7 +420,6 @@ final class IndexWriter
                 }
             }
 
-            // ✅ Mettre à jour les tokens existants
             if (! empty($this->incrementBuffer)) {
                 foreach ($this->incrementBuffer as $key => $count) {
                     $parts = explode('|', $key);
@@ -361,6 +444,12 @@ final class IndexWriter
         $this->resetBuffers();
     }
 
+    /**
+     * Extracts words from text while preserving original case.
+     *
+     * @param  string  $text  The text to extract words from
+     * @return array<int, string> The extracted words
+     */
     private function extractWordsWithOriginalCase(string $text): array
     {
         $words = preg_split('/[\s\-_\/]+/', $text, -1, PREG_SPLIT_NO_EMPTY);

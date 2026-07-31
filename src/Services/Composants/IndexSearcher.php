@@ -18,6 +18,12 @@ use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
 use AndyDefer\Repository\ValueObjects\ClusterQueries;
 use Illuminate\Support\Collection;
 
+/**
+ * Service for searching indexed documents.
+ *
+ * Provides full-text search capabilities with support for lexical and
+ * metaphone token matching, cluster-based filtering, and n-gram generation.
+ */
 final class IndexSearcher
 {
     public function __construct(
@@ -28,11 +34,23 @@ final class IndexSearcher
         private readonly ClusterService $clusterService,
     ) {}
 
+    /**
+     * Checks whether a document exists by its fingerprint.
+     *
+     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint to check
+     * @return bool True if the document exists
+     */
     public function exists(IndexableFingerPrintVO $fingerprint): bool
     {
         return $this->documentRepository->existsByFingerPrint($fingerprint);
     }
 
+    /**
+     * Performs a search using the given query record.
+     *
+     * @param  SearchQueryRecord  $query  The search query configuration
+     * @return IndexableSearchResultCollection The search results
+     */
     public function search(SearchQueryRecord $query): IndexableSearchResultCollection
     {
         $results = new IndexableSearchResultCollection;
@@ -91,6 +109,12 @@ final class IndexSearcher
         return $results;
     }
 
+    /**
+     * Resolves the minimum n-gram size from the query or configuration.
+     *
+     * @param  SearchQueryRecord  $query  The search query
+     * @return int The resolved minimum size
+     */
     private function resolveMinSize(SearchQueryRecord $query): int
     {
         $configMin = $this->config->getNgramMinSize();
@@ -106,6 +130,12 @@ final class IndexSearcher
         return max($configMin, $requestedMin);
     }
 
+    /**
+     * Resolves the maximum n-gram size from the query or configuration.
+     *
+     * @param  SearchQueryRecord  $query  The search query
+     * @return int The resolved maximum size
+     */
     private function resolveMaxSize(SearchQueryRecord $query): int
     {
         $configMin = $this->config->getNgramMinSize();
@@ -121,6 +151,17 @@ final class IndexSearcher
         return min($configMax, $requestedMax);
     }
 
+    /**
+     * Searches for tokens matching the given criteria.
+     *
+     * @param  string  $ngram  The normalized n-gram to search for
+     * @param  array<int, string>  $fields  The fields to search in
+     * @param  ClusterQueries|null  $clusterQueries  The cluster filters to apply
+     * @param  GramType  $type  The token type (LEXICAL or METAPHONE)
+     * @param  int  $minSize  The minimum n-gram size
+     * @param  int  $maxSize  The maximum n-gram size
+     * @return Collection<int, string> The document IDs matching the search
+     */
     private function searchTokens(
         string $ngram,
         array $fields,
@@ -149,7 +190,6 @@ final class IndexSearcher
             $query->whereIn('field', $fields);
         }
 
-        // Appliquer les filtres cluster sur la relation document
         if ($clusterQueries !== null && ! $clusterQueries->isEmpty()) {
             $query->whereHas('document', function ($subQuery) use ($clusterQueries) {
                 foreach ($clusterQueries->all() as $column => $queryExpression) {
@@ -161,6 +201,12 @@ final class IndexSearcher
         return $query->pluck('document_id')->unique()->values();
     }
 
+    /**
+     * Intersects multiple result sets to find common document IDs.
+     *
+     * @param  array<int, Collection<int, string>>  $results  The result sets to intersect
+     * @return Collection<int, string> The intersected document IDs
+     */
     private function intersectResults(array $results): Collection
     {
         if (empty($results)) {
@@ -182,6 +228,15 @@ final class IndexSearcher
         return $intersection->values();
     }
 
+    /**
+     * Finds the match information for a document.
+     *
+     * @param  IndexedDocument  $document  The document to check
+     * @param  SearchQueryRecord  $query  The search query
+     * @param  int  $minSize  The minimum n-gram size
+     * @param  int  $maxSize  The maximum n-gram size
+     * @return array{field: string, gram_value: string, gram_type: GramType}|null The match info or null if no match
+     */
     private function findMatchInfo(
         IndexedDocument $document,
         SearchQueryRecord $query,
@@ -233,6 +288,14 @@ final class IndexSearcher
         return null;
     }
 
+    /**
+     * Generates all n-grams from a term within the given size range.
+     *
+     * @param  string  $term  The term to generate n-grams from
+     * @param  int  $minSize  The minimum n-gram size
+     * @param  int  $maxSize  The maximum n-gram size
+     * @return array<int, string> The generated n-grams
+     */
     private function generateNgramsFromTerm(string $term, int $minSize, int $maxSize): array
     {
         $length = strlen($term);
