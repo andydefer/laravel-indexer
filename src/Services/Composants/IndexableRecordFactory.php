@@ -7,7 +7,7 @@ namespace AndyDefer\LaravelIndexer\Services\Composants;
 use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 /**
  * Factory for creating IndexedDocumentRecord instances from Indexable entities.
@@ -30,7 +30,7 @@ final class IndexableRecordFactory
         $key = $entity->getKey();
         $morphClass = $entity->getMorphClass();
 
-        $fingerprint = new IndexableFingerPrintVO($morphClass.'|'.$key);
+        $fingerprint = new IndexableFingerprintVO($morphClass.'|'.$key);
 
         return new IndexedDocumentRecord(
             fingerprint: $fingerprint,

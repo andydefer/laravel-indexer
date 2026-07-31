@@ -1,85 +1,139 @@
-# Laravel Indexer
-
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/andydefer/laravel-indexer.svg)](https://packagist.org/packages/andydefer/laravel-indexer)
-[![PHP Version Require](https://img.shields.io/packagist/php-v/andydefer/laravel-indexer.svg)](https://packagist.org/packages/andydefer/laravel-indexer)
-[![Laravel Version](https://img.shields.io/badge/Laravel-10%2F11%2F12%2F13%2F14%2F15-ff2d20.svg)](https://laravel.com)
-[![License](https://img.shields.io/packagist/l/andydefer/laravel-indexer.svg)](https://packagist.org/packages/andydefer/laravel-indexer)
+# Laravel Indexer - Documentation Complète
 
 ## Table des matières
 
-- [Installation](#installation)
-- [Préparer votre modèle](#préparer-votre-modèle)
-- [Les Clusters](#les-clusters)
-  - [Format du cluster](#format-du-cluster)
-  - [Créer un Cluster](#créer-un-cluster)
-  - [Lire un Cluster](#lire-un-cluster)
-  - [Ajouter des valeurs](#ajouter-des-valeurs)
-  - [Méthodes conditionnelles](#méthodes-conditionnelles)
-  - [Méthodes utilitaires pour tableaux et enums](#méthodes-utilitaires-pour-tableaux-et-enums)
-  - [Mode de recherche (AND / OR / NOT)](#mode-de-recherche-and--or--not)
-  - [Collection de clusters](#collection-de-clusters-clustervocollection)
-  - [Supprimer des valeurs](#supprimer-des-valeurs)
-  - [Vérification](#vérification)
-  - [Méthodes statiques](#méthodes-statiques)
-  - [Conversion](#conversion)
-  - [Exemples avancés](#exemples-avancés)
-- [Indexer des données](#indexer-des-données)
-- [GenericIndexerService](#genericindexerservice)
-- [GenericIndexModelsDirective](#genericindexmodelsdirective)
-- [GenericOrchestratorRecurringTask](#genericorchestratorrecurringtask)
-- [GenericIndexBatchUniqueTask](#genericindexbatchuniquetask)
-- [Rechercher](#rechercher)
-- [Autocomplétion](#autocomplétion)
-- [Supprimer](#supprimer)
-- [Repositories](#repositories)
-- [Collections](#collections)
+1. [Installation](#1-installation)
+2. [Configuration](#2-configuration)
+3. [Préparer votre modèle](#3-préparer-votre-modèle)
+4. [Les Clusters contextuels](#4-les-clusters-contextuels)
+5. [Indexer des données](#5-indexer-des-données)
+6. [Rechercher des documents](#6-rechercher-des-documents)
+7. [Syntaxe de recherche](#7-syntaxe-de-recherche)
+8. [GenericIndexerService](#8-genericindexerservice)
+9. [CLI avec GenericIndexModelsDirective](#9-cli-avec-genericindexmodelsdirective)
+10. [Tâches d'indexation programmée](#10-tâches-dindexation-programmée)
+11. [Autocomplétion](#11-autocomplétion)
+12. [Supprimer des documents](#12-supprimer-des-documents)
+13. [Repositories](#13-repositories)
+14. [Collections](#14-collections)
+15. [Référence des clusters](#15-référence-des-clusters)
+16. [Cas d'usage concrets](#16-cas-dusage-concrets)
+17. [Débogage et résolution des problèmes](#17-débogage-et-résolution-des-problèmes)
+18. [Performance et bonnes pratiques](#18-performance-et-bonnes-pratiques)
 
 ---
 
-## Installation
+## 1. Installation
+
+### 1.1 Prérequis
+
+- PHP 8.1 ou supérieur
+- Laravel 10.x, 11.x, 12.x, 13.x, 14.x ou 15.x
+
+### 1.2 Installation via Composer
 
 ```bash
 composer require andydefer/laravel-indexer
 ```
 
-### Migrations
+### 1.3 Migrations
 
 ```bash
 php artisan vendor:publish --tag=indexer-migrations
 php artisan migrate
 ```
 
-### Configuration
+### 1.4 Configuration
 
 ```bash
 php artisan vendor:publish --tag=indexer-config
 ```
 
+---
+
+## 2. Configuration
+
+Le fichier de configuration `config/indexer.php` :
+
 ```php
-// config/indexer.php
+<?php
+
+declare(strict_types=1);
+
 return [
+    /*
+    |--------------------------------------------------------------------------
+    | Chemin de stockage
+    |--------------------------------------------------------------------------
+    */
+    'storage_path' => storage_path('indexer'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Types de tokens
+    |--------------------------------------------------------------------------
+    */
     'token_types' => [
         'ngrams' => [
-            'min_size' => 3,
-            'max_size' => 5,
+            'min_size' => 3,  // Taille minimale des n-grams
+            'max_size' => 5,  // Taille maximale des n-grams
         ],
-        'metaphone' => true,
+        'metaphone' => true, // Activation de la recherche phonétique
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Limite par défaut
+    |--------------------------------------------------------------------------
+    */
     'default_limit' => 100,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cache
+    |--------------------------------------------------------------------------
+    */
+    'enable_cache' => true,
+    'cache_ttl' => 3600,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Taille des lots
+    |--------------------------------------------------------------------------
+    */
     'batch_size' => 50,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Modèles à indexer automatiquement
+    |--------------------------------------------------------------------------
+    */
     'model_indexables' => [
-        App\Models\User::class,
-        App\Models\Hospital::class,
-        App\Models\Specialty::class,
+        // App\Models\User::class,
+        // App\Models\Hospital::class,
     ],
-    'full_text_max_length' => 100,
-    'max_text_length' => 1000,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Limites de texte
+    |--------------------------------------------------------------------------
+    */
+    'full_text_max_length' => 100, // Découpage des textes longs
+    'max_text_length' => 1000,     // Longueur maximale d'un champ
 ];
+```
+
+### 2.1 Variables d'environnement
+
+```env
+INDEXER_BATCH_SIZE=100
+INDEXER_FULL_TEXT_MAX_LENGTH=200
+INDEXER_MAX_TEXT_LENGTH=2000
 ```
 
 ---
 
-## Préparer votre modèle
+## 3. Préparer votre modèle
 
 Votre modèle doit implémenter l'interface `Indexable`.
 
@@ -89,8 +143,8 @@ Votre modèle doit implémenter l'interface `Indexable`.
 namespace App\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
 use Illuminate\Database\Eloquent\Model;
 
 class User extends Model implements Indexable
@@ -100,11 +154,13 @@ class User extends Model implements Indexable
      */
     public function shouldBeIndexed(): bool
     {
-        return $this->is_active;
+        return $this->is_active && !$this->trashed();
     }
 
     /**
      * Retourne les données à indexer.
+     *
+     * Ces données seront tokenisées et rendues recherchables.
      */
     public function getIndexableData(): StrictAssociative
     {
@@ -113,24 +169,17 @@ class User extends Model implements Indexable
             'email' => $this->email,
             'bio' => $this->bio,
             'skills' => $this->skills,
-            'role' => $this->role,
+            'city' => $this->city,
+            'country' => $this->country,
             'profile' => [
-                'twitter' => $this->twitter,
-                'github' => $this->github,
+                'twitter' => $this->twitter_handle,
+                'github' => $this->github_handle,
             ],
         ]);
     }
 
     /**
-     * Retourne l'identifiant unique du modèle.
-     */
-    public function getKey()
-    {
-        return $this->id;
-    }
-
-    /**
-     * Retourne le nom de la classe morph.
+     * Retourne la classe morph.
      */
     public function getMorphClass()
     {
@@ -138,736 +187,515 @@ class User extends Model implements Indexable
     }
 
     /**
-     * Génère le cluster dynamique du modèle.
-     * 
+     * Retourne le cluster contextuel du modèle.
+     *
      * Le cluster permet de filtrer les recherches par contexte
-     * (tenant, environnement, rôle, statut, etc.).
+     * (tenant, rôle, statut, géolocalisation, etc.).
      */
     public function getIndexableCluster(): ClusterVO
     {
-        return new ClusterVO('type:user')
-            ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
-            ->whenNotEmpty('role', $this->role)
-            ->whenBool('verified', $this->email_verified_at !== null);
+        return new ClusterVO([
+            'type' => 'user',
+            'tenant' => $this->tenant_id,
+            'status' => $this->is_active ? 'active' : 'inactive',
+            'role' => $this->role,
+            'country' => $this->country,
+            'city' => $this->city,
+            'verified' => $this->email_verified_at !== null ? 'true' : 'false',
+        ]);
     }
 }
 ```
 
----
+### 3.1 Données imbriquées
 
-## Les Clusters
-
-Le cluster est un **filtre contextuel** permettant de filtrer les recherches par contexte (tenant, environnement, rôle, statut, etc.). C'est un élément clé de l'indexation qui permet une recherche multi-contextes.
-
-### Format du cluster
-
-```
-key1:value1|key2:value2|key3:value3
-```
-
-| Élément | Description |
-|---------|-------------|
-| `key:value` | Paire clé-valeur (une clé = une valeur) |
-| `|` | Séparateur de paires |
-| `@AND` / `@OR` / `@NOT` | Mode de recherche (optionnel pour le stockage, obligatoire pour la recherche) |
-
-**Caractères autorisés :**
-- **Clés** : `a-z`, `A-Z`, `0-9`, `_` uniquement
-- **Valeurs** : Tous les caractères (libre)
-
-### Créer un Cluster
-
-#### Constructeur classique
+Les données imbriquées sont automatiquement aplaties pour l'indexation :
 
 ```php
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
+// Dans getIndexableData()
+return StrictAssociative::from([
+    'name' => 'John Doe',
+    'profile' => [
+        'twitter' => '@johndoe',
+        'github' => 'johndoe',
+    ],
+]);
 
-// Cluster simple (stockage)
-$cluster = new ClusterVO('tenant:company_abc');
-
-// Cluster multi-attributs (stockage)
-$cluster = new ClusterVO('tenant:company_abc|env:production|region:europe');
-
-// Cluster avec mode (recherche)
-$cluster = new ClusterVO('tenant:company_abc|env:production@AND');
-$cluster = new ClusterVO('role_doctor:true|role_admin:true@OR');
-$cluster = new ClusterVO('status:inactive@NOT');
+// Données indexées :
+// - name: John Doe
+// - profile.twitter: @johndoe
+// - profile.github: johndoe
 ```
 
-#### Méthode `make()` - Builder fluent
+### 3.2 Recherche par champ spécifique
 
 ```php
-// Stockage (sans mode)
-$cluster = ClusterVO::make('type', 'user')
-    ->with('role', 'doctor')
-    ->with('status', 'active');
-// Résultat: type:user|role:doctor|status:active
+// Recherche dans le champ 'name'
+$query = 'john=name';
 
-// Recherche (avec mode)
-$cluster = ClusterVO::make('type', 'user', 'AND')
-    ->with('role', 'doctor')
-    ->with('status', 'active');
-// Résultat: type:user|role:doctor|status:active@AND
+// Recherche dans plusieurs champs
+$query = 'john=name,email,bio';
+
+// Recherche dans un champ imbriqué
+$query = 'johndoe=profile.github';
 ```
 
 ---
 
-### Lire un Cluster
+## 4. Les Clusters contextuels
 
-#### `get(string $key): ?string`
+### 4.1 Qu'est-ce qu'un cluster ?
 
-Retourne la valeur pour une clé donnée.
-
-```php
-$cluster = new ClusterVO('tenant:company_abc|env:production');
-
-$cluster->get('tenant');  // 'company_abc'
-$cluster->get('env');     // 'production'
-$cluster->get('unknown'); // null
-```
-
-#### `has(string $key): bool`
-
-Vérifie si une clé existe.
+Un cluster est un **filtre contextuel** qui permet de restreindre les recherches à un contexte spécifique.
 
 ```php
-$cluster = new ClusterVO('tenant:company_abc|env:production');
-
-$cluster->has('tenant');  // true
-$cluster->has('unknown'); // false
+// Exemple : Filtrer les utilisateurs actifs avec rôle admin
+$cluster = new ClusterVO([
+    'status' => 'active',
+    'role' => 'admin',
+]);
 ```
 
-#### `all(): array`
-
-Retourne toutes les paires clé-valeur.
+### 4.2 Création d'un cluster
 
 ```php
-$cluster = new ClusterVO('type:user|role:doctor|status:active');
+use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 
-$cluster->all();
-// [
-//     'type' => 'user',
-//     'role' => 'doctor',
-//     'status' => 'active',
-// ]
+// Création simple
+$cluster = new ClusterVO([
+    'status' => 'active',
+    'role' => 'admin',
+    'tenant' => 'company_abc',
+]);
+
+// Création avec données imbriquées
+$cluster = new ClusterVO([
+    'user' => [
+        'status' => 'active',
+        'role' => 'admin',
+    ],
+    'addresses' => [
+        ['city' => 'Kinshasa', 'country' => 'RDC'],
+        ['city' => 'Paris', 'country' => 'France'],
+    ],
+]);
 ```
 
----
-
-### Ajouter des valeurs
-
-#### `with(string $key, string $value): self`
-
-Ajoute une paire clé-valeur.
+### 4.3 Accès aux données
 
 ```php
-$cluster = new ClusterVO('type:user')
-    ->with('role', 'doctor')
-    ->with('status', 'active');
-// type:user|role:doctor|status:active
+$cluster = new ClusterVO([
+    'status' => 'active',
+    'role' => 'admin',
+    'profile' => [
+        'name' => 'John Doe',
+    ],
+]);
+
+// Accès simple
+$status = $cluster->get('status'); // 'active'
+
+// Accès par notation pointée
+$name = $cluster->get('profile.name'); // 'John Doe'
+
+// Vérification d'existence
+if ($cluster->has('profile.name')) {
+    echo $cluster->get('profile.name');
+}
 ```
 
-#### `withIf(bool $condition, string $key, string $value): self`
-
-Ajoute une paire uniquement si la condition est vraie.
-
-```php
-$cluster = new ClusterVO('type:user')
-    ->withIf($isAdmin, 'role', 'admin')
-    ->withIf($isActive, 'status', 'active');
-```
-
-#### `withTernary(string $key, bool $condition, string $trueValue, string $falseValue): self`
-
-Ajoute une paire clé-valeur en fonction d'un booléen.
-
-```php
-$cluster = new ClusterVO('type:user')
-    ->withTernary('status', $isActive, 'active', 'inactive')
-    ->withTernary('verified', $isVerified, 'true', 'false');
-// status:active|verified:true (si les conditions sont vraies)
-```
-
----
-
-### Méthodes conditionnelles
-
-Ces méthodes ajoutent des paires uniquement si certaines conditions sont remplies.
-
-#### `whenNotEmpty(string $key, mixed $value): self`
-
-Ajoute une valeur si elle n'est pas vide.
-
-```php
-$cluster = new ClusterVO('type:user')
-    ->whenNotEmpty('city', $user->city)
-    ->whenNotEmpty('country', $user->country)
-    ->whenNotEmpty('role', $user->role);
-// type:user|city:Paris|country:France|role:doctor
-```
-
-#### `whenNotNull(string $key, mixed $value): self`
-
-Ajoute une valeur si elle n'est pas nulle.
-
-```php
-$cluster = new ClusterVO('type:user')
-    ->whenNotNull('role', $user->role)
-    ->whenNotNull('tenant', $user->tenant_id);
-// type:user|role:doctor|tenant:company_abc
-```
-
-#### `whenNumeric(string $key, mixed $value): self`
-
-Ajoute une valeur si elle est numérique.
-
-```php
-$cluster = new ClusterVO('type:user')
-    ->whenNumeric('age', 25)           // ✅ 25
-    ->whenNumeric('age', '30')         // ✅ '30'
-    ->whenNumeric('score', null)       // ❌ null
-    ->whenNumeric('rating', 'not a number'); // ❌ Non numérique
-// type:user|age:25|age:30
-```
-
-#### `whenBool(string $key, mixed $value): self`
-
-Ajoute une valeur si elle est booléenne.
-
-```php
-$cluster = new ClusterVO('type:user')
-    ->whenBool('verified', true)   // ✅ true → 'true'
-    ->whenBool('active', false)    // ✅ false → 'false'
-    ->whenBool('role', 'doctor');  // ❌ Non booléen
-// type:user|verified:true|active:false
-```
-
----
-
-### Méthodes utilitaires pour tableaux et enums
-
-Ces méthodes permettent d'ajouter facilement plusieurs paires à partir de tableaux ou d'enums.
-
-#### `withCases(string $prefix, array $values, string $suffix = ''): self`
-
-Ajoute des paires pour chaque valeur d'un tableau. Format : `prefix_{value}{suffix}:true`
-
-```php
-$languages = ['fr', 'en', 'lu', 'ln'];
-$cluster = new ClusterVO('type:user')
-    ->withCases('lang_', $languages);
-// type:user|lang_fr:true|lang_en:true|lang_lu:true|lang_ln:true
-```
-
-#### `withEnum(string $prefix, string $enumClass, string $suffix = ''): self`
-
-Ajoute des paires pour chaque case d'un enum `UnitEnum`. Utilise le nom du case en minuscules.
-
-```php
-$cluster = new ClusterVO('type:user')
-    ->withEnum('role_', UserType::class);
-// type:user|role_patient:true|role_doctor:true|role_admin:true|role_staff:true
-```
-
-#### `withEnumValues(string $prefix, string $enumClass, string $suffix = ''): self`
-
-Ajoute des paires pour les valeurs d'un enum. Pour `BackedEnum`, utilise `$case->value`. Pour `UnitEnum`, utilise `$case->name`. Tout est converti en minuscules.
-
-```php
-$cluster = new ClusterVO('type:user')
-    ->withEnumValues('status_', UserStatus::class);
-// type:user|status_active:true|status_inactive:true|status_pending:true|status_banned:true
-```
-
----
-
-### Mode de recherche (AND / OR / NOT)
-
-Le mode est utilisé UNIQUEMENT pour la recherche. Il est optionnel pour le stockage.
-
-#### Définition du mode
-
-```php
-// Sans mode (stockage)
-$cluster = new ClusterVO('type:user|status:active');
-
-// Avec mode (recherche)
-$cluster = new ClusterVO('type:user|status:active@AND');
-$cluster = new ClusterVO('type:user|status:active@OR');
-$cluster = new ClusterVO('status:inactive@NOT');
-```
-
-#### Utilisation en recherche
-
-```php
-// Mode AND : toutes les conditions doivent être remplies
-$cluster = new ClusterVO('type:user|status:active@AND');
-// WHERE cluster LIKE '%type:user%' AND cluster LIKE '%status:active%'
-
-// Mode OR : au moins une condition doit être remplie
-$cluster = new ClusterVO('role_doctor:true|role_admin:true@OR');
-// WHERE cluster LIKE '%role_doctor:true%' OR cluster LIKE '%role_admin:true%'
-
-// Mode NOT : aucune condition ne doit être remplie
-$cluster = new ClusterVO('status:inactive@NOT');
-// WHERE cluster NOT LIKE '%status:inactive%'
-```
-
-#### Application à une requête
-
-```php
-$cluster = new ClusterVO('type:user|status:active@AND');
-$cluster->applyToQuery($query);
-// Ou avec une colonne personnalisée
-$cluster->applyToQuery($query, 'cluster');
-```
-
-**⚠️ Important :** `applyToQuery()` lève une exception si le cluster n'a pas de mode.
-
----
-
-### Collection de clusters (ClusterVOCollection)
-
-La collection de clusters permet de combiner plusieurs clusters avec des opérateurs logiques.
-
-```php
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
-
-$clusters = new ClusterVOCollection();
-$clusters->add(new ClusterVO('tenant:company_abc@AND'));
-$clusters->add(new ClusterVO('env:production@AND'));
-
-// Opérateur AND : tous les clusters doivent correspondre
-$results = $repository->findByClusters($clusters, 'AND');
-
-// Opérateur OR : au moins un cluster doit correspondre
-$results = $repository->findByClusters($clusters, 'OR');
-
-// Opérateur NOT : aucun cluster ne doit correspondre
-$results = $repository->findByClusters($clusters, 'NOT');
-```
-
-**Filtrage avancé :**
-
-```php
-// Exemple : (role:doctor OR role:admin) AND status:active
-$clusters = new ClusterVOCollection();
-$clusters->add(new ClusterVO('role_doctor:true|role_admin:true@OR'));
-$clusters->add(new ClusterVO('status:active@AND'));
-
-$results = $repository->findByClusters($clusters, 'AND');
-```
-
----
-
-### Supprimer des valeurs
-
-#### `without(string $key): self`
-
-Supprime une clé entière.
-
-```php
-$cluster = new ClusterVO('type:user|role:doctor|status:active');
-
-// Supprime la clé
-$new = $cluster->without('role');
-// type:user|status:active
-
-// Si la clé n'existe pas, retourne l'instance inchangée
-$new = $cluster->without('unknown');
-// type:user|role:doctor|status:active (inchangé)
-```
-
----
-
-### Vérification
-
-#### `hasAll(array $keys): bool`
-
-Vérifie si toutes les clés existent.
-
-```php
-$cluster = new ClusterVO('type:user|role:doctor|status:active');
-
-$cluster->hasAll(['type', 'role']);       // true
-$cluster->hasAll(['type', 'role', 'status']); // true
-$cluster->hasAll(['type', 'unknown']);     // false
-```
-
-#### `hasAny(array $keys): bool`
-
-Vérifie si au moins une des clés existe.
-
-```php
-$cluster = new ClusterVO('type:user|role:doctor');
-
-$cluster->hasAny(['type', 'unknown']);  // true
-$cluster->hasAny(['unknown', 'type']);  // true
-$cluster->hasAny(['unknown1', 'unknown2']); // false
-```
-
----
-
-### Méthodes statiques
-
-#### `make(string $key, string $value, ?string $mode = null): self`
-
-Crée un cluster avec une paire clé-valeur initiale.
-
-```php
-// Stockage (sans mode)
-$cluster = ClusterVO::make('type', 'user')
-    ->with('role', 'doctor')
-    ->with('status', 'active');
-
-// Recherche (avec mode)
-$cluster = ClusterVO::make('type', 'user', 'AND')
-    ->with('role', 'doctor')
-    ->with('status', 'active');
-// type:user|role:doctor|status:active@AND
-```
-
----
-
-### Conversion
-
-#### `getValue(): string`
-
-Retourne la chaîne brute du cluster.
-
-```php
-$cluster = new ClusterVO('type:user|role:doctor');
-$cluster->getValue(); // 'type:user|role:doctor'
-```
-
-#### `__toString(): string`
-
-Alias de `getValue()`.
-
-```php
-$cluster = new ClusterVO('type:user|role:doctor');
-echo $cluster; // 'type:user|role:doctor'
-```
-
-#### `toArray(): array`
-
-Retourne le cluster sous forme de tableau.
-
-```php
-$cluster = new ClusterVO('type:user|role:doctor');
-$cluster->toArray();
-// ['type' => 'user', 'role' => 'doctor']
-```
-
----
-
-### Exemples avancés
-
-#### Exemple 1: Modèle avec métadonnées
+### 4.4 Utilisation dans le modèle
 
 ```php
 public function getIndexableCluster(): ClusterVO
 {
-    return new ClusterVO('type:user')
-        ->withTernary('status', (bool) $this->is_active, 'active', 'inactive')
-        ->withTernary('verified', (bool) $this->email_verified_at, 'true', 'false')
-        ->whenNotEmpty('role', $this->role)
-        ->whenBool('verified', $this->email_verified_at !== null);
+    return new ClusterVO([
+        'type' => 'user',
+        'status' => $this->is_active ? 'active' : 'inactive',
+        'role' => $this->role,
+        'tenant' => $this->tenant_id,
+        'country' => $this->country,
+        'city' => $this->city,
+        'verified' => $this->email_verified_at !== null ? 'true' : 'false',
+        'has_orders' => $this->orders()->count() > 0 ? 'true' : 'false',
+    ]);
 }
-// type:user|status:active|verified:true|role:admin
-```
-
-#### Exemple 2: Modèle multi-tenant
-
-```php
-public function getIndexableCluster(): ClusterVO
-{
-    $cluster = new ClusterVO('type:doctor')
-        ->with('tenant', $this->tenant_id)
-        ->withTernary('status', $this->is_available, 'available', 'unavailable')
-        ->whenNotEmpty('specialty', $this->specialty)
-        ->whenNotEmpty('city', $this->city)
-        ->whenNumeric('experience', $this->years_of_experience);
-
-    if ($this->is_featured) {
-        $cluster = $cluster->with('featured', 'true');
-    }
-
-    return $cluster;
-}
-// tenant:company_abc|status:available|specialty:cardiology|city:Paris|experience:10|featured:true
-```
-
-#### Exemple 3: Utilisation des enums
-
-```php
-public function getIndexableCluster(): ClusterVO
-{
-    return new ClusterVO('type:user')
-        ->withEnum('role_', UserType::class)
-        ->withCases('lang_', $this->languages)
-        ->withTernary('status', $this->is_active, 'active', 'inactive');
-}
-// type:user|role_patient:true|role_doctor:true|lang_fr:true|lang_en:true|status:active
-```
-
-#### Exemple 4: Recherche avec cluster multiple (AND)
-
-```php
-use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
-use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
-
-// Recherche des médecins actifs en cardiologie à Paris
-$clusters = new ClusterVOCollection();
-$clusters->add(new ClusterVO('type:doctor|specialty:cardiology@AND'));
-$clusters->add(new ClusterVO('city:Paris@AND'));
-$clusters->add(new ClusterVO('status:active@AND'));
-
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('cardiologue=name,specialty'),
-    clusters: $clusters,
-    clustersOperator: 'AND'
-);
-
-$results = $this->indexer->search($query);
-```
-
-#### Exemple 5: Recherche OR pour les rôles
-
-```php
-$clusters = new ClusterVOCollection();
-$clusters->add(new ClusterVO('role_doctor:true|role_admin:true@OR'));
-
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name'),
-    clusters: $clusters,
-    clustersOperator: 'OR'
-);
-```
-
-#### Exemple 6: Exclusion (NOT)
-
-```php
-$clusters = new ClusterVOCollection();
-$clusters->add(new ClusterVO('status:inactive@NOT'));
-
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name'),
-    clusters: $clusters,
-    clustersOperator: 'NOT'
-);
 ```
 
 ---
 
-## Indexer des données
+## 5. Indexer des données
 
-### Indexer un document
+### 5.1 Indexer un document
 
 ```php
+<?php
+
+namespace App\Services;
+
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
 
-class UserService
+class UserIndexer
 {
     public function __construct(
-        private IndexerInterface $indexer
+        private readonly IndexerInterface $indexer
     ) {}
 
     public function indexUser(User $user): void
     {
-        $record = IndexableRecordFactory::convert($user);
+        $cluster = $user->getIndexableCluster();
+        $record = IndexableRecordFactory::convert($user, $cluster);
         $this->indexer->index($record);
     }
 }
 ```
 
-### Indexer en masse
+### 5.2 Indexer en masse
 
 ```php
+<?php
+
+namespace App\Services;
+
 use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
+use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
+use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
 
-public function indexAllUsers(): void
+class BulkIndexer
 {
-    $records = new IndexableRecordCollection;
+    public function __construct(
+        private readonly IndexerInterface $indexer
+    ) {}
 
-    foreach (User::where('is_active', true)->cursor() as $user) {
-        $records->add(IndexableRecordFactory::convert($user));
+    public function indexAllUsers(): void
+    {
+        $records = new IndexableRecordCollection();
+
+        User::where('is_active', true)->chunk(100, function ($users) use ($records) {
+            foreach ($users as $user) {
+                $cluster = $user->getIndexableCluster();
+                $records->add(IndexableRecordFactory::convert($user, $cluster));
+            }
+
+            $this->indexer->indexMany($records);
+        });
     }
-
-    $this->indexer->indexMany($records);
 }
 ```
 
-### Rafraîchir (mise à jour)
+### 5.3 Rafraîchir un document
 
 ```php
 public function updateUser(User $user): void
 {
     $user->save();
-    $record = IndexableRecordFactory::convert($user);
+
+    $cluster = $user->getIndexableCluster();
+    $record = IndexableRecordFactory::convert($user, $cluster);
+
     $this->indexer->refresh($record);
 }
 ```
 
----
-
-## GenericIndexerService
-
-Service générique d'indexation qui fonctionne avec n'importe quel modèle Eloquent implémentant `Indexable`. Il gère automatiquement le chunking, le batch processing, la limitation et les opérations CRUD sur l'index.
-
-### Injection du service
+### 5.4 Indexation avec GenericIndexerService
 
 ```php
+<?php
+
+namespace App\Services;
+
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
 
 class UserIndexer
 {
     public function __construct(
-        private readonly GenericIndexerInterface $genericIndexer,
+        private readonly GenericIndexerInterface $indexer
     ) {}
+
+    public function indexUser(int $userId): void
+    {
+        $this->indexer->indexById(User::class, $userId);
+    }
+
+    public function reindexAllUsers(): void
+    {
+        $this->indexer
+            ->setBatchSize(50)
+            ->setLimit(10000)
+            ->reindexAll(User::class);
+    }
+
+    public function getIndexedCount(): int
+    {
+        return $this->indexer->countIndexed(User::class);
+    }
 }
 ```
 
-### Indexer un document
+---
 
-```php
-// Avec le modèle directement
-$user = User::find($userId);
-$this->genericIndexer->index($user);
+## 6. Rechercher des documents
 
-// Ou avec la classe et l'ID
-$this->genericIndexer->indexById(User::class, $userId);
-```
-
-### Indexer tous les documents
-
-```php
-$this->genericIndexer->indexAll(User::class);
-```
-
-### Indexer avec batch et limite
-
-```php
-$this->genericIndexer
-    ->setBatchSize(50)
-    ->setLimit(1000)
-    ->indexAll(Doctor::class);
-```
-
-### Reconstruire tout l'index
-
-```php
-$this->genericIndexer->reindexAll(User::class);
-```
-
-### Supprimer un document
-
-```php
-// Avec le modèle directement
-$user = User::find($userId);
-$this->genericIndexer->delete($user);
-
-// Ou avec la classe et l'ID
-$this->genericIndexer->deleteById(User::class, $userId);
-```
-
-### Supprimer tous les documents d'un type
-
-```php
-$this->genericIndexer->deleteAll(User::class);
-```
-
-### Rafraîchir un document
-
-```php
-// Avec le modèle directement
-$user = User::find($userId);
-$this->genericIndexer->refresh($user);
-
-// Ou avec la classe et l'ID
-$this->genericIndexer->refreshById(User::class, $userId);
-```
-
-### Compter les documents indexés
-
-```php
-$count = $this->genericIndexer->countIndexed(User::class);
-```
-
-### Vérifier l'existence
-
-```php
-// Avec le modèle directement
-$user = User::find($userId);
-if ($this->genericIndexer->exists($user)) {
-    // L'utilisateur est indexé
-}
-
-// Ou avec la classe et l'ID
-if ($this->genericIndexer->existsById(User::class, $userId)) {
-    // L'utilisateur est indexé
-}
-```
-
-### Exemple complet
+### 6.1 Recherche simple
 
 ```php
 <?php
 
-declare(strict_types=1);
+namespace App\Services;
+
+use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
+use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
+use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
+
+class UserSearchService
+{
+    public function __construct(
+        private readonly IndexerInterface $indexer
+    ) {}
+
+    public function search(string $query, int $limit = 20): array
+    {
+        $searchQuery = new SearchQueryRecord(
+            query: new SearchQueryVO($query . '=name,email,bio'),
+            limit: $limit
+        );
+
+        $results = $this->indexer->search($searchQuery);
+        $userIds = $results->getIds()->toArray();
+
+        return User::whereIn('id', $userIds)->get()->toArray();
+    }
+}
+
+// Utilisation
+$service = new UserSearchService($indexer);
+$users = $service->search('john');
+```
+
+### 6.2 Recherche avec filtres de cluster
+
+```php
+use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
+use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
+use AndyDefer\Repository\ValueObjects\ClusterQueries;
+
+$searchQuery = new SearchQueryRecord(
+    query: new SearchQueryVO('john=name,email'),
+    cluster_queries: new ClusterQueries([
+        'cluster' => 'status=active & role=admin'
+    ]),
+    limit: 20
+);
+
+$results = $this->indexer->search($searchQuery);
+```
+
+### 6.3 Recherche multi-termes
+
+```php
+// Recherche 'john' dans 'name' ET 'doe' dans 'last_name'
+$searchQuery = new SearchQueryRecord(
+    query: new SearchQueryVO('john=name|doe=last_name'),
+    limit: 20
+);
+
+$results = $this->indexer->search($searchQuery);
+```
+
+### 6.4 Vérification d'existence
+
+```php
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+
+$fingerprint = new IndexableFingerPrintVO('App\Models\User|123');
+$exists = $this->indexer->exists($fingerprint);
+```
+
+---
+
+## 7. Syntaxe de recherche
+
+### 7.1 Format général
+
+```
+ngram=field1,field2|ngram2=field3|ngram3=field1,field4
+```
+
+### 7.2 Exemples
+
+| Requête | Description |
+|---------|-------------|
+| `john=name` | Recherche "john" dans le champ "name" |
+| `john=name,email` | Recherche "john" dans "name" ou "email" |
+| `john=name\|doe=last_name` | Recherche "john" ET "doe" |
+| `john=profile.twitter` | Recherche dans un champ imbriqué |
+
+### 7.3 Comment fonctionne la recherche ?
+
+1. Le terme est normalisé (minuscules, accents supprimés)
+2. Le système génère tous les n-grams possibles du terme
+3. Il recherche les tokens LEXICAL correspondants
+4. Si aucun résultat, il recherche les tokens METAPHONE (phonétique)
+5. Retourne les documents trouvés
+
+**Exemple :**
+- Indexé : "john" → tokens : ["joh", "ohn", "john"]
+- Recherche "joh" → trouve "john" car "joh" est un token
+- Recherche "jon" → trouve "john" via métaphone (JN → jn)
+
+---
+
+## 8. GenericIndexerService
+
+Le `GenericIndexerService` est le service principal pour indexer vos modèles Eloquent.
+
+### 8.1 Injection
+
+```php
+<?php
+
+namespace App\Services;
 
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
 
 class DoctorIndexer
 {
     public function __construct(
-        private readonly GenericIndexerInterface $genericIndexer,
+        private readonly GenericIndexerInterface $indexer
+    ) {}
+}
+```
+
+### 8.2 Indexation
+
+```php
+// Indexer un modèle
+$doctor = Doctor::find(1);
+$this->indexer->index($doctor);
+
+// Indexer par ID
+$this->indexer->indexById(Doctor::class, 1);
+
+// Indexer tous les modèles
+$this->indexer->indexAll(Doctor::class);
+
+// Indexer avec batch et limite
+$this->indexer
+    ->setBatchSize(50)
+    ->setLimit(1000)
+    ->indexAll(Doctor::class);
+```
+
+### 8.3 Réindexation
+
+```php
+// Réindexer tous les modèles (supprime puis recrée)
+$this->indexer->reindexAll(Doctor::class);
+```
+
+### 8.4 Suppression
+
+```php
+// Supprimer un modèle
+$doctor = Doctor::find(1);
+$this->indexer->delete($doctor);
+
+// Supprimer par ID
+$this->indexer->deleteById(Doctor::class, 1);
+
+// Supprimer tous les modèles d'un type
+$this->indexer->deleteAll(Doctor::class);
+```
+
+### 8.5 Rafraîchissement
+
+```php
+// Rafraîchir un modèle (supprime puis recrée si éligible)
+$doctor = Doctor::find(1);
+$this->indexer->refresh($doctor);
+
+// Rafraîchir par ID
+$this->indexer->refreshById(Doctor::class, 1);
+```
+
+### 8.6 Comptage et vérification
+
+```php
+// Compter les documents indexés
+$count = $this->indexer->countIndexed(Doctor::class);
+
+// Vérifier si un modèle est indexé
+$doctor = Doctor::find(1);
+$exists = $this->indexer->exists($doctor);
+
+// Vérifier par ID
+$exists = $this->indexer->existsById(Doctor::class, 1);
+```
+
+### 8.7 Exemple complet
+
+```php
+<?php
+
+namespace App\Services;
+
+use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
+
+class IndexManagementService
+{
+    public function __construct(
+        private readonly GenericIndexerInterface $indexer
     ) {}
 
-    public function indexDoctor(int $doctorId): void
+    public function fullReindex(): void
     {
-        $doctor = Doctor::find($doctorId);
-        if ($doctor) {
-            $this->genericIndexer->index($doctor);
+        // Configurer les lots
+        $this->indexer->setBatchSize(50);
+
+        // Réindexer tous les types
+        $this->indexer->reindexAll(User::class);
+        $this->indexer->reindexAll(Product::class);
+        $this->indexer->reindexAll(Order::class);
+
+        // Vérifier le résultat
+        $count = $this->indexer->countIndexed(User::class);
+        echo "Utilisateurs indexés: {$count}\n";
+    }
+
+    public function indexSpecificModels(array $ids): void
+    {
+        foreach ($ids as $id) {
+            try {
+                $this->indexer->indexById(User::class, $id);
+            } catch (ModelNotFoundException $e) {
+                echo "Utilisateur {$id} non trouvé\n";
+            }
         }
     }
 
-    public function reindexAllDoctors(): void
+    public function cleanupInactive(): void
     {
-        $this->genericIndexer
-            ->setBatchSize(50)
-            ->setLimit(10000)
-            ->reindexAll(Doctor::class);
-    }
-
-    public function getIndexedDoctorCount(): int
-    {
-        return $this->genericIndexer->countIndexed(Doctor::class);
-    }
-
-    public function cleanupDoctorIndex(): void
-    {
-        $this->genericIndexer->deleteAll(Doctor::class);
+        // Supprimer les utilisateurs inactifs de l'index
+        $inactiveUsers = User::where('is_active', false)->get();
+        foreach ($inactiveUsers as $user) {
+            $this->indexer->delete($user);
+        }
     }
 }
 ```
 
 ---
 
-## GenericIndexModelsDirective
+## 9. CLI avec GenericIndexModelsDirective
 
-Directive CLI pour indexer les modèles configurés dans `indexer.model_indexables`.
-
-### Signature
+### 9.1 Signature
 
 ```bash
 index:models {batch=50} {limit=?} {models*} {--reindex} {--count} {--delete}
 ```
 
-### Options
+### 9.2 Options
 
 | Option | Description |
 |--------|-------------|
@@ -878,7 +706,7 @@ index:models {batch=50} {limit=?} {models*} {--reindex} {--count} {--delete}
 | `--count` | Compte les documents indexés |
 | `--delete` | Supprime tous les documents de l'index |
 
-### Exemples
+### 9.3 Exemples
 
 ```bash
 # Indexer tous les modèles configurés
@@ -896,11 +724,11 @@ index:models {batch=50} {limit=?} {models*} {--reindex} {--count} {--delete}
 # Réindexer avec batch et limit
 ./bin/directive index:models 20 10 [App.Models.User] --reindex
 
-# Ignorer le batch (valeur par défaut) et appliquer une limite
-./bin/directive index:models _ 20 [App.Models.User]
+# Utiliser un alias
+./bin/directive idx:models [App.Models.User]
 ```
 
-### Configuration
+### 9.4 Configuration
 
 ```php
 // config/indexer.php
@@ -913,12 +741,19 @@ index:models {batch=50} {limit=?} {models*} {--reindex} {--count} {--delete}
 
 ---
 
-## GenericOrchestratorRecurringTask
+## 10. Tâches d'indexation programmée
 
-Tâche récurrente qui orchestre l'indexation de tous les modèles configurés. Elle récupère la liste des modèles depuis `model_indexables` et dispatch des tâches batch pour chaque lot.
+### 10.1 GenericOrchestratorRecurringTask
 
-### Configuration
+Cette tâche récurrente orchestre l'indexation de tous les modèles configurés.
 
+**Fonctionnement :**
+1. Récupère les modèles configurés depuis `model_indexables`
+2. Pour chaque modèle, récupère les IDs éligibles (`shouldBeIndexed()`)
+3. Découpe les IDs par lots (`batch_size`)
+4. Enregistre une tâche `GenericIndexBatchUniqueTask` pour chaque lot
+
+**Configuration :**
 ```php
 // config/indexer.php
 'batch_size' => 50,
@@ -928,29 +763,11 @@ Tâche récurrente qui orchestre l'indexation de tous les modèles configurés. 
 ],
 ```
 
-### Fonctionnement
+### 10.2 GenericIndexBatchUniqueTask
 
-1. Récupère les modèles configurables depuis `model_indexables`
-2. Pour chaque modèle, récupère les IDs éligibles (`shouldBeIndexed()`)
-3. Découpe les IDs par lots (`batch_size`)
-4. Enregistre une tâche `GenericIndexBatchUniqueTask` pour chaque lot
+Cette tâche unique indexe un lot d'éléments.
 
-### Enregistrement
-
-```php
-use AndyDefer\LaravelIndexer\Tasks\RecurringTasks\GenericOrchestratorRecurringTask;
-
-// La tâche est automatiquement enregistrée par le provider
-```
-
----
-
-## GenericIndexBatchUniqueTask
-
-Tâche unique qui indexe un lot d'éléments pour plusieurs modèles.
-
-### Payload
-
+**Payload :**
 ```json
 {
     "items": [
@@ -961,191 +778,30 @@ Tâche unique qui indexe un lot d'éléments pour plusieurs modèles.
 }
 ```
 
-### Fonctionnement
-
-1. Reçoit une `IndexableVOCollection` contenant des paires `(modelClass, id)`
+**Fonctionnement :**
+1. Reçoit une `IndexableVOCollection`
 2. Récupère toutes les instances en **UNE SEULE requête par classe**
 3. Pour chaque modèle, vérifie l'éligibilité (`shouldBeIndexed()`)
 4. Supprime le document s'il existe déjà
-5. Indexe le modèle avec son cluster dynamique (`getIndexableCluster()`)
-
-### Utilisation manuelle
-
-```php
-use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
-use AndyDefer\LaravelIndexer\Tasks\UniqueTasks\GenericIndexBatchUniqueTask;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
-use AndyDefer\Task\Records\UniqueTaskConfigRecord;
-use AndyDefer\Task\ValueObjects\DescriptionVO;
-use AndyDefer\Task\ValueObjects\DurationVO;
-use AndyDefer\Task\ValueObjects\Iso8601DateTimeVO;
-use AndyDefer\Task\ValueObjects\MaxFailedAttemptsVO;
-use AndyDefer\Task\ValueObjects\UniqueTaskFqcnVO;
-
-$collection = new IndexableVOCollection;
-$collection->add(new IndexableVO(User::class, 1));
-$collection->add(new IndexableVO(User::class, 2));
-$collection->add(new IndexableVO(Hospital::class, 3));
-
-$payload = StrictDataObject::from([
-    'items' => $collection,
-]);
-
-$config = UniqueTaskConfigRecord::from([
-    'scheduled_at' => new Iso8601DateTimeVO(now()->toIso8601String()),
-    'max_attempts' => new MaxFailedAttemptsVO(3),
-    'grace_period' => new DurationVO(3600),
-    'description' => new DescriptionVO('Batch task for indexing'),
-]);
-
-$uniqueTaskService->register(
-    new UniqueTaskFqcnVO(GenericIndexBatchUniqueTask::class),
-    $payload,
-    $config
-);
-```
+5. Indexe le modèle avec son cluster dynamique
 
 ---
 
-## Rechercher
+## 11. Autocomplétion
 
-### Comment fonctionne la recherche ?
-
-1. Le terme est normalisé (minuscules, accents supprimés)
-2. Le système génère tous les n-grammes possibles du terme
-3. Il recherche les tokens LEXICAL correspondants
-4. Si aucun résultat, il recherche les tokens METAPHONE (phonétique)
-5. Retourne les documents trouvés
-
-**Exemple :**
-- Indexé : "john" → tokens : ["joh", "ohn", "john"]
-- Recherche "joh" → trouve "john" car "joh" est un token
-- Recherche "jon" → trouve "john" via métaphone (JN → jn)
-
-### Recherche simple avec clusters
+### 11.1 Autocomplétion simple
 
 ```php
-use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
+<?php
 
-public function searchUsers(string $query): array
-{
-    $clusters = new ClusterVOCollection();
-    
-    $searchQuery = new SearchQueryRecord(
-        query: new SearchQueryVO($query . '=name,email,bio'),
-        clusters: $clusters,
-        clustersOperator: 'AND'
-    );
+namespace App\Services;
 
-    $results = $this->indexer->search($searchQuery);
-    
-    $userIds = $results->getItems()->getIdValues()->toArray();
-    
-    return User::whereIn('id', $userIds)->get();
-}
-```
-
-### Recherche multi-termes (AND)
-
-```php
-$clusters = new ClusterVOCollection();
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name|developer=bio'),
-    clusters: $clusters,
-    clustersOperator: 'AND'
-);
-```
-
-### Recherche multi-champs (OR)
-
-```php
-$clusters = new ClusterVOCollection();
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name,email,bio'),
-    clusters: $clusters,
-    clustersOperator: 'AND'
-);
-```
-
-### Recherche avec limite
-
-```php
-$clusters = new ClusterVOCollection();
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name,email'),
-    clusters: $clusters,
-    clustersOperator: 'AND',
-    limit: 20
-);
-```
-
-### Filtrer par cluster AND
-
-```php
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
-use AndyDefer\LaravelIndexer\ValueObjects\ClusterVO;
-
-$clusters = new ClusterVOCollection();
-$clusters->add(new ClusterVO('tenant:company_abc|type:user|status:active@AND'));
-
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name,email'),
-    clusters: $clusters,
-    clustersOperator: 'AND'
-);
-
-$results = $this->indexer->search($query);
-```
-
-### Filtrer par cluster OR
-
-```php
-$clusters = new ClusterVOCollection();
-$clusters->add(new ClusterVO('role_doctor:true@OR'));
-$clusters->add(new ClusterVO('role_admin:true@OR'));
-
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name,email'),
-    clusters: $clusters,
-    clustersOperator: 'OR'
-);
-```
-
-### Filtrer par cluster NOT
-
-```php
-$clusters = new ClusterVOCollection();
-$clusters->add(new ClusterVO('status:inactive@NOT'));
-
-$query = new SearchQueryRecord(
-    query: new SearchQueryVO('john=name,email'),
-    clusters: $clusters,
-    clustersOperator: 'NOT'
-);
-```
-
-### Vérifier l'existence d'un document
-
-```php
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
-
-$fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-$exists = $this->indexer->exists($fingerPrint);
-```
-
----
-
-## Autocomplétion
-
-```php
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 
 class AutocompleteService
 {
     public function __construct(
-        private IndexedTokenRepository $tokenRepository
+        private readonly IndexedTokenRepository $tokenRepository
     ) {}
 
     public function suggest(string $prefix): array
@@ -1154,9 +810,21 @@ class AutocompleteService
         return $tokens->pluck('token')->toArray();
     }
 }
+
+// Utilisation
+$suggestions = $service->suggest('jo');
+// ['john', 'jonathan', 'joe', ...]
 ```
 
-### Autocomplétion par champ
+### 11.2 Autocomplétion avec contexte
+
+```php
+// Autocomplétion avec cluster
+$tokens = $this->tokenRepository
+    ->findByTokenAndClusterQuery($prefix, 'status=active');
+```
+
+### 11.3 Autocomplétion par champ
 
 ```php
 $tokens = $this->tokenRepository->getModel()
@@ -1169,76 +837,48 @@ $tokens = $this->tokenRepository->getModel()
     ->get();
 ```
 
-### Autocomplétion avec cluster
-
-```php
-$cluster = new ClusterVO('tenant:company_abc@AND');
-
-$tokens = $this->tokenRepository->getModel()
-    ->newQuery()
-    ->where('token', 'LIKE', $prefix . '%')
-    ->whereHas('document', function ($q) use ($cluster) {
-        $cluster->applyToQuery($q);
-    })
-    ->select('token')
-    ->distinct()
-    ->limit(10)
-    ->get();
-```
-
 ---
 
-## Supprimer
+## 12. Supprimer des documents
 
-### Supprimer un document
+### 12.1 Suppression unitaire
 
 ```php
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
-$fingerPrint = new IndexableFingerPrintVO('App.Models.User|123');
-$this->indexer->delete($fingerPrint);
+$fingerprint = new IndexableFingerPrintVO('App\Models\User|123');
+$this->indexer->delete($fingerprint);
 ```
 
-### Supprimer plusieurs
+### 12.2 Suppression par lots
 
 ```php
 use AndyDefer\LaravelIndexer\Collections\IndexableFingerPrintVOCollection;
 
-$collection = new IndexableFingerPrintVOCollection;
-$collection->add(new IndexableFingerPrintVO('App.Models.User|123'));
-$collection->add(new IndexableFingerPrintVO('App.Models.User|456'));
+$collection = new IndexableFingerPrintVOCollection();
+$collection->add(new IndexableFingerPrintVO('App\Models\User|1'));
+$collection->add(new IndexableFingerPrintVO('App\Models\User|2'));
+$collection->add(new IndexableFingerPrintVO('App\Models\Product|5'));
+
 $this->indexer->deleteMany($collection);
 ```
 
-### Supprimer par namespace
+### 12.3 Suppression par namespace
 
 ```php
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 
 $repository = app(IndexedDocumentRepository::class);
-$repository->deleteByNamespace('App.Models.User');
+$repository->deleteByNamespace('App\Models\User');
 ```
 
-### Supprimer par cluster
+### 12.4 Suppression par cluster
 
 ```php
-$cluster = new ClusterVO('tenant:company_abc@AND');
-$repository->deleteByCluster($cluster);
-
-$repository->deleteByClusterKeyValue('tenant', 'company_abc');
+$repository->deleteByClusterQuery('status=inactive');
 ```
 
-### Supprimer par clusters multiples
-
-```php
-$clusters = new ClusterVOCollection();
-$clusters->add(new ClusterVO('tenant:company_abc@AND'));
-$clusters->add(new ClusterVO('env:production@AND'));
-
-$deleted = $repository->deleteByClusters($clusters, 'AND');
-```
-
-### Vider l'index
+### 12.5 Vider l'index
 
 ```php
 $this->indexer->clear();
@@ -1246,244 +886,569 @@ $this->indexer->clear();
 
 ---
 
-## Repositories
+## 13. Repositories
 
-### IndexedDocumentRepository
+### 13.1 IndexedDocumentRepository
 
 ```php
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
 
 $repository = app(IndexedDocumentRepository::class);
 
-// Trouver
-$doc = $repository->findByFingerPrint($fingerPrint);
-$doc = $repository->findByFingerprintString('App.Models.User|123');
-$docs = $repository->findByNamespace('App.Models.User');
-$docs = $repository->findByCluster($cluster);
-$docs = $repository->findByClusters($clusters, 'AND');
-$docs = $repository->findByClusters($clusters, 'OR');
-$docs = $repository->findByClusters($clusters, 'NOT');
-$docs = $repository->findByClusterKeyValue('tenant', 'company_abc');
-$docs = $repository->findByIds(['uuid1', 'uuid2']);
+// Recherche par fingerprint
+$doc = $repository->findByFingerPrint($fingerprint);
+$doc = $repository->findByFingerprintString('App\Models\User|123');
 
-// Compter
-$count = $repository->countByNamespace('App.Models.User');
-$count = $repository->countByCluster($cluster);
-$count = $repository->countByClusters($clusters, 'AND');
+// Recherche par namespace
+$docs = $repository->findByNamespace('App\Models\User');
 
-// Distinct
+// Recherche par cluster
+$docs = $repository->findByClusterQuery('status=active & role=admin');
+
+// Comptage
+$count = $repository->countByNamespace('App\Models\User');
+$count = $repository->countByClusterQuery('status=active');
+
+// Vérification d'existence
+$exists = $repository->existsByFingerPrint($fingerprint);
+$exists = $repository->existsByNamespace('App\Models\User');
+
+// Suppression
+$repository->deleteByFingerPrint($fingerprint);
+$repository->deleteByNamespace('App\Models\User');
+$repository->deleteByClusterQuery('status=inactive');
+
+// Valeurs distinctes
 $namespaces = $repository->getDistinctNamespaces();
 $keys = $repository->getDistinctClusterKeys();
-$values = $repository->getDistinctClusterValues('tenant');
+$values = $repository->getDistinctClusterValues('status');
 
-// Vérifier
-$exists = $repository->existsByFingerPrint($fingerPrint);
-$exists = $repository->existsByNamespace('App.Models.User');
-$exists = $repository->existsByCluster($cluster);
-$exists = $repository->existsByClusters($clusters, 'AND');
-
-// Supprimer
-$repository->deleteByFingerPrint($fingerPrint);
-$repository->deleteByFingerprintString('App.Models.User|123');
-$repository->deleteByNamespace('App.Models.User');
-$repository->deleteByCluster($cluster);
-$repository->deleteByClusters($clusters, 'AND');
-$repository->deleteByClusterKeyValue('tenant', 'company_abc');
+// Utilitaires
+$docs = $repository->findAllWithTokens();
 ```
 
-### IndexedTokenRepository
+### 13.2 IndexedTokenRepository
 
 ```php
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Enums\GramType;
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
 
 $repository = app(IndexedTokenRepository::class);
 
-// Trouver
+// Recherche par token
 $tokens = $repository->findByToken('john');
-$tokens = $repository->findByType(GramType::LEXICAL);
-$tokens = $repository->findByField('name');
-$tokens = $repository->findByDocumentId('uuid');
-$tokens = $repository->findByDocumentFingerPrint($fingerPrint);
-$tokens = $repository->findByNamespace('App.Models.User');
-$tokens = $repository->findByCluster($cluster);
-$tokens = $repository->findByClusters($clusters, 'AND');
-$tokens = $repository->findByClusters($clusters, 'OR');
-$tokens = $repository->findByClusters($clusters, 'NOT');
-$tokens = $repository->findByClusterKeyValue('tenant', 'company_abc');
-
-// Token + critères
 $tokens = $repository->findByTokenAndField('john', 'name');
 $tokens = $repository->findByTokenAndType('john', GramType::LEXICAL);
-$tokens = $repository->findByTokenAndNamespace('john', 'App.Models.User');
-$tokens = $repository->findByTokenAndCluster('john', $cluster);
-$tokens = $repository->findByTokenAndClusters('john', $clusters, 'AND');
-$tokens = $repository->findByTokenFieldAndNamespace('john', 'name', 'App.Models.User');
 
-// Document IDs par token
+// Recherche par token et cluster
+$tokens = $repository->findByTokenAndClusterQuery('john', 'status=active');
+
+// Recherche par champ
+$tokens = $repository->findByField('name');
+
+// Recherche par document
+$tokens = $repository->findByDocumentId('uuid');
+$tokens = $repository->findByNamespace('App\Models\User');
+
+// Autocomplétion
+$tokens = $repository->autocomplete('jo', 10);
+
+// Document IDs
 $ids = $repository->getDocumentIdsForToken('john');
-$ids = $repository->getDocumentIdsForTokenAndField('john', 'name');
-$ids = $repository->getDocumentIdsForTokenAndCluster('john', $cluster);
-$ids = $repository->getDocumentIdsForTokenAndClusters('john', $clusters, 'AND');
-$ids = $repository->getDocumentIdsForTokenFieldAndCluster('john', 'name', $cluster);
-$ids = $repository->getDocumentIdsForTokenFieldAndClusters('john', 'name', $clusters, 'AND');
 
-// Compter
+// Comptage
 $count = $repository->countDistinctTokens();
-$count = $repository->countByType(GramType::LEXICAL);
 $count = $repository->countByField('name');
-$count = $repository->countByNamespace('App.Models.User');
 
-// Supprimer
+// Suppression
 $repository->deleteByDocumentId('uuid');
-$repository->deleteByDocumentFingerPrint($fingerPrint);
-$repository->deleteByNamespace('App.Models.User');
-$repository->deleteByCluster($cluster);
-$repository->deleteByClusters($clusters, 'AND');
-$repository->deleteByClusterKeyValue('tenant', 'company_abc');
 $repository->deleteByToken('john');
-$repository->deleteByTokenAndField('john', 'name');
+
+// Utilitaires
+$tokens = $repository->getDistinctTokens();
+$fields = $repository->getDistinctFields();
+$repository->incrementFrequency($tokenId);
 ```
 
 ---
 
-## Collections
+## 14. Collections
 
-### IndexableSearchResultCollection
+### 14.1 IndexableSearchResultCollection
 
 ```php
 $results = $this->indexer->search($query);
 
+// Accès aux résultats
 foreach ($results as $result) {
-    $item = $result->item;
-    $fingerprint = $item->fingerprint->getValue();
-    $field = $result->field;
-    $gram = $result->gram_value;
-    $type = $result->gram_type->value;
+    $item = $result->item;              // IndexedDocumentRecord
+    $fingerprint = $item->fingerprint;  // IndexableFingerPrintVO
+    $field = $result->field;            // string
+    $gram = $result->gram_value;        // string
+    $type = $result->gram_type;         // GramType
 }
 
 // Filtrage
 $byField = $results->filterByField('name');
-$byNamespace = $results->filterByNamespace('App.Models.User');
+$byType = $results->filterByGramType(GramType::LEXICAL);
+$byNamespace = $results->filterByNamespace('App\Models\User');
 
 // Extraction
-$ids = $results->getIds();
-$items = $results->getItems();
-$fingerPrints = $results->getFingerPrints();
+$ids = $results->getIds();                // StringTypedCollection
+$items = $results->getItems();            // IndexableRecordCollection
+$fingerprints = $results->getFingerprints();
 
 // Groupement
 $byField = $results->groupByField();
 $byNamespace = $results->groupByNamespace();
 ```
 
-### IndexableRecordCollection
+### 14.2 IndexableRecordCollection
 
 ```php
-$records = new IndexableRecordCollection;
+use AndyDefer\LaravelIndexer\Collections\IndexableRecordCollection;
 
+$records = new IndexableRecordCollection();
+
+// Ajout
 $records->add($record);
+
+// Découpage
 $chunks = $records->chunk(100);
 
-$users = $records->filterByNamespace('App.Models.User');
-$withTenant = $records->filterByCluster('tenant', 'company_abc');
+// Filtrage
+$users = $records->filterByNamespace('App\Models\User');
+$active = $records->filterByCluster('status', 'active');
 
-$fingerPrints = $records->getFingerPrints();
-$ids = $records->getIdValues();
+// Extraction
+$fingerprints = $records->getFingerprints();
+$clusters = $records->getClusters();
+$ids = $records->getIds();
 
-$record = $records->findById('123');
-$record = $records->findByIdAndNamespace('123', 'App.Models.User');
+// Recherche
+$found = $records->findById('123');
+$found = $records->findByIdAndNamespace('123', 'App\Models\User');
 
-$hasId = $records->containsId('123');
-$hasNamespace = $records->containsNamespace('App.Models.User');
+// Recherche textuelle
+$withJohn = $records->searchTextInData('John');
 
-$this->indexer->indexMany($records);
+// Tri
+$sorted = $records->sortByDataField('name', true);
+
+// Pluck
+$names = $records->pluckDataField('name');
 ```
 
-### IndexableVOCollection
-
-Collection spécialisée pour manipuler les `IndexableVO`.
+### 14.3 IndexableVOCollection
 
 ```php
 use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
 
-$collection = new IndexableVOCollection;
+$collection = new IndexableVOCollection();
 $collection->add(new IndexableVO(User::class, 1));
 $collection->add(new IndexableVO(User::class, 2));
 $collection->add(new IndexableVO(Hospital::class, 3));
 
-// Récupérer les IDs
+// Extraction
 $ids = $collection->getIds(); // [1, 2, 3]
+$classes = $collection->getModelClasses();
 
-// Récupérer les classes de modèles
-$classes = $collection->getModelClasses(); // [User::class, User::class, Hospital::class]
-
-// Récupérer les instances en UNE SEULE requête par classe
+// Récupération optimisée (UNE SEULE requête par classe)
 $instances = $collection->getModelInstances();
 
-// Filtrer par classe
+// Filtrage
 $users = $collection->filterByModelClass(User::class);
-
-// Filtrer par plusieurs classes
-$usersAndHospitals = $collection->filterByModelClasses([User::class, Hospital::class]);
-
-// Filtrer par classe et IDs
-$specificUsers = $collection->filterByModelClassAndIds(User::class, [1, 2]);
 
 // Vérification
 $hasId = $collection->containsId(1);
 $hasClass = $collection->containsModelClass(User::class);
 
-// Recherche
-$item = $collection->findById(1);
-
-// Groupement par classe
+// Groupement
 $groups = $collection->groupByModelClass();
-// [
-//     User::class => IndexableVOCollection [items: 2],
-//     Hospital::class => IndexableVOCollection [items: 1],
-// ]
 ```
 
-### IndexableFingerPrintVOCollection
+### 14.4 IndexableFingerPrintVOCollection
 
 ```php
-$fingerPrints = new IndexableFingerPrintVOCollection;
+use AndyDefer\LaravelIndexer\Collections\IndexableFingerPrintVOCollection;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
 
-$users = $fingerPrints->filterByNamespace('App.Models.User');
-$ids = $fingerPrints->getIds();
-$namespaces = $fingerPrints->getNamespaces();
+$fingerprints = new IndexableFingerPrintVOCollection();
+$fingerprints->add(new IndexableFingerPrintVO('App\Models\User|1'));
+$fingerprints->add(new IndexableFingerPrintVO('App\Models\User|2'));
 
-$hasId = $fingerPrints->containsId('123');
-$hasNamespace = $fingerPrints->containsNamespace('App.Models.User');
+// Filtrage
+$users = $fingerprints->filterByNamespace('App\Models\User');
 
-$fp = $fingerPrints->findByValue('App.Models.User|123');
-$fp = $fingerPrints->findByIdAndNamespace('123', 'App.Models.User');
+// Extraction
+$ids = $fingerprints->getIds();
+$namespaces = $fingerprints->getNamespaces();
 
-$grouped = $fingerPrints->groupByNamespace();
+// Vérification
+$hasId = $fingerprints->containsId('1');
+
+// Recherche
+$fp = $fingerprints->findByValue('App\Models\User|1');
+$fp = $fingerprints->findByIdAndNamespace('1', 'App\Models\User');
+
+// Groupement
+$grouped = $fingerprints->groupByNamespace();
 ```
 
-### ClusterVOCollection
+---
+
+## 15. Référence des clusters
+
+### 15.1 Syntaxe des requêtes cluster
+
+Les requêtes cluster permettent de filtrer les documents par leurs clusters.
+
+| Opérateur | Description | Exemple |
+|-----------|-------------|---------|
+| `=` | Égalité | `status=active` |
+| `!=` | Différent | `status!=inactive` |
+| `<` | Inférieur | `age<18` |
+| `>` | Supérieur | `age>18` |
+| `<=` | Inférieur ou égal | `age<=18` |
+| `>=` | Supérieur ou égal | `age>=18` |
+| `&` ou `AND` | ET logique | `status=active & role=admin` |
+| `\|` ou `OR` | OU logique | `status=active | role=admin` |
+| `*` | EXISTS | `*email` (la clé existe) |
+| `#` | NOT_EXISTS | `#deleted_at` (la clé est absente) |
+
+### 15.2 Exemples
 
 ```php
-use AndyDefer\LaravelIndexer\Collections\ClusterVOCollection;
+// Égalité simple
+$docs = $repository->findByClusterQuery('status=active');
 
-$clusters = new ClusterVOCollection;
+// AND
+$docs = $repository->findByClusterQuery('status=active & role=admin');
 
-$withTenant = $clusters->filterByKey('tenant');
-$withSpecific = $clusters->filterByPair('tenant', 'company_abc');
+// OR
+$docs = $repository->findByClusterQuery('status=active | status=pending');
 
-$values = $clusters->getValuesForKey('tenant');
-$keys = $clusters->getUniqueKeys();
+// Fonction SQL
+$docs = $repository->findByClusterQuery('COUNT(addresses) > 2');
 
-$grouped = $clusters->groupByKey('tenant');
+// Sous-condition
+$docs = $repository->findByClusterQuery('addresses[city=Kinshasa]');
 
-$hasKey = $clusters->hasKey('tenant');
-$hasPair = $clusters->hasPair('tenant', 'company_abc');
+// EXISTS
+$docs = $repository->findByClusterQuery('*email');
+```
 
-$merged = $clusters->mergeAll();
+### 15.3 Fonctions SQL disponibles
+
+| Fonction | Description | Exemple |
+|----------|-------------|---------|
+| `COUNT(path)` | Nombre d'éléments | `COUNT(addresses) > 2` |
+| `SUM(path)` | Somme des valeurs | `SUM(prices) > 500` |
+| `AVG(path)` | Moyenne | `AVG(scores) >= 85` |
+| `LENGTH(path)` | Longueur d'une chaîne | `LENGTH(name) > 5` |
+| `JSON_LENGTH(path)` | Longueur d'un tableau JSON | `JSON_LENGTH(addresses) > 2` |
+
+---
+
+## 16. Cas d'usage concrets
+
+### 16.1 Recherche d'utilisateurs
+
+```php
+<?php
+
+namespace App\Services;
+
+use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
+use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
+use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
+use AndyDefer\Repository\ValueObjects\ClusterQueries;
+
+class UserSearchService
+{
+    public function __construct(
+        private readonly IndexerInterface $indexer
+    ) {}
+
+    public function searchActiveAdmins(string $query): array
+    {
+        $searchQuery = new SearchQueryRecord(
+            query: new SearchQueryVO($query . '=name,email,bio'),
+            cluster_queries: new ClusterQueries([
+                'cluster' => 'status=active & role=admin'
+            ]),
+            limit: 20
+        );
+
+        $results = $this->indexer->search($searchQuery);
+        $userIds = $results->getIds()->toArray();
+
+        return User::whereIn('id', $userIds)->get()->toArray();
+    }
+
+    public function searchByLocation(string $query, string $city): array
+    {
+        $searchQuery = new SearchQueryRecord(
+            query: new SearchQueryVO($query . '=name,email,bio'),
+            cluster_queries: new ClusterQueries([
+                'cluster' => "city=$city"
+            ]),
+            limit: 20
+        );
+
+        $results = $this->indexer->search($searchQuery);
+        $userIds = $results->getIds()->toArray();
+
+        return User::whereIn('id', $userIds)->get()->toArray();
+    }
+}
+```
+
+### 16.2 Recherche de produits e-commerce
+
+```php
+<?php
+
+namespace App\Services;
+
+use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
+use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
+use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
+use AndyDefer\Repository\ValueObjects\ClusterQueries;
+
+class ProductSearchService
+{
+    public function __construct(
+        private readonly IndexerInterface $indexer
+    ) {}
+
+    public function searchProducts(string $query, array $filters): array
+    {
+        $conditions = [];
+
+        if (isset($filters['category'])) {
+            $conditions[] = "category={$filters['category']}";
+        }
+        if (isset($filters['min_price'])) {
+            $conditions[] = "price>={$filters['min_price']}";
+        }
+        if (isset($filters['max_price'])) {
+            $conditions[] = "price<={$filters['max_price']}";
+        }
+        if (isset($filters['in_stock'])) {
+            $conditions[] = "in_stock=" . ($filters['in_stock'] ? 'true' : 'false');
+        }
+
+        $clusterQuery = implode(' & ', $conditions);
+
+        $searchQuery = new SearchQueryRecord(
+            query: new SearchQueryVO($query . '=name,description,tags'),
+            cluster_queries: !empty($clusterQuery) ? new ClusterQueries([
+                'cluster' => $clusterQuery
+            ]) : null,
+            limit: $filters['limit'] ?? 20
+        );
+
+        $results = $this->indexer->search($searchQuery);
+        $productIds = $results->getIds()->toArray();
+
+        return Product::whereIn('id', $productIds)->get()->toArray();
+    }
+}
+
+// Utilisation
+$service = new ProductSearchService($indexer);
+$products = $service->searchProducts('laptop', [
+    'category' => 'electronics',
+    'min_price' => 500,
+    'max_price' => 2000,
+    'in_stock' => true,
+    'limit' => 10,
+]);
+```
+
+### 16.3 API REST avec recherche
+
+```php
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
+use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
+use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
+use AndyDefer\Repository\ValueObjects\ClusterQueries;
+
+class UserController extends Controller
+{
+    public function __construct(
+        private readonly IndexerInterface $indexer
+    ) {}
+
+    public function search(Request $request): JsonResponse
+    {
+        $query = $request->get('q');
+        $role = $request->get('role');
+        $status = $request->get('status');
+        $city = $request->get('city');
+        $limit = $request->get('limit', 20);
+
+        $clusterConditions = [];
+
+        if ($role) {
+            $clusterConditions[] = "role=$role";
+        }
+        if ($status) {
+            $clusterConditions[] = "status=$status";
+        }
+        if ($city) {
+            $clusterConditions[] = "city=$city";
+        }
+
+        $searchQuery = new SearchQueryRecord(
+            query: new SearchQueryVO($query . '=name,email,bio'),
+            cluster_queries: !empty($clusterConditions) ? new ClusterQueries([
+                'cluster' => implode(' & ', $clusterConditions)
+            ]) : null,
+            limit: $limit
+        );
+
+        $results = $this->indexer->search($searchQuery);
+        $userIds = $results->getIds()->toArray();
+
+        $users = User::whereIn('id', $userIds)
+            ->select('id', 'name', 'email', 'role', 'city')
+            ->get();
+
+        return response()->json([
+            'data' => $users,
+            'meta' => [
+                'total' => $users->count(),
+                'limit' => $limit,
+            ]
+        ]);
+    }
+}
+
+// Exemples d'appels API
+// GET /api/users/search?q=john&role=admin
+// GET /api/users/search?q=jane&status=active&city=Paris
+// GET /api/users/search?q=doe&role=doctor&limit=10
+```
+
+---
+
+## 17. Débogage et résolution des problèmes
+
+### 17.1 Vérifier les modèles indexés
+
+```bash
+# Compter les documents indexés
+./bin/directive index:models [App.Models.User] --count
+
+# Voir le SQL généré
+DB::enableQueryLog();
+$users = User::whereCluster('clusters', 'status=active')->get();
+dd(DB::getQueryLog());
+```
+
+### 17.2 Vérifier les clusters
+
+```php
+$user = User::find(1);
+dd($user->getIndexableCluster()->toArray());
+```
+
+### 17.3 Problèmes courants
+
+| Problème | Cause | Solution |
+|----------|-------|----------|
+| Aucun résultat | Requête invalide | Vérifier la syntaxe de recherche |
+| Résultats incomplets | Token size trop petit | Augmenter `min_size` dans la config |
+| Indexation lente | Batch size trop petit | Augmenter `batch_size` |
+| Erreur de syntaxe | Parenthèses mal équilibrées | Vérifier les parenthèses dans la requête |
+
+### 17.4 Vérification de l'index
+
+```bash
+# Vérifier les documents indexés
+./bin/directive index:models [App.Models.User] --count
+
+# Supprimer et réindexer
+./bin/directive index:models [App.Models.User] --reindex
+```
+
+---
+
+## 18. Performance et bonnes pratiques
+
+### 18.1 Indexation
+
+```php
+// ✅ Recommandé - Utiliser des batches
+$this->indexer->setBatchSize(50)->indexAll(User::class);
+
+// ✅ Recommandé - Filtrer avant d'indexer
+User::where('is_active', true)->chunk(100, function ($users) {
+    // Indexer uniquement les utilisateurs actifs
+});
+
+// ❌ À éviter - Indexer sans batch
+User::all()->each(fn($user) => $this->indexer->index($user));
+```
+
+### 18.2 Recherche
+
+```php
+// ✅ Recommandé - Limiter les résultats
+$searchQuery = new SearchQueryRecord(..., limit: 20);
+
+// ✅ Recommandé - Utiliser les clusters pour filtrer
+$searchQuery = new SearchQueryRecord(
+    query: $query,
+    cluster_queries: new ClusterQueries(['cluster' => 'status=active'])
+);
+
+// ❌ À éviter - Recherche sans limite
+$searchQuery = new SearchQueryRecord(..., limit: null);
+```
+
+### 18.3 Configuration
+
+```php
+// Recommandations de configuration
+return [
+    'token_types' => [
+        'ngrams' => [
+            'min_size' => 3,  // Bon équilibre
+            'max_size' => 5,  // Bon équilibre
+        ],
+        'metaphone' => true,  // Recherche phonétique
+    ],
+    'batch_size' => 100,  // Pour les gros volumes
+    'full_text_max_length' => 200,  // Pour les textes longs
+];
+```
+
+### 18.4 Optimisation des modèles
+
+```php
+public function shouldBeIndexed(): bool
+{
+    // ✅ Indexer uniquement les modèles actifs
+    return $this->is_active && !$this->trashed();
+}
+
+public function getIndexableCluster(): ClusterVO
+{
+    // ✅ Utiliser des clusters pour le filtrage
+    return new ClusterVO([
+        'status' => $this->is_active ? 'active' : 'inactive',
+        'tenant' => $this->tenant_id,
+        // ✅ Éviter les valeurs trop dynamiques
+    ]);
+}
 ```
 
 ---

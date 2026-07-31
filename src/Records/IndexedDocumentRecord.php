@@ -7,7 +7,7 @@ namespace AndyDefer\LaravelIndexer\Records;
 use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 /**
  * Record representing an indexed document.
@@ -20,7 +20,7 @@ final class IndexedDocumentRecord extends AbstractRecord
 {
     public function __construct(
         public readonly ?string $id = null,
-        public readonly ?IndexableFingerPrintVO $fingerprint = null,
+        public readonly ?IndexableFingerprintVO $fingerprint = null,
         public readonly ?ClusterVO $cluster = null,
         public readonly ?StrictAssociative $data = null,
     ) {}

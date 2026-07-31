@@ -7,17 +7,17 @@ namespace AndyDefer\LaravelIndexer\Collections;
 use AndyDefer\DomainStructures\Abstracts\AbstractTypedCollection;
 use AndyDefer\DomainStructures\Collections\Core\TypedCollection;
 use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 /**
- * A specialized collection for IndexableFingerPrintVO objects.
+ * A specialized collection for IndexableFingerprintVO objects.
  *
  * Provides convenient filtering, grouping, and querying methods for
  * collections of entity fingerprints.
  *
- * @method IndexableFingerPrintVO|null first()
- * @method IndexableFingerPrintVO|null last()
- * @method IndexableFingerPrintVO|null find(callable $callback)
+ * @method IndexableFingerprintVO|null first()
+ * @method IndexableFingerprintVO|null last()
+ * @method IndexableFingerprintVO|null find(callable $callback)
  * @method self filter(callable $callback)
  * @method self mapPreserveType(callable $callback)
  * @method TypedCollection map(callable $callback)
@@ -31,7 +31,7 @@ final class IndexableFingerPrintVOCollection extends AbstractTypedCollection
 {
     public function __construct()
     {
-        parent::__construct(IndexableFingerPrintVO::class);
+        parent::__construct(IndexableFingerprintVO::class);
     }
 
     /**
@@ -43,7 +43,7 @@ final class IndexableFingerPrintVOCollection extends AbstractTypedCollection
     public function filterByNamespace(string $namespace): self
     {
         return $this->filter(
-            fn (IndexableFingerPrintVO $fingerprint): bool => $fingerprint->belongsTo($namespace)
+            fn (IndexableFingerprintVO $fingerprint): bool => $fingerprint->belongsTo($namespace)
         );
     }
 
@@ -56,7 +56,7 @@ final class IndexableFingerPrintVOCollection extends AbstractTypedCollection
     public function filterByNamespaces(array $namespaces): self
     {
         return $this->filter(
-            fn (IndexableFingerPrintVO $fingerprint): bool => $fingerprint->belongsToAny($namespaces)
+            fn (IndexableFingerprintVO $fingerprint): bool => $fingerprint->belongsToAny($namespaces)
         );
     }
 
@@ -154,9 +154,9 @@ final class IndexableFingerPrintVOCollection extends AbstractTypedCollection
      * Finds a fingerprint by its raw string value.
      *
      * @param  string  $value  The raw fingerprint string (e.g., 'App\Models\User|123')
-     * @return IndexableFingerPrintVO|null The matching fingerprint, or null if not found
+     * @return IndexableFingerprintVO|null The matching fingerprint, or null if not found
      */
-    public function findByValue(string $value): ?IndexableFingerPrintVO
+    public function findByValue(string $value): ?IndexableFingerprintVO
     {
         foreach ($this->items as $fingerprint) {
             if ($fingerprint->getValue() === $value) {
@@ -172,9 +172,9 @@ final class IndexableFingerPrintVOCollection extends AbstractTypedCollection
      *
      * @param  string  $id  The entity ID to match
      * @param  string  $namespace  The namespace to match
-     * @return IndexableFingerPrintVO|null The matching fingerprint, or null if not found
+     * @return IndexableFingerprintVO|null The matching fingerprint, or null if not found
      */
-    public function findByIdAndNamespace(string $id, string $namespace): ?IndexableFingerPrintVO
+    public function findByIdAndNamespace(string $id, string $namespace): ?IndexableFingerprintVO
     {
         foreach ($this->items as $fingerprint) {
             if ($fingerprint->getId() === $id && $fingerprint->belongsTo($namespace)) {

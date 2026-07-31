@@ -8,7 +8,7 @@ use AndyDefer\DomainStructures\Utils\StrictAssociative;
 use AndyDefer\LaravelCluster\Casts\ClusterCast;
 use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -25,7 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property StrictAssociative $data The document data as a key-value collection
  * @property-read Collection<int, IndexedToken> $tokens The tokens associated with this document
  * @property-read int|null $tokens_count The number of tokens associated with this document
- * @property-read IndexableFingerPrintVO $fingerprint The document fingerprint (namespace|id)
+ * @property-read IndexableFingerprintVO $fingerprint The document fingerprint (namespace|id)
  * @property-read ClusterVO $cluster The document cluster as a value object
  * @property-read string $namespace The namespace extracted from the fingerprint
  * @property-read string $entity_id The entity ID extracted from the fingerprint
@@ -98,14 +98,14 @@ final class IndexedDocument extends Model
     // =============================================
 
     /**
-     * Casts the fingerprint attribute to an IndexableFingerPrintVO.
+     * Casts the fingerprint attribute to an IndexableFingerprintVO.
      *
-     * @return Attribute<IndexableFingerPrintVO, never>
+     * @return Attribute<IndexableFingerprintVO, never>
      */
     protected function fingerprint(): Attribute
     {
         return Attribute::make(
-            get: fn (mixed $value, array $attributes): IndexableFingerPrintVO => new IndexableFingerPrintVO($attributes['fingerprint']),
+            get: fn (mixed $value, array $attributes): IndexableFingerprintVO => new IndexableFingerprintVO($attributes['fingerprint']),
         );
     }
 

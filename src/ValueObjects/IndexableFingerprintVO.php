@@ -13,12 +13,12 @@ use InvalidArgumentException;
  * Format: "{namespace}|{id}" where namespace is the FQCN with backslashes.
  *
  * @example
- * $fingerprint = new IndexableFingerPrintVO('App\Models\User|123');
+ * $fingerprint = new IndexableFingerprintVO('App\Models\User|123');
  * $fingerprint->getId(); // '123'
  * $fingerprint->getNamespace(); // 'App\Models\User'
  * $fingerprint->getValue(); // 'App\Models\User|123'
  */
-final class IndexableFingerPrintVO extends AbstractValueObject
+final class IndexableFingerprintVO extends AbstractValueObject
 {
     private const SEPARATOR = '|';
 

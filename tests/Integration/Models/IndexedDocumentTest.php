@@ -11,7 +11,7 @@ use AndyDefer\LaravelIndexer\Models\IndexedDocument;
 use AndyDefer\LaravelIndexer\Models\IndexedToken;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use Illuminate\Database\Eloquent\Collection;
 
 class IndexedDocumentTest extends IntegrationTestCase
@@ -63,7 +63,7 @@ class IndexedDocumentTest extends IntegrationTestCase
     {
         $fingerprint = $this->document->fingerprint;
 
-        $this->assertInstanceOf(IndexableFingerPrintVO::class, $fingerprint);
+        $this->assertInstanceOf(IndexableFingerprintVO::class, $fingerprint);
         $this->assertEquals('App\Models\User', $fingerprint->getNamespace());
         $this->assertEquals('123', $fingerprint->getId());
         $this->assertEquals('App\Models\User|123', $fingerprint->getValue());

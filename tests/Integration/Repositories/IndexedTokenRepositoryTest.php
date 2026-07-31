@@ -14,7 +14,7 @@ use AndyDefer\LaravelIndexer\Records\IndexedTokenRecord;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use AndyDefer\Repository\Records\FindByRecord;
 use AndyDefer\Repository\Records\PaginateRecord;
 use AndyDefer\Repository\ValueObjects\ClusterQueries;
@@ -471,7 +471,7 @@ final class IndexedTokenRepositoryTest extends IntegrationTestCase
         $this->createToken($doc->id, 'john', 'name', 'John');
         $this->createToken($doc->id, 'doe', 'name', 'Doe');
 
-        $fingerprint = new IndexableFingerPrintVO('App\\Models\\User|123');
+        $fingerprint = new IndexableFingerprintVO('App\\Models\\User|123');
         $count = $this->repository->deleteByDocumentFingerPrint($fingerprint);
         $this->assertSame(2, $count);
 

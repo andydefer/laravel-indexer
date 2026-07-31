@@ -11,7 +11,7 @@ use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
 use AndyDefer\LaravelIndexer\Tests\Fixtures\Indexable\TestIndexableEntity;
 use AndyDefer\LaravelIndexer\Tests\Fixtures\Indexable\TestIndexableEntityNotIndexable;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 final class IndexableRecordFactoryTest extends IntegrationTestCase
 {
@@ -36,7 +36,7 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
         $record = IndexableRecordFactory::convert($entity, $cluster);
 
         $this->assertInstanceOf(IndexedDocumentRecord::class, $record);
-        $this->assertInstanceOf(IndexableFingerPrintVO::class, $record->fingerprint);
+        $this->assertInstanceOf(IndexableFingerprintVO::class, $record->fingerprint);
         $this->assertInstanceOf(StrictAssociative::class, $record->data);
         $this->assertNotNull($record->cluster);
 

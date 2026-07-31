@@ -13,7 +13,7 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexDeleter;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 final class IndexDeleterTest extends IntegrationTestCase
 {
@@ -40,7 +40,7 @@ final class IndexDeleterTest extends IntegrationTestCase
         array $data,
         array $cluster = ['model' => 'User', 'tenant' => 'company_abc', 'env' => 'production']
     ): void {
-        $fingerprintVO = new IndexableFingerPrintVO($fingerprint);
+        $fingerprintVO = new IndexableFingerprintVO($fingerprint);
         $clusterVO = new ClusterVO($cluster);
         $record = new IndexedDocumentRecord(
             fingerprint: $fingerprintVO,
@@ -67,7 +67,7 @@ final class IndexDeleterTest extends IntegrationTestCase
         $tokens = $this->tokenRepository->findByDocumentId($doc->id);
         $this->assertNotEmpty($tokens);
 
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|123');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|123');
         $this->indexDeleter->delete($fingerprint);
 
         $doc = $this->documentRepository->findByFingerprintString('App\Models\User|123');
@@ -76,7 +76,7 @@ final class IndexDeleterTest extends IntegrationTestCase
 
     public function test_delete_does_nothing_when_document_not_exists(): void
     {
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|999');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|999');
         $this->indexDeleter->delete($fingerprint);
 
         $this->assertTrue(true);
@@ -110,8 +110,8 @@ final class IndexDeleterTest extends IntegrationTestCase
         $this->assertNotNull($doc3);
 
         $collection = new IndexableFingerPrintVOCollection;
-        $collection->add(new IndexableFingerPrintVO('App\Models\User|123'));
-        $collection->add(new IndexableFingerPrintVO('App\Models\User|456'));
+        $collection->add(new IndexableFingerprintVO('App\Models\User|123'));
+        $collection->add(new IndexableFingerprintVO('App\Models\User|456'));
 
         $this->indexDeleter->deleteMany($collection);
 

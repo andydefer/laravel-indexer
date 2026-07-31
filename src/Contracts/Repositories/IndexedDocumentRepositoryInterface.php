@@ -7,7 +7,7 @@ namespace AndyDefer\LaravelIndexer\Contracts\Repositories;
 use AndyDefer\LaravelCluster\Enums\DatabaseDriver;
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use AndyDefer\Repository\AbstractRepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -28,10 +28,10 @@ interface IndexedDocumentRepositoryInterface extends AbstractRepositoryInterface
     /**
      * Finds a document by its fingerprint value object.
      *
-     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint to search for
+     * @param  IndexableFingerprintVO  $fingerprint  The fingerprint to search for
      * @return IndexedDocument|null The matching document, or null if not found
      */
-    public function findByFingerPrint(IndexableFingerPrintVO $fingerprint): ?IndexedDocument;
+    public function findByFingerPrint(IndexableFingerprintVO $fingerprint): ?IndexedDocument;
 
     /**
      * Finds a document by its raw fingerprint string.
@@ -105,10 +105,10 @@ interface IndexedDocumentRepositoryInterface extends AbstractRepositoryInterface
     /**
      * Deletes a document by its fingerprint value object.
      *
-     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint of the document to delete
+     * @param  IndexableFingerprintVO  $fingerprint  The fingerprint of the document to delete
      * @return int The number of deleted records (0 or 1)
      */
-    public function deleteByFingerPrint(IndexableFingerPrintVO $fingerprint): int;
+    public function deleteByFingerPrint(IndexableFingerprintVO $fingerprint): int;
 
     /**
      * Deletes a document by its raw fingerprint string.
@@ -165,10 +165,10 @@ interface IndexedDocumentRepositoryInterface extends AbstractRepositoryInterface
     /**
      * Checks if a document exists by its fingerprint value object.
      *
-     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint to check
+     * @param  IndexableFingerprintVO  $fingerprint  The fingerprint to check
      * @return bool True if the document exists
      */
-    public function existsByFingerPrint(IndexableFingerPrintVO $fingerprint): bool;
+    public function existsByFingerPrint(IndexableFingerprintVO $fingerprint): bool;
 
     /**
      * Checks if any document exists in a given namespace.

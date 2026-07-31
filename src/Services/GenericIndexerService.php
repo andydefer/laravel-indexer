@@ -11,7 +11,7 @@ use AndyDefer\LaravelIndexer\Contracts\Indexable;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
 use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
@@ -81,7 +81,7 @@ final class GenericIndexerService implements GenericIndexerInterface
         $cluster = $model->getIndexableCluster();
         $record = IndexableRecordFactory::convert($model, $cluster);
 
-        $fingerprint = IndexableFingerPrintVO::fromParts(
+        $fingerprint = IndexableFingerprintVO::fromParts(
             $model->getMorphClass(),
             (string) $model->getKey()
         );
@@ -133,7 +133,7 @@ final class GenericIndexerService implements GenericIndexerInterface
                     continue;
                 }
 
-                $fingerprint = IndexableFingerPrintVO::fromParts(
+                $fingerprint = IndexableFingerprintVO::fromParts(
                     $model->getMorphClass(),
                     (string) $model->getKey()
                 );
@@ -170,7 +170,7 @@ final class GenericIndexerService implements GenericIndexerInterface
      */
     public function delete(Model&Indexable $model): void
     {
-        $fingerprint = IndexableFingerPrintVO::fromParts(
+        $fingerprint = IndexableFingerprintVO::fromParts(
             $model->getMorphClass(),
             (string) $model->getKey()
         );
@@ -206,7 +206,7 @@ final class GenericIndexerService implements GenericIndexerInterface
      */
     public function refresh(Model&Indexable $model): void
     {
-        $fingerprint = IndexableFingerPrintVO::fromParts(
+        $fingerprint = IndexableFingerprintVO::fromParts(
             $model->getMorphClass(),
             (string) $model->getKey()
         );
@@ -248,7 +248,7 @@ final class GenericIndexerService implements GenericIndexerInterface
      */
     public function exists(Model&Indexable $model): bool
     {
-        $fingerprint = IndexableFingerPrintVO::fromParts(
+        $fingerprint = IndexableFingerprintVO::fromParts(
             $model->getMorphClass(),
             (string) $model->getKey()
         );
@@ -261,7 +261,7 @@ final class GenericIndexerService implements GenericIndexerInterface
      */
     public function existsById(string $modelClass, int $id): bool
     {
-        $fingerprint = IndexableFingerPrintVO::fromParts(
+        $fingerprint = IndexableFingerprintVO::fromParts(
             $modelClass,
             (string) $id
         );

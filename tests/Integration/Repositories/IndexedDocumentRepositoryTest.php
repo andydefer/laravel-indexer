@@ -15,7 +15,7 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Tests\Fixtures\Models\TestProduct;
 use AndyDefer\LaravelIndexer\Tests\Fixtures\Models\TestUser;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use AndyDefer\Repository\Records\FindByRecord;
 use AndyDefer\Repository\Records\PaginateRecord;
 use AndyDefer\Repository\ValueObjects\ClusterQueries;
@@ -98,7 +98,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $data = ['name' => 'John Doe', 'email' => 'john@example.com'];
 
         $record = new IndexedDocumentRecord(
-            fingerprint: new IndexableFingerPrintVO($fingerprint),
+            fingerprint: new IndexableFingerprintVO($fingerprint),
             cluster: new ClusterVO($cluster),
             data: StrictAssociative::from($data),
         );
@@ -126,7 +126,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $document = $this->createDocument(['id' => $id, 'namespace' => TestUser::class]);
 
         $result = $this->repository->findByFingerPrint(
-            new IndexableFingerPrintVO(TestUser::class.'|'.$id)
+            new IndexableFingerprintVO(TestUser::class.'|'.$id)
         );
 
         $this->assertNotNull($result);
@@ -136,7 +136,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
     public function test_find_by_finger_print_returns_null_when_not_found(): void
     {
         $result = $this->repository->findByFingerPrint(
-            new IndexableFingerPrintVO(TestUser::class.'|999')
+            new IndexableFingerprintVO(TestUser::class.'|999')
         );
 
         $this->assertNull($result);
@@ -221,7 +221,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->createDocument(['id' => $id, 'namespace' => TestUser::class]);
 
         $deleted = $this->repository->deleteByFingerPrint(
-            new IndexableFingerPrintVO(TestUser::class.'|'.$id)
+            new IndexableFingerprintVO(TestUser::class.'|'.$id)
         );
 
         $this->assertSame(1, $deleted);
@@ -299,7 +299,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $this->createDocument(['id' => $id, 'namespace' => TestUser::class]);
 
         $exists = $this->repository->existsByFingerPrint(
-            new IndexableFingerPrintVO(TestUser::class.'|'.$id)
+            new IndexableFingerprintVO(TestUser::class.'|'.$id)
         );
 
         $this->assertTrue($exists);
@@ -308,7 +308,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
     public function test_exists_by_finger_print_returns_false_when_not_exists(): void
     {
         $exists = $this->repository->existsByFingerPrint(
-            new IndexableFingerPrintVO(TestUser::class.'|999')
+            new IndexableFingerprintVO(TestUser::class.'|999')
         );
 
         $this->assertFalse($exists);
@@ -371,12 +371,12 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
     {
         $records = [
             new IndexedDocumentRecord(
-                fingerprint: new IndexableFingerPrintVO(TestUser::class.'|1'),
+                fingerprint: new IndexableFingerprintVO(TestUser::class.'|1'),
                 cluster: new ClusterVO(['status' => 'active']),
                 data: StrictAssociative::from(['name' => 'John']),
             ),
             new IndexedDocumentRecord(
-                fingerprint: new IndexableFingerPrintVO(TestUser::class.'|2'),
+                fingerprint: new IndexableFingerprintVO(TestUser::class.'|2'),
                 cluster: new ClusterVO(['status' => 'inactive']),
                 data: StrictAssociative::from(['name' => 'Jane']),
             ),
@@ -532,7 +532,7 @@ final class IndexedDocumentRepositoryTest extends IntegrationTestCase
         $doc = $this->createDocument(['id' => $id, 'namespace' => TestUser::class]);
 
         $filters = new IndexedDocumentFiltersRecord(
-            fingerprint: new IndexableFingerPrintVO(TestUser::class.'|'.$id)
+            fingerprint: new IndexableFingerprintVO(TestUser::class.'|'.$id)
         );
 
         $findBy = new FindByRecord(

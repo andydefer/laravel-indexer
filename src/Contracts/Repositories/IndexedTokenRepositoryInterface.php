@@ -8,7 +8,7 @@ use AndyDefer\LaravelCluster\Enums\DatabaseDriver;
 use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\Models\IndexedToken;
 use AndyDefer\LaravelIndexer\Records\IndexedTokenRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use AndyDefer\Repository\AbstractRepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -83,7 +83,7 @@ interface IndexedTokenRepositoryInterface extends AbstractRepositoryInterface
 
     public function findByDocumentId(string $documentId): Collection;
 
-    public function findByDocumentFingerPrint(IndexableFingerPrintVO $fingerprint): Collection;
+    public function findByDocumentFingerPrint(IndexableFingerprintVO $fingerprint): Collection;
 
     public function findByNamespace(string $namespace): Collection;
 
@@ -177,7 +177,7 @@ interface IndexedTokenRepositoryInterface extends AbstractRepositoryInterface
 
     public function deleteByDocumentId(string $documentId): int;
 
-    public function deleteByDocumentFingerPrint(IndexableFingerPrintVO $fingerprint): int;
+    public function deleteByDocumentFingerPrint(IndexableFingerprintVO $fingerprint): int;
 
     public function deleteByNamespace(string $namespace): int;
 

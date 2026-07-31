@@ -13,7 +13,7 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\IndexerService;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 final class IndexerServiceTest extends IntegrationTestCase
 {
@@ -40,7 +40,7 @@ final class IndexerServiceTest extends IntegrationTestCase
     private function createRecord(string $fingerprint, array $data, array $cluster = ['model' => 'User', 'tenant' => 'company_abc', 'env' => 'production']): IndexedDocumentRecord
     {
         return new IndexedDocumentRecord(
-            fingerprint: new IndexableFingerPrintVO($fingerprint),
+            fingerprint: new IndexableFingerprintVO($fingerprint),
             data: StrictAssociative::from($data),
             cluster: $this->createClusterVO($cluster),
         );
@@ -181,7 +181,7 @@ final class IndexerServiceTest extends IntegrationTestCase
         $tokens = $this->tokenRepository->findByDocumentId($doc->id);
         $this->assertNotEmpty($tokens);
 
-        $this->indexer->delete(new IndexableFingerPrintVO('App\Models\User|456'));
+        $this->indexer->delete(new IndexableFingerprintVO('App\Models\User|456'));
 
         $doc = $this->documentRepository->findByFingerprintString('App\Models\User|456');
         $this->assertNull($doc);
@@ -208,8 +208,8 @@ final class IndexerServiceTest extends IntegrationTestCase
         $this->assertNotNull($doc3);
 
         $collection = new IndexableFingerPrintVOCollection;
-        $collection->add(new IndexableFingerPrintVO('App\Models\User|111'));
-        $collection->add(new IndexableFingerPrintVO('App\Models\User|222'));
+        $collection->add(new IndexableFingerprintVO('App\Models\User|111'));
+        $collection->add(new IndexableFingerprintVO('App\Models\User|222'));
 
         $this->indexer->deleteMany($collection);
 

@@ -15,7 +15,7 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 final class IndexWriterTest extends IntegrationTestCase
 {
@@ -54,7 +54,7 @@ final class IndexWriterTest extends IntegrationTestCase
 
     public function test_index_creates_document_and_tokens(): void
     {
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|123');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|123');
         $cluster = $this->createClusterVO([
             'model' => 'User',
             'tenant' => 'company_abc',
@@ -96,7 +96,7 @@ final class IndexWriterTest extends IntegrationTestCase
 
     public function test_index_increments_frequency_on_existing_token(): void
     {
-        $fingerPrint1 = new IndexableFingerPrintVO('App\Models\User|456');
+        $fingerPrint1 = new IndexableFingerprintVO('App\Models\User|456');
         $cluster = $this->createClusterVO([
             'model' => 'User',
             'tenant' => 'company_abc',
@@ -123,7 +123,7 @@ final class IndexWriterTest extends IntegrationTestCase
         );
         $this->assertEquals(1, $token->frequency);
 
-        $fingerPrint2 = new IndexableFingerPrintVO('App\Models\User|789');
+        $fingerPrint2 = new IndexableFingerprintVO('App\Models\User|789');
         $record2 = new IndexedDocumentRecord(
             fingerprint: $fingerPrint2,
             data: StrictAssociative::from([
@@ -146,7 +146,7 @@ final class IndexWriterTest extends IntegrationTestCase
 
     public function test_index_handles_nested_data(): void
     {
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|789');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|789');
         $cluster = $this->createClusterVO([
             'model' => 'User',
             'tenant' => 'company_abc',
@@ -195,7 +195,7 @@ final class IndexWriterTest extends IntegrationTestCase
 
     public function test_index_handles_array_values(): void
     {
-        $fingerprint = new IndexableFingerPrintVO('App\Models\Product|123');
+        $fingerprint = new IndexableFingerprintVO('App\Models\Product|123');
         $cluster = $this->createClusterVO([
             'model' => 'Product',
             'tenant' => 'company_abc',
@@ -249,7 +249,7 @@ final class IndexWriterTest extends IntegrationTestCase
 
     public function test_index_converts_numeric_and_boolean_to_string(): void
     {
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|999');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|999');
         $cluster = $this->createClusterVO([
             'model' => 'User',
             'tenant' => 'company_abc',
@@ -308,7 +308,7 @@ final class IndexWriterTest extends IntegrationTestCase
     {
         // Config déjà settée dans setUp avec min_size=2, max_size=4
 
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|111');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|111');
         $cluster = $this->createClusterVO([
             'model' => 'User',
             'tenant' => 'company_abc',
@@ -355,14 +355,14 @@ final class IndexWriterTest extends IntegrationTestCase
         $records = new IndexableRecordCollection;
 
         $record1 = new IndexedDocumentRecord(
-            fingerprint: new IndexableFingerPrintVO('App\Models\User|1'),
+            fingerprint: new IndexableFingerprintVO('App\Models\User|1'),
             data: StrictAssociative::from(['name' => 'User 1']),
             cluster: $this->createClusterVO(['model' => 'User', 'tenant' => 'company_abc']),
         );
         $records->add($record1);
 
         $record2 = new IndexedDocumentRecord(
-            fingerprint: new IndexableFingerPrintVO('App\Models\User|2'),
+            fingerprint: new IndexableFingerprintVO('App\Models\User|2'),
             data: StrictAssociative::from(['name' => 'User 2']),
             cluster: $this->createClusterVO(['model' => 'User', 'tenant' => 'company_abc']),
         );
@@ -370,8 +370,8 @@ final class IndexWriterTest extends IntegrationTestCase
 
         $this->indexWriter->indexMany($records);
 
-        $doc1 = $this->documentRepository->findByFingerPrint(new IndexableFingerPrintVO('App\Models\User|1'));
-        $doc2 = $this->documentRepository->findByFingerPrint(new IndexableFingerPrintVO('App\Models\User|2'));
+        $doc1 = $this->documentRepository->findByFingerPrint(new IndexableFingerprintVO('App\Models\User|1'));
+        $doc2 = $this->documentRepository->findByFingerPrint(new IndexableFingerprintVO('App\Models\User|2'));
 
         $this->assertNotNull($doc1);
         $this->assertNotNull($doc2);
@@ -389,7 +389,7 @@ final class IndexWriterTest extends IntegrationTestCase
     {
         $longText = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.';
 
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|999');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|999');
         $cluster = $this->createClusterVO([
             'model' => 'User',
             'tenant' => 'company_abc',
@@ -441,7 +441,7 @@ final class IndexWriterTest extends IntegrationTestCase
     {
         $longWord = 'Supercalifragilisticexpialidocious';
 
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|888');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|888');
         $cluster = $this->createClusterVO([
             'model' => 'User',
             'tenant' => 'company_abc',
@@ -483,7 +483,7 @@ final class IndexWriterTest extends IntegrationTestCase
 
     public function test_index_handles_mixed_short_and_long_texts(): void
     {
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|777');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|777');
         $cluster = $this->createClusterVO([
             'model' => 'User',
             'tenant' => 'company_abc',
@@ -534,7 +534,7 @@ final class IndexWriterTest extends IntegrationTestCase
     {
         $textWithSpecialChars = "L'utilisateur Jean-Pierre a acheté 2 produits à 100€ !";
 
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|666');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|666');
         $cluster = $this->createClusterVO([
             'model' => 'User',
             'tenant' => 'company_abc',

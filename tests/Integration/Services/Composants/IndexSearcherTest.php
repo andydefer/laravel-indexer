@@ -18,7 +18,7 @@ use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexSearcher;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
 use AndyDefer\LaravelIndexer\Tests\IntegrationTestCase;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use AndyDefer\LaravelIndexer\ValueObjects\SearchQueryVO;
 use AndyDefer\PhpServices\Contracts\Services\NGramGeneratorInterface;
 use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
@@ -64,7 +64,7 @@ final class IndexSearcherTest extends IntegrationTestCase
         array $data,
         array $cluster = ['model' => 'User', 'tenant' => 'company_abc', 'env' => 'production']
     ): void {
-        $fingerprintVO = new IndexableFingerPrintVO($fingerprint);
+        $fingerprintVO = new IndexableFingerprintVO($fingerprint);
         $clusterVO = new ClusterVO($cluster);
         $record = new IndexedDocumentRecord(
             fingerprint: $fingerprintVO,
@@ -86,7 +86,7 @@ final class IndexSearcherTest extends IntegrationTestCase
     {
         $this->createAndIndexDocument('App\Models\User|123', ['name' => 'John Doe']);
 
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|123');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|123');
         $exists = $this->indexSearcher->exists($fingerprint);
 
         $this->assertTrue($exists);
@@ -94,7 +94,7 @@ final class IndexSearcherTest extends IntegrationTestCase
 
     public function test_exists_returns_false_when_document_not_exists(): void
     {
-        $fingerprint = new IndexableFingerPrintVO('App\Models\User|999');
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|999');
         $exists = $this->indexSearcher->exists($fingerprint);
 
         $this->assertFalse($exists);

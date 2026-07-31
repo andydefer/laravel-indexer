@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Collections;
 
+use AndyDefer\DomainStructures\Abstracts\AbstractTypedCollection;
 use AndyDefer\DomainStructures\Collections\Core\TypedCollection;
 use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
 use AndyDefer\LaravelCluster\Collections\ClusterVOCollection;
@@ -27,7 +28,7 @@ use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
  * @method self reverse()
  * @method self sort(int $flags = SORT_REGULAR)
  */
-final class IndexableRecordCollection extends TypedCollection
+final class IndexableRecordCollection extends AbstractTypedCollection
 {
     public function __construct()
     {

@@ -10,7 +10,7 @@ use AndyDefer\LaravelIndexer\Collections\IndexableSearchResultCollection;
 use AndyDefer\LaravelIndexer\Records\IndexableSearchResultRecord;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 /**
  * Main interface for the indexing service.
@@ -37,9 +37,9 @@ interface IndexerInterface
     /**
      * Deletes a document from the index.
      *
-     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint of the document to delete
+     * @param  IndexableFingerprintVO  $fingerprint  The fingerprint of the document to delete
      */
-    public function delete(IndexableFingerPrintVO $fingerprint): void;
+    public function delete(IndexableFingerprintVO $fingerprint): void;
 
     /**
      * Deletes multiple documents from the index.
@@ -58,10 +58,10 @@ interface IndexerInterface
     /**
      * Checks if a document exists in the index.
      *
-     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint to check
+     * @param  IndexableFingerprintVO  $fingerprint  The fingerprint to check
      * @return bool True if the document exists, false otherwise
      */
-    public function exists(IndexableFingerPrintVO $fingerprint): bool;
+    public function exists(IndexableFingerprintVO $fingerprint): bool;
 
     /**
      * Searches the index using the provided query.

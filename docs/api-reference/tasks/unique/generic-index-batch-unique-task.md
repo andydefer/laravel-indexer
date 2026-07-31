@@ -2,7 +2,7 @@
 
 ## Description
 
-Tâche unique qui traite un lot d'éléments à indexer. Elle reçoit une collection d'`IndexableVO` et indexe chaque modèle avec son cluster dynamique.
+Tâche unique qui traite un lot de modèles pour l'indexation. Reçoit une collection d'objets `IndexableVO`, récupère les instances de modèles correspondantes et les indexe. Gère la déduplication en vérifiant si un modèle est déjà indexé et le réindexe si nécessaire.
 
 ## Hiérarchie / Implémentations
 
@@ -11,116 +11,91 @@ AbstractUniqueTask
     └── GenericIndexBatchUniqueTask
 ```
 
-**Dépendances :**
-- `IndexerInterface` - Service d'indexation bas niveau
-- `IndexedDocumentRepositoryInterface` - Repository des documents
-- `ConsoleInterface` - Interface console pour les alertes
-
-**Lien source :** [GenericIndexBatchUniqueTask.php](https://github.com/andydefer/laravel-indexer/blob/main/src/Tasks/UniqueTasks/GenericIndexBatchUniqueTask.php)
-
 ## Rôle principal
 
-Cette tâche unique est le **travailleur** de l'indexation. Elle :
+Cette tâche est l'unité d'exécution du système d'indexation par lots. Elle :
 
-1. **Reçoit** une collection d'`IndexableVO` (modèle + ID)
-2. **Récupère** chaque modèle depuis la base de données
-3. **Vérifie** l'éligibilité du modèle (`shouldBeIndexed()`)
-4. **Supprime** le document s'il existe déjà (réindexation)
-5. **Indexe** le modèle avec son cluster dynamique
-6. **Gère** les erreurs (modèle introuvable)
+- Reçoit un lot d'objets valeur indexables
+- Récupère les instances de modèles en une seule requête par classe
+- Filtre les modèles non indexables (`shouldBeIndexed()`)
+- Gère la déduplication (suppression puis réindexation)
+- Indexe tous les modèles valides en une seule opération
 
----
+### Responsabilités
 
-## Cycle de vie
+1. **Validation du payload** : Vérifie la présence et la validité des items
+2. **Récupération optimisée** : Une requête par classe de modèle
+3. **Filtrage** : Exclusion des modèles non indexables
+4. **Déduplication** : Suppression des documents existants
+5. **Indexation en masse** : `indexMany()` pour une performance optimale
 
-```
-Réception du payload
-    ↓
-Vérification de la collection (items)
-    ↓
-Pour chaque item :
-    ↓
-    Récupération du modèle via getInstance()
-    ↓
-    Vérification de l'éligibilité (shouldBeIndexed)
-    ↓
-    Si déjà indexé → suppression
-    ↓
-    Indexation avec cluster dynamique
-    ↓
-Résumé des résultats
-```
+## Détails
 
----
+[Voir la classe AbstractUniqueTask](https://github.com/andydefer/task/blob/main/src/Abstract/AbstractUniqueTask.php)
 
-## Structure du payload
+[Voir la classe IndexableVOCollection](https://github.com/andydefer/laravel-indexer/blob/main/src/Collections/IndexableVOCollection.php)
 
-```json
-{
-    "items": [
-        {
-            "modelClass": "App\\Models\\User",
-            "id": 1
-        },
-        {
-            "modelClass": "App\\Models\\User",
-            "id": 2
-        }
-    ]
-}
-```
-
----
-
-## Méthodes
+## API / Méthodes publiques
 
 ### `process(): void`
 
-Méthode principale exécutée lors de l'appel de la tâche.
+Méthode principale de la tâche. Traite le lot d'items et les indexe.
 
 **Retourne :** `void`
 
-**Exceptions :** `ModelNotFoundException` - Capturée pour chaque item
-
-**Exemple :**
-```php
-// La tâche est exécutée automatiquement par le système de tâches
-// Exemple d'enregistrement :
-$config = UniqueTaskConfigRecord::from([
-    'scheduled_at' => new Iso8601DateTimeVO(now()->toIso8601String()),
-    'max_attempts' => new MaxFailedAttemptsVO(3),
-]);
-
-$uniqueTaskService->register(
-    new UniqueTaskFqcnVO(GenericIndexBatchUniqueTask::class),
-    $payload,
-    $config
-);
-```
+**Comportement :**
+1. Valide le payload
+2. Récupère les instances de modèles
+3. Pour chaque item, vérifie la validité du modèle
+4. Supprime les documents existants si nécessaire
+5. Indexe tous les modèles valides en une seule opération
 
 ---
 
-### `after(bool $success, ?DescriptionVO $error): void`
+### `after(bool $success, ?DescriptionVO $error = null): void`
 
-Hook exécuté après le traitement de la tâche.
+Méthode appelée après l'exécution de la tâche.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `$success` | `bool` | Indique si la tâche a réussi |
-| `$error` | `DescriptionVO|null` | Message d'erreur en cas d'échec |
+| `$error` | `DescriptionVO|null` | Description de l'erreur si `$success` est `false` |
 
 **Retourne :** `void`
 
-**Exemple :**
-```php
-protected function after(bool $success, ?DescriptionVO $error = null): void
-{
-    if ($success) {
-        $this->info(new DescriptionVO('Lot indexé avec succès'));
-    } else {
-        $this->error(new DescriptionVO("Échec de l'indexation du lot : {$error->getValue()}"));
-    }
-}
+---
+
+## Architecture interne
+
+### Flux d'exécution
+
+```
+GenericIndexBatchUniqueTask::process()
+    │
+    ├── Valide le payload
+    │   ├── items présent
+    │   └── items non vide
+    │
+    ├── Récupère les instances de modèles
+    │   └── IndexableVOCollection::getModelInstances()
+    │       └── Une requête par classe de modèle
+    │
+    ├── Pour chaque item
+    │   │
+    │   ├── Vérifie l'existence du modèle
+    │   │   └── Si absent → skip avec warning
+    │   │
+    │   ├── Vérifie shouldBeIndexed()
+    │   │   └── Si false → skip
+    │   │
+    │   ├── Vérifie l'existence dans l'index
+    │   │   └── Si existe → supprime
+    │   │
+    │   └── Convertit en record
+    │       └── IndexableRecordFactory::convert()
+    │
+    └── Indexe tous les records
+        └── indexer->indexMany()
 ```
 
 ---
@@ -130,147 +105,107 @@ protected function after(bool $success, ?DescriptionVO $error = null): void
 ### Cas 1 : Indexation d'un lot d'utilisateurs
 
 ```php
-<?php
+// Payload généré par l'orchestrateur
+$items = new IndexableVOCollection();
+$items->add(new IndexableVO(User::class, 1));
+$items->add(new IndexableVO(User::class, 2));
+$items->add(new IndexableVO(User::class, 3));
 
-declare(strict_types=1);
+$payload = StrictDataObject::from(['items' => $items]);
 
-use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
-use AndyDefer\LaravelIndexer\Tasks\UniqueTasks\GenericIndexBatchUniqueTask;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
-use AndyDefer\Task\Contracts\Services\UniqueTaskServiceInterface;
-use AndyDefer\Task\Records\UniqueTaskConfigRecord;
-use AndyDefer\Task\ValueObjects\Iso8601DateTimeVO;
-
-class UserIndexer
-{
-    public function __construct(
-        private readonly UniqueTaskServiceInterface $uniqueTaskService
-    ) {}
-
-    public function indexUserBatch(array $userIds): void
-    {
-        $collection = new IndexableVOCollection;
-        foreach ($userIds as $id) {
-            $collection->add(new IndexableVO(User::class, $id));
-        }
-
-        $payload = StrictDataObject::from([
-            'items' => $collection,
-        ]);
-
-        $config = UniqueTaskConfigRecord::from([
-            'scheduled_at' => new Iso8601DateTimeVO(now()->toIso8601String()),
-            'max_attempts' => new MaxFailedAttemptsVO(3),
-        ]);
-
-        $this->uniqueTaskService->register(
-            new UniqueTaskFqcnVO(GenericIndexBatchUniqueTask::class),
-            $payload,
-            $config
-        );
-    }
-}
+// La tâche traite le lot
+$task = new GenericIndexBatchUniqueTask();
+$task->setPayload($payload);
+$task->run();
 ```
 
----
-
-### Cas 2 : Gestion des modèles non éligibles
+### Cas 2 : Réindexation d'un lot avec déduplication
 
 ```php
-// Exemple de log lorsqu'un modèle n'est pas éligible
-// Item 5 should not be indexed, skipping
-
-// Causes possibles :
-// - Le modèle est inactif (is_active = false)
-// - La méthode shouldBeIndexed() retourne false
-// - Le modèle n'est pas publié (is_published = false)
+// Si un modèle est déjà indexé, il est supprimé puis réindexé
+// Items: [User|1, User|2, User|3]
+// User|1 déjà indexé → supprimé puis réindexé
+// User|2 non indexé → indexé
+// User|3 inactif (shouldBeIndexed = false) → skip
 ```
 
----
-
-### Cas 3 : Réindexation d'un lot existant
+### Cas 3 : Gestion des modèles inexistants
 
 ```php
-// Si un document existe déjà, il est supprimé puis réindexé
-// Item 42 already indexed, deleting and re-indexing
-
-// Cela garantit que l'index est toujours à jour
-// avec les dernières données du modèle
+// Si un modèle a été supprimé entre temps
+// Items: [User|1, User|2, User|3]
+// User|2 n'existe plus dans la base
+// Résultat: "Item 2 not found, skipping"
 ```
 
 ---
 
 ## Gestion des erreurs
 
-| Situation | Comportement | Message |
-|-----------|--------------|---------|
-| Payload invalide (pas d'items) | Erreur et arrêt | `Invalid payload: missing items or empty collection` |
-| Collection vide | Erreur et arrêt | `Invalid payload: items collection is empty` |
-| Modèle introuvable | Skip + alerte | `Item {id} not found, skipping` |
-| Modèle non éligible | Skip + info | `Item {id} should not be indexed, skipping` |
-| Échec global | Hook `after()` avec `$success = false` | `Batch indexation failed: {error}` |
+| Situation | Exception | Message |
+|-----------|-----------|---------|
+| Payload invalide (sans items) | - | `Invalid payload: missing items or empty collection` |
+| Items vides | - | `Invalid payload: items collection is empty` |
+| Échec d'indexation | `Throwable` | Propage l'exception |
 
 ---
 
 ## Intégration
 
-### Avec GenericOrchestratorRecurringTask
+Cette tâche s'intègre avec :
 
-La tâche est dispatchée par l'orchestrateur :
+- **`IndexerInterface`** : Pour l'indexation des records
+- **`IndexedDocumentRepositoryInterface`** : Pour la vérification et suppression
+- **`ConsoleInterface`** : Pour les alertes et logs
+- **`IndexableVOCollection`** : Collection des items à traiter
 
-```php
-// GenericOrchestratorRecurringTask crée les payloads
-$payload = StrictDataObject::from([
-    'items' => $collection, // IndexableVOCollection
-]);
+### Flux de données
 
-$uniqueTaskService->register(
-    new UniqueTaskFqcnVO(GenericIndexBatchUniqueTask::class),
-    $payload,
-    $config
-);
 ```
-
-### Avec IndexableVO
-
-Chaque item est un `IndexableVO` :
-
-```php
-public function getInstance(): Model&Indexable
-{
-    return $this->modelClass::find($this->id);
-}
-```
-
-### Avec IndexableRecordFactory
-
-Conversion du modèle en `IndexableRecord` :
-
-```php
-$cluster = $model->getIndexableCluster();
-$record = IndexableRecordFactory::convert($model, $cluster);
+GenericIndexBatchUniqueTask
+    │
+    ├── Payload reçu
+    │   └── items: IndexableVOCollection
+    │
+    ├── Récupération des instances
+    │   └── getModelInstances()
+    │       └── Collection<Model&Indexable>
+    │
+    ├── Conversion en records
+    │   └── IndexableRecordFactory::convert()
+    │       └── IndexedDocumentRecord
+    │
+    └── Indexation
+        └── IndexerInterface::indexMany()
 ```
 
 ---
 
 ## Performance
 
-- **Batch processing** : Traite plusieurs éléments en une seule tâche
-- **Suppression des doublons** : Supprime avant d'indexer pour éviter les conflits
-- **Gestion des erreurs** : Continue même si un élément échoue
-- **Complexité** : O(n) où n est le nombre d'éléments dans le lot
+| Opération | Complexité | Notes |
+|-----------|------------|-------|
+| `getModelInstances()` | O(n + m) | n = items, m = classes de modèles |
+| Vérification d'existence | O(n) | Une requête par item |
+| Conversion | O(n) | n = nombre d'items valides |
+| `indexMany()` | O(n * tokens) | n = nombre de records |
+
+**Optimisations :**
+
+- `getModelInstances()` exécute une seule requête par classe de modèle
+- `indexMany()` utilise le buffering pour les tokens
+- Les modèles exclus par `shouldBeIndexed()` ne sont pas traités
 
 ---
 
 ## Compatibilité
 
-| Version PHP | Support |
-|-------------|---------|
+| Version | Support |
+|---------|---------|
 | PHP 8.1+ | ✅ Complet |
-| PHP 8.2+ | ✅ Complet |
-| PHP 8.3+ | ✅ Complet |
-| PHP 8.4+ | ✅ Complet |
-| PHP 8.5+ | ✅ Complet |
+| PHP 8.0 | ✅ Complet |
+| Laravel 10+ | ✅ Complet |
+| Task Package 1.x+ | ✅ Complet |
 
 ---
 
@@ -281,82 +216,45 @@ $record = IndexableRecordFactory::convert($model, $cluster);
 
 declare(strict_types=1);
 
-use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
 use AndyDefer\LaravelIndexer\Tasks\UniqueTasks\GenericIndexBatchUniqueTask;
+use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
 use AndyDefer\LaravelIndexer\ValueObjects\IndexableVO;
-use AndyDefer\Task\Contracts\Services\UniqueTaskServiceInterface;
-use AndyDefer\Task\Records\UniqueTaskConfigRecord;
-use AndyDefer\Task\ValueObjects\Iso8601DateTimeVO;
-use AndyDefer\Task\ValueObjects\MaxFailedAttemptsVO;
+use AndyDefer\DomainStructures\Utils\StrictDataObject;
 
-class BatchIndexer
-{
-    public function __construct(
-        private readonly UniqueTaskServiceInterface $uniqueTaskService
-    ) {}
+// 1. Création du lot
+$items = new IndexableVOCollection();
+$items->add(new IndexableVO(User::class, 1));
+$items->add(new IndexableVO(User::class, 2));
+$items->add(new IndexableVO(User::class, 3));
+$items->add(new IndexableVO(Product::class, 10));
+$items->add(new IndexableVO(Product::class, 11));
 
-    public function indexBatch(string $modelClass, array $ids): void
-    {
-        // 1. Créer la collection
-        $collection = new IndexableVOCollection;
-        foreach ($ids as $id) {
-            $collection->add(new IndexableVO($modelClass, $id));
-        }
+// 2. Création du payload
+$payload = StrictDataObject::from(['items' => $items]);
 
-        // 2. Créer le payload
-        $payload = StrictDataObject::from([
-            'items' => $collection,
-        ]);
+// 3. Création et exécution de la tâche
+$task = new GenericIndexBatchUniqueTask();
+$task->setPayload($payload);
+$task->run();
 
-        // 3. Configurer la tâche
-        $config = UniqueTaskConfigRecord::from([
-            'scheduled_at' => new Iso8601DateTimeVO(now()->toIso8601String()),
-            'max_attempts' => new MaxFailedAttemptsVO(3),
-            'description' => "Indexation du lot de {$modelClass}",
-        ]);
-
-        // 4. Enregistrer la tâche
-        $alias = $this->uniqueTaskService->register(
-            new UniqueTaskFqcnVO(GenericIndexBatchUniqueTask::class),
-            $payload,
-            $config
-        );
-
-        echo "✅ Tâche enregistrée : {$alias->getValue()}\n";
-    }
-
-    public function processBatch(array $ids): void
-    {
-        $this->indexBatch(User::class, $ids);
-    }
-
-    public function processBatches(array $allIds, int $batchSize = 50): void
-    {
-        $chunks = array_chunk($allIds, $batchSize);
-        foreach ($chunks as $chunk) {
-            $this->indexBatch(User::class, $chunk);
-        }
-        echo "✅ {$totalBatches} lots dispatchés\n";
-    }
-
-    public function getTaskStatus(string $alias): void
-    {
-        $task = $this->uniqueTaskService->find(new TaskAliasVO($alias));
-        if ($task) {
-            echo "📊 Statut : {$task->status->value}\n";
-            echo "📊 Tentatives : {$task->attempts->getValue()}/{$task->max_attempts->getValue()}\n";
-        }
-    }
-}
+// Résultat attendu :
+// Processing batch of 5 items...
+// Item 1 already indexed, deleting and re-indexing
+// Item 2 should not be indexed, skipping
+// Item 3 indexing...
+// Item 10 indexing...
+// Item 11 indexing...
+// Indexed 4 items, skipped 1 items
+// Batch indexation completed successfully
 ```
 
 ---
 
 ## Voir aussi
 
-- `GenericOrchestratorRecurringTask` - Tâche récurrente qui dispatch cette tâche
-- `AbstractUniqueTask` - Classe de base pour les tâches uniques
-- `IndexableVO` - Value Object pour les modèles indexables
-- `IndexableVOCollection` - Collection d'IndexableVO
-- `UniqueTaskService` - Service de gestion des tâches uniques
-- `IndexableRecordFactory` - Factory pour les enregistrements indexables
+- `AbstractUniqueTask` - Classe parente des tâches uniques
+- `IndexableVOCollection` - Collection des objets valeur indexables
+- `IndexableVO` - Value Object d'entité indexable
+- `IndexableRecordFactory` - Factory de records
+- `IndexerInterface` - Service d'indexation
+- `IndexedDocumentRepositoryInterface` - Repository des documents

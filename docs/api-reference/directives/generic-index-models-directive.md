@@ -2,7 +2,7 @@
 
 ## Description
 
-Directive CLI pour indexer les modèles configurés avec des clusters dynamiques. Elle orchestre l'indexation des modèles Eloquent implémentant l'interface `Indexable`.
+Directive CLI permettant d'indexer, réindexer, compter et supprimer des modèles Eloquent depuis la ligne de commande. Elle fait partie du système `laravel-directive` et offre une interface alternative aux commandes Artisan.
 
 ## Hiérarchie / Implémentations
 
@@ -11,42 +11,49 @@ AbstractDirective
     └── GenericIndexModelsDirective
 ```
 
-**Interfaces :** `AbstractDirective` (via héritage)
-
-**Lien source :** [GenericIndexModelsDirective.php](https://github.com/andydefer/laravel-indexer/blob/main/src/Directives/GenericIndexModelsDirective.php)
-
 ## Rôle principal
 
-Permet d'indexer en masse des modèles via la ligne de commande. Contrairement à l'approche traditionnelle avec des clusters statiques, cette directive utilise les clusters dynamiques générés par chaque modèle via la méthode `getIndexableCluster()`.
+Cette directive sert d'interface utilisateur pour les opérations d'indexation en masse. Elle permet de :
 
----
+- Indexer de nouveaux modèles (sans supprimer les existants)
+- Réindexer tous les modèles (suppression puis réindexation)
+- Compter les documents indexés par classe de modèle
+- Supprimer tous les documents indexés d'une classe
+
+Elle est conçue pour être utilisée dans des environnements de production via des scripts ou des tâches planifiées.
+
+## Détails
+
+[Voir la classe AbstractDirective](https://github.com/andydefer/laravel-directive/blob/main/src/AbstractDirective.php)
 
 ## API / Méthodes publiques
 
 ### `getSignature(): string`
 
-Retourne la signature de la commande CLI.
+Retourne la signature de la commande avec ses paramètres et options.
 
-**Retourne :** `string` - La signature de la commande
+**Retourne :** `string` - Signature de la commande
+
+**Paramètres :**
+- `batch` (int, défaut: 50) - Taille des lots pour le chunking
+- `limit` (int, optionnel) - Nombre maximum d'éléments à indexer
+- `models*` (variadique) - Liste des modèles à indexer (notation pointée)
+- `--reindex` (flag) - Supprime puis réindexe tous les modèles
+- `--count` (flag) - Compte les documents indexés
+- `--delete` (flag) - Supprime tous les documents indexés
 
 **Exemple :**
 ```bash
-bin/directive index:models [App.Models.User,App.Models.Hospital] --reindex
+bin/directive index:models 50 100 [App.Models.User,App.Models.Product] --reindex
 ```
 
 ---
 
 ### `getDescription(): string`
 
-Retourne la description de la commande.
+Retourne la description de la commande affichée dans l'aide.
 
 **Retourne :** `string` - Description de la commande
-
-**Exemple :**
-```bash
-bin/directive index:models --help
-# Affiche : Index models from config (App.Models.User, App.Models.Hospital, etc.) with dynamic clusters
-```
 
 ---
 
@@ -56,179 +63,189 @@ Retourne les alias de la commande.
 
 **Retourne :** `StringTypedCollection` - Collection des alias
 
+**Alias disponibles :**
+- `idx:models`
+- `indexer:models`
+
 **Exemple :**
 ```bash
 bin/directive idx:models [App.Models.User]
-bin/directive indexer:models [App.Models.User]
 ```
+
+---
+
+### `shouldBootLaravel(): bool`
+
+Indique si l'application Laravel doit être bootée avant l'exécution.
+
+**Retourne :** `bool` - Toujours `true` car cette directive nécessite l'accès aux services Laravel
 
 ---
 
 ### `execute(): ExitCode`
 
-Point d'entrée de la directive. Parse les arguments et exécute l'action demandée.
+Point d'entrée principal de la directive. Analyse les arguments, résout les classes de modèles et délègue à la méthode appropriée.
 
-**Retourne :** `ExitCode` - Code de sortie (`SUCCESS`, `FAILURE`, `INVALID_ARGUMENT`)
+**Retourne :** `ExitCode` - Code de sortie (`SUCCESS`, `INVALID_ARGUMENT` ou `FAILURE`)
 
-**Exceptions :** `Throwable` - Toute exception est capturée et transformée en message d'erreur
-
----
-
-## Paramètres de la commande
-
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `batch` | `int` | Taille des lots pour le chunking (défaut: 50) |
-| `limit` | `int|null` | Nombre maximum d'éléments à indexer (optionnel) |
-| `models*` | `array` | Liste des modèles à indexer (notation pointée: `App.Models.User`) |
-| `--reindex` | `bool` | Supprime puis réindexe tous les modèles |
-| `--count` | `bool` | Compte les documents indexés |
-| `--delete` | `bool` | Supprime tous les documents de l'index |
+**Exemple :**
+```bash
+bin/directive index:models [App.Models.User,App.Models.Hospital] --count
+```
 
 ---
 
 ## Cas d'utilisation
 
-### Cas 1 : Indexer tous les modèles configurés
+### Cas 1 : Indexation initiale
+
+Lors du déploiement initial, on indexe tous les modèles configurés.
 
 ```bash
-bin/directive index:models [App.Models.User,App.Models.Hospital,App.Models.Specialty]
+bin/directive index:models [App.Models.User,App.Models.Product,App.Models.Order]
 ```
 
-**Résultat :** Tous les modèles configurés sont indexés avec leurs clusters dynamiques respectifs.
+### Cas 2 : Réindexation après modification de schéma
 
----
-
-### Cas 2 : Réindexer avec un batch et une limite
+Après une modification du schéma de données ou des règles d'indexation, on réindexe tout.
 
 ```bash
-bin/directive index:models 20 100 [App.Models.User] --reindex
+bin/directive index:models [App.Models.User,App.Models.Product] --reindex
 ```
 
-**Résultat :** Les utilisateurs sont réindexés par lots de 20, avec une limite de 100 éléments.
+### Cas 3 : Comptage des documents indexés
 
----
-
-### Cas 3 : Compter les documents indexés
+Pour vérifier l'état de l'index avant une opération.
 
 ```bash
-bin/directive index:models [App.Models.User] --count
+bin/directive index:models [App.Models.User,App.Models.Product] --count
 ```
 
-**Résultat :** Affiche le nombre de documents indexés pour le modèle `User`.
+### Cas 4 : Nettoyage partiel
 
-**Exemple de sortie :**
-```
-📊 Indexed App\Models\User: 150
-📈 Total indexed: 150
-```
-
----
-
-### Cas 4 : Supprimer tous les documents d'un modèle
+Pour supprimer les données indexées d'un type spécifique.
 
 ```bash
-bin/directive index:models [App.Models.User] --delete
+bin/directive index:models [App.Models.TempData] --delete
 ```
 
-**Résultat :** Tous les documents indexés pour le modèle `User` sont supprimés.
+### Cas 5 : Indexation avec limites
 
-**Exemple de sortie :**
-```
-🗑️ All App\Models\User deleted from index
-🗑️ Total models cleared: 1
+Pour tester ou indexer un sous-ensemble de données.
+
+```bash
+# Indexer seulement 100 utilisateurs avec des lots de 10
+bin/directive index:models 10 100 [App.Models.User]
 ```
 
 ---
 
 ## Gestion des erreurs
 
-| Situation | Code | Message |
-|-----------|------|---------|
-| Aucun modèle spécifié | `INVALID_ARGUMENT` | `No models specified.` |
-| Classe de modèle inexistante | `INVALID_ARGUMENT` | `Class 'Invalid\Model' does not exist` |
-| Modèle non configuré | `INVALID_ARGUMENT` | `Model 'App\Models\Other' is not configured in indexer.model_indexables` |
-| Erreur d'exécution | `FAILURE` | Message d'erreur de l'exception |
+| Situation | Exception | Message |
+|-----------|-----------|---------|
+| Aucun modèle spécifié | - | `❌ No models specified.` |
+| Classe de modèle inexistante | - | `❌ Class '{class}' does not exist` |
+| Modèle non configuré | - | `❌ Model '{class}' is not configured in indexer.model_indexables` |
+| Aucun modèle valide trouvé | - | `❌ No valid models found in config.` |
+| Erreur inattendue | `Throwable` | `❌ {message}` |
 
 ---
 
 ## Intégration
 
-### Avec IndexerConfig
+Cette directive s'intègre avec :
 
-La directive utilise `IndexerConfigInterface` pour récupérer la liste des modèles indexables :
+- **`GenericIndexerInterface`** : Service d'indexation générique
+- **`IndexerConfigInterface`** : Configuration du système d'indexation
+- **`AbstractDirective`** : Classe parente du système `laravel-directive`
 
-```php
-$validClasses = $indexerConfig->getModelIndexables();
+### Flux de données
+
 ```
-
-### Avec GenericIndexerService
-
-La directive délègue toutes les opérations d'indexation à `GenericIndexerInterface` :
-
-```php
-$genericIndexer->indexAll($modelClass);
-$genericIndexer->deleteAll($modelClass);
-$genericIndexer->countIndexed($modelClass);
+GenericIndexModelsDirective
+    │
+    ├── Résout les classes de modèles
+    │   └── Vérifie existence + configuration
+    │
+    ├── Mode --count
+    │   └── genericIndexer->countIndexed()
+    │
+    ├── Mode --delete
+    │   └── genericIndexer->deleteAll()
+    │
+    ├── Mode --reindex
+    │   └── genericIndexer->reindexAll()
+    │       ├── deleteAll()
+    │       └── indexAll()
+    │
+    └── Mode index (défaut)
+        └── genericIndexer->indexAll()
 ```
-
-### Avec les clusters dynamiques
-
-Les clusters sont récupérés dynamiquement par `GenericIndexerService` via la méthode `getIndexableCluster()` de chaque modèle. La directive n'a pas à gérer les clusters.
 
 ---
 
 ## Performance
 
-- **Batch processing** : Les opérations d'indexation sont traitées par lots (batch) pour optimiser la mémoire
-- **Limitation** : Possibilité de limiter le nombre d'éléments à traiter
-- **Chunking** : Utilisation du chunking d'Eloquent pour éviter de charger tous les modèles en mémoire
-- **Complexité** : O(n) où n est le nombre de modèles à indexer
+| Opération | Complexité | Notes |
+|-----------|------------|-------|
+| `index:models` | O(n * m) | n = nombre de modèles, m = nombre total d'entités |
+| `--reindex` | O(2 * n * m) | Supprime puis réindexe |
+| `--count` | O(1) | Une requête COUNT par classe |
+| `--delete` | O(n) | Suppression par namespace |
+
+### Optimisations
+
+- **Batch size** : Contrôle le nombre d'éléments traités par lot
+- **Limit** : Permet de tester sur un sous-ensemble
+- **Indexation différée** : Les lots sont traités séquentiellement
 
 ---
 
 ## Compatibilité
 
-| Version PHP | Support |
-|-------------|---------|
+| Version | Support |
+|---------|---------|
 | PHP 8.1+ | ✅ Complet |
-| PHP 8.2+ | ✅ Complet |
-| PHP 8.3+ | ✅ Complet |
-| PHP 8.4+ | ✅ Complet |
-| PHP 8.5+ | ✅ Complet |
+| PHP 8.0 | ✅ Complet |
+| Laravel 10+ | ✅ Complet |
+| laravel-directive 2.x+ | ✅ Complet |
 
 ---
 
 ## Exemple complet
 
 ```bash
-# 1. Indexer tous les modèles configurés
-bin/directive index:models [App.Models.User,App.Models.Hospital,App.Models.Specialty]
+#!/bin/bash
 
-# 2. Compter les documents indexés
-bin/directive index:models [App.Models.User] --count
+# 1. Vérifier l'état actuel
+bin/directive index:models [App.Models.User,App.Models.Product] --count
 
-# 3. Indexer avec batch et limite
-bin/directive index:models 25 500 [App.Models.User,App.Models.Hospital]
+# 2. Réindexer tous les produits avec un batch de 100
+bin/directive index:models 100 [App.Models.Product] --reindex
 
-# 4. Réindexer avec reindex
-bin/directive index:models [App.Models.User] --reindex
+# 3. Indexer uniquement les 50 premiers utilisateurs
+bin/directive index:models 50 50 [App.Models.User]
 
-# 5. Supprimer tout l'index d'un modèle
-bin/directive index:models [App.Models.Hospital] --delete
+# 4. Vérifier le résultat
+bin/directive index:models [App.Models.User,App.Models.Product] --count
 
-# 6. Utiliser un alias
-bin/directive idx:models [App.Models.User]
+# 5. Nettoyer les données temporaires
+bin/directive index:models [App.Models.TempData] --delete
+```
 
-# 7. Voir l'aide
-bin/directive index:models --help
+### Intégration dans une tâche CRON
+
+```bash
+# Toutes les nuits à 2h00, réindexer tous les modèles
+0 2 * * * cd /var/www/project && bin/directive index:models [App.Models.User,App.Models.Product,App.Models.Order] --reindex
 ```
 
 ---
 
 ## Voir aussi
 
-- `GenericIndexerService` - Service d'indexation générique
-- `Indexable` - Interface pour les modèles indexables
-- `ClusterVO` - Value Object pour les clusters dynamiques
-- `IndexerConfig` - Configuration des modèles indexables
+- `GenericIndexerInterface` - Service d'indexation générique
+- `IndexerConfigInterface` - Configuration du système d'indexation
+- `AbstractDirective` - Classe parente des directives CLI
+- `GenericIndexBatchUniqueTask` - Tâche d'indexation par lots

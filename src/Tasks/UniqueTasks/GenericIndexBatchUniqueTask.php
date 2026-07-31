@@ -10,7 +10,7 @@ use AndyDefer\LaravelIndexer\Collections\IndexableVOCollection;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
 use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexableRecordFactory;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use AndyDefer\Task\Abstract\AbstractUniqueTask;
 use AndyDefer\Task\ValueObjects\DescriptionVO;
 use Illuminate\Database\Eloquent\Model;
@@ -86,7 +86,7 @@ final class GenericIndexBatchUniqueTask extends AbstractUniqueTask
                 continue;
             }
 
-            $fingerprint = IndexableFingerPrintVO::fromParts(
+            $fingerprint = IndexableFingerprintVO::fromParts(
                 $model->getMorphClass(),
                 (string) $model->getKey()
             );

@@ -6,7 +6,7 @@ namespace AndyDefer\LaravelIndexer\Records;
 
 use AndyDefer\DomainStructures\Abstracts\AbstractRecord;
 use AndyDefer\DomainStructures\Collections\Utility\StringTypedCollection;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 /**
  * Filter record for querying indexed documents.
@@ -18,7 +18,7 @@ final class IndexedDocumentFiltersRecord extends AbstractRecord
 {
     public function __construct(
         public readonly ?string $id = null,
-        public readonly ?IndexableFingerPrintVO $fingerprint = null,
+        public readonly ?IndexableFingerprintVO $fingerprint = null,
         public readonly ?string $namespace = null,
         public readonly ?string $entity_id = null,
         public readonly ?string $cluster_query = null,

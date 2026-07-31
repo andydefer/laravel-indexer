@@ -11,7 +11,7 @@ use AndyDefer\LaravelIndexer\Enums\GramType;
 use AndyDefer\LaravelIndexer\Models\IndexedToken;
 use AndyDefer\LaravelIndexer\Records\IndexedTokenFiltersRecord;
 use AndyDefer\LaravelIndexer\Records\IndexedTokenRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use AndyDefer\Repository\AbstractRepository;
 use AndyDefer\Repository\Records\FindByRecord;
 use AndyDefer\Repository\Records\PaginateRecord;
@@ -282,7 +282,7 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
     /**
      * {@inheritDoc}
      */
-    public function findByDocumentFingerPrint(IndexableFingerPrintVO $fingerprint): Collection
+    public function findByDocumentFingerPrint(IndexableFingerprintVO $fingerprint): Collection
     {
         return $this->model->newQuery()
             ->whereHas('document', function (Builder $query) use ($fingerprint): void {
@@ -485,7 +485,7 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
     /**
      * {@inheritDoc}
      */
-    public function deleteByDocumentFingerPrint(IndexableFingerPrintVO $fingerprint): int
+    public function deleteByDocumentFingerPrint(IndexableFingerprintVO $fingerprint): int
     {
         return $this->model->newQuery()
             ->whereHas('document', function (Builder $query) use ($fingerprint): void {

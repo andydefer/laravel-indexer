@@ -7,7 +7,7 @@ namespace AndyDefer\LaravelIndexer\Services\Composants;
 use AndyDefer\LaravelIndexer\Collections\IndexableFingerPrintVOCollection;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 /**
  * Service for deleting indexed documents and their associated tokens.
@@ -26,9 +26,9 @@ final class IndexDeleter
      *
      * The associated tokens are automatically deleted via database cascade.
      *
-     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint of the document to delete
+     * @param  IndexableFingerprintVO  $fingerprint  The fingerprint of the document to delete
      */
-    public function delete(IndexableFingerPrintVO $fingerprint): void
+    public function delete(IndexableFingerprintVO $fingerprint): void
     {
         $this->documentRepository->deleteByFingerPrint($fingerprint);
     }

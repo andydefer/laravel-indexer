@@ -2,94 +2,104 @@
 
 ## Description
 
-Service générique d'indexation qui gère le cycle de vie complet des documents indexés pour n'importe quel modèle Eloquent implémentant l'interface `Indexable`. Il utilise des clusters dynamiques générés par les modèles eux-mêmes.
+Service d'indexation générique fournissant une API de haut niveau pour l'indexation, le rafraîchissement, la suppression et l'interrogation des modèles Eloquent implémentant le contrat `Indexable`.
 
 ## Hiérarchie / Implémentations
 
 ```
-GenericIndexerService
-    └── Implémente GenericIndexerInterface
+GenericIndexerService (classe finale)
+    ├── Implémente GenericIndexerInterface
+    ├── Dépend de IndexerInterface
+    ├── Dépend de IndexedDocumentRepositoryInterface
+    └── Dépend de IndexerConfigInterface
 ```
-
-**Dépendances :**
-- `IndexerInterface` - Service d'indexation bas niveau
-- `IndexedDocumentRepositoryInterface` - Repository des documents
-- `IndexerConfigInterface` - Configuration de l'indexeur
-
-**Lien source :** [GenericIndexerService.php](https://github.com/andydefer/laravel-indexer/blob/main/src/Services/GenericIndexerService.php)
 
 ## Rôle principal
 
-Orchestre les opérations d'indexation pour les modèles Eloquent :
-- **Indexation** : Ajout ou mise à jour de documents
-- **Suppression** : Retrait de documents de l'index
-- **Réindexation** : Reconstruction complète de l'index
-- **Vérification** : Existence et comptage des documents
-- **Gestion des lots** : Traitement par batch avec limitation
+Ce service est le point d'entrée principal pour toutes les opérations d'indexation sur les modèles Eloquent. Il orchestre :
 
----
+- L'indexation unitaire et par lots
+- La réindexation complète
+- La suppression unitaire et par namespace
+- Le rafraîchissement des documents indexés
+- Le comptage et la vérification d'existence
+
+### Responsabilités
+
+1. **Indexation** : `index()`, `indexById()`, `indexAll()`
+2. **Suppression** : `delete()`, `deleteById()`, `deleteAll()`
+3. **Rafraîchissement** : `refresh()`, `refreshById()`, `reindexAll()`
+4. **Interrogation** : `countIndexed()`, `exists()`, `existsById()`
+5. **Configuration** : `setBatchSize()`, `setLimit()`
+
+## Détails
+
+[Voir la classe GenericIndexerInterface](https://github.com/andydefer/laravel-indexer/blob/main/src/Contracts/GenericIndexerInterface.php)
+
+[Voir l'interface Indexable](https://github.com/andydefer/laravel-indexer/blob/main/src/Contracts/Indexable.php)
 
 ## API / Méthodes publiques
 
 ### `setBatchSize(int $batchSize): self`
 
-Définit la taille des lots pour l'indexation en masse.
+Définit la taille des lots pour les opérations d'indexation en masse.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$batchSize` | `int` | Nombre d'éléments par lot |
+| `$batchSize` | `int` | Nombre de modèles à traiter par lot |
 
-**Retourne :** `self` - Instance du service (fluent)
+**Retourne :** `self` - L'instance courante pour le chaînage
 
 **Exemple :**
 ```php
-$genericIndexer->setBatchSize(100)->indexAll(User::class);
+$service->setBatchSize(100)->indexAll(User::class);
 ```
 
 ---
 
 ### `setLimit(?int $limit): self`
 
-Définit le nombre maximum d'éléments à indexer.
+Définit le nombre maximum de modèles à traiter.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$limit` | `int|null` | Nombre maximum d'éléments, ou `null` pour illimité |
+| `$limit` | `int|null` | Nombre maximum de modèles, ou `null` pour illimité |
 
-**Retourne :** `self` - Instance du service (fluent)
+**Retourne :** `self` - L'instance courante pour le chaînage
 
 **Exemple :**
 ```php
-$genericIndexer->setLimit(500)->indexAll(User::class);
+$service->setLimit(50)->indexAll(User::class);
+// Indexe seulement les 50 premiers utilisateurs
 ```
 
 ---
 
 ### `index(Model&Indexable $model): void`
 
-Indexe un modèle spécifique.
+Indexe un modèle unique. Si déjà indexé, le rafraîchit.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$model` | `Model&Indexable` | Le modèle à indexer |
+| `$model` | `Model&Indexable` | Modèle à indexer |
 
 **Retourne :** `void`
 
 **Exemple :**
 ```php
-$user = User::find(1);
-$genericIndexer->index($user);
+$user = User::find(123);
+$service->index($user);
 ```
 
 ---
 
 ### `indexById(string $modelClass, int $id): void`
 
-Indexe un modèle par son ID.
+Indexe un modèle par sa classe et son ID.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$modelClass` | `string` | FQCN du modèle |
+| `$modelClass` | `string` | Nom de classe qualifié du modèle |
 | `$id` | `int` | ID du modèle |
 
 **Retourne :** `void`
@@ -98,41 +108,43 @@ Indexe un modèle par son ID.
 
 **Exemple :**
 ```php
-$genericIndexer->indexById(User::class, 42);
+$service->indexById(User::class, 123);
 ```
 
 ---
 
 ### `indexAll(string $modelClass): void`
 
-Indexe tous les modèles d'une classe.
+Indexe tous les modèles d'une classe donnée.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$modelClass` | `string` | FQCN du modèle |
+| `$modelClass` | `string` | Nom de classe qualifié du modèle |
 
 **Retourne :** `void`
 
 **Exemple :**
 ```php
-$genericIndexer->indexAll(User::class);
+$service->indexAll(User::class);
+// Indexe tous les utilisateurs
 ```
 
 ---
 
 ### `reindexAll(string $modelClass): void`
 
-Réindexe tous les modèles d'une classe (supprime puis réindexe).
+Réindexe tous les modèles d'une classe (supprime puis indexe).
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$modelClass` | `string` | FQCN du modèle |
+| `$modelClass` | `string` | Nom de classe qualifié du modèle |
 
 **Retourne :** `void`
 
 **Exemple :**
 ```php
-$genericIndexer->reindexAll(User::class);
+$service->reindexAll(User::class);
+// Supprime tous les utilisateurs indexés puis les réindexe
 ```
 
 ---
@@ -143,25 +155,25 @@ Supprime un modèle de l'index.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$model` | `Model&Indexable` | Le modèle à supprimer |
+| `$model` | `Model&Indexable` | Modèle à supprimer de l'index |
 
 **Retourne :** `void`
 
 **Exemple :**
 ```php
-$user = User::find(1);
-$genericIndexer->delete($user);
+$user = User::find(123);
+$service->delete($user);
 ```
 
 ---
 
 ### `deleteById(string $modelClass, int $id): void`
 
-Supprime un modèle de l'index par son ID.
+Supprime un modèle de l'index par sa classe et son ID.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$modelClass` | `string` | FQCN du modèle |
+| `$modelClass` | `string` | Nom de classe qualifié du modèle |
 | `$id` | `int` | ID du modèle |
 
 **Retourne :** `void`
@@ -170,79 +182,79 @@ Supprime un modèle de l'index par son ID.
 
 **Exemple :**
 ```php
-$genericIndexer->deleteById(User::class, 42);
+$service->deleteById(User::class, 123);
 ```
 
 ---
 
 ### `deleteAll(string $modelClass): void`
 
-Supprime tous les documents d'une classe de l'index.
+Supprime tous les modèles d'une classe de l'index.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$modelClass` | `string` | FQCN du modèle |
+| `$modelClass` | `string` | Nom de classe qualifié du modèle |
 
 **Retourne :** `void`
 
 **Exemple :**
 ```php
-$genericIndexer->deleteAll(User::class);
+$service->deleteAll(User::class);
+// Supprime tous les utilisateurs de l'index
 ```
 
 ---
 
 ### `refresh(Model&Indexable $model): void`
 
-Rafraîchit un modèle dans l'index (supprime puis réindexe si éligible).
+Rafraîchit un modèle dans l'index (supprime puis recrée).
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$model` | `Model&Indexable` | Le modèle à rafraîchir |
+| `$model` | `Model&Indexable` | Modèle à rafraîchir |
 
 **Retourne :** `void`
 
+**Comportement :**
+1. Supprime le document existant
+2. Si `shouldBeIndexed()` retourne `true`, recrée le document
+
 **Exemple :**
 ```php
-$user = User::find(1);
-$genericIndexer->refresh($user);
+$user = User::find(123);
+$service->refresh($user);
 ```
 
 ---
 
 ### `refreshById(string $modelClass, int $id): void`
 
-Rafraîchit un modèle par son ID.
+Rafraîchit un modèle par sa classe et son ID.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$modelClass` | `string` | FQCN du modèle |
+| `$modelClass` | `string` | Nom de classe qualifié du modèle |
 | `$id` | `int` | ID du modèle |
 
 **Retourne :** `void`
 
 **Exceptions :** `ModelNotFoundException` - Si le modèle n'existe pas
 
-**Exemple :**
-```php
-$genericIndexer->refreshById(User::class, 42);
-```
-
 ---
 
 ### `countIndexed(string $modelClass): int`
 
-Compte les documents indexés pour une classe de modèle.
+Retourne le nombre de documents indexés pour une classe donnée.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$modelClass` | `string` | FQCN du modèle |
+| `$modelClass` | `string` | Nom de classe qualifié du modèle |
 
 **Retourne :** `int` - Nombre de documents indexés
 
 **Exemple :**
 ```php
-$count = $genericIndexer->countIndexed(User::class);
+$count = $service->countIndexed(User::class);
 echo "{$count} utilisateurs indexés";
 ```
 
@@ -250,165 +262,89 @@ echo "{$count} utilisateurs indexés";
 
 ### `exists(Model&Indexable $model): bool`
 
-Vérifie si un modèle est indexé.
+Vérifie si un modèle est actuellement indexé.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$model` | `Model&Indexable` | Le modèle à vérifier |
+| `$model` | `Model&Indexable` | Modèle à vérifier |
 
 **Retourne :** `bool` - `true` si le modèle est indexé
-
-**Exemple :**
-```php
-$user = User::find(1);
-if ($genericIndexer->exists($user)) {
-    echo "L'utilisateur est indexé";
-}
-```
 
 ---
 
 ### `existsById(string $modelClass, int $id): bool`
 
-Vérifie si un modèle est indexé par son ID.
+Vérifie si un modèle est indexé par sa classe et son ID.
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `$modelClass` | `string` | FQCN du modèle |
+| `$modelClass` | `string` | Nom de classe qualifié du modèle |
 | `$id` | `int` | ID du modèle |
 
 **Retourne :** `bool` - `true` si le modèle est indexé
-
-**Exemple :**
-```php
-if ($genericIndexer->existsById(User::class, 42)) {
-    echo "L'utilisateur 42 est indexé";
-}
-```
 
 ---
 
 ## Cas d'utilisation
 
-### Cas 1 : Indexation d'un nouvel utilisateur
+### Cas 1 : Indexation d'un nouveau modèle
 
 ```php
-<?php
-
-declare(strict_types=1);
-
-use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
-
 class UserService
 {
     public function __construct(
-        private readonly GenericIndexerInterface $genericIndexer
+        private readonly GenericIndexerInterface $indexer
     ) {}
 
-    public function createUser(array $data): User
+    public function create(array $data): User
     {
         $user = User::create($data);
-        
-        // ✅ Indexer automatiquement le nouvel utilisateur
-        $this->genericIndexer->index($user);
-        
+        $this->indexer->index($user);
         return $user;
     }
 }
 ```
 
----
-
-### Cas 2 : Réindexation complète après une migration
+### Cas 2 : Suppression avec nettoyage d'index
 
 ```php
-<?php
-
-declare(strict_types=1);
-
-class ReindexCommand
+class UserService
 {
-    public function __construct(
-        private readonly GenericIndexerInterface $genericIndexer
-    ) {}
+    public function delete(int $id): void
+    {
+        $user = User::findOrFail($id);
+        $user->delete();
+        $this->indexer->delete($user);
+    }
+}
+```
 
+### Cas 3 : Réindexation après mise à jour
+
+```php
+class UserService
+{
+    public function update(int $id, array $data): User
+    {
+        $user = User::findOrFail($id);
+        $user->update($data);
+        $this->indexer->refresh($user);
+        return $user;
+    }
+}
+```
+
+### Cas 4 : Indexation initiale en masse
+
+```php
+class SetupCommand
+{
     public function handle(): void
     {
-        // ✅ Réindexer tous les médecins
-        $this->genericIndexer
-            ->setBatchSize(100)
-            ->setLimit(null)
-            ->reindexAll(Doctor::class);
-        
-        // ✅ Réindexer tous les hôpitaux
-        $this->genericIndexer
-            ->setBatchSize(50)
-            ->reindexAll(Hospital::class);
-        
-        echo "✅ Réindexation terminée\n";
-    }
-}
-```
-
----
-
-### Cas 3 : Suppression en cascade
-
-```php
-<?php
-
-declare(strict_types=1);
-
-class UserDeletionService
-{
-    public function __construct(
-        private readonly GenericIndexerInterface $genericIndexer
-    ) {}
-
-    public function deleteUser(int $userId): void
-    {
-        $user = User::findOrFail($userId);
-        
-        // ✅ Supprimer l'utilisateur de l'index
-        $this->genericIndexer->delete($user);
-        
-        // ✅ Supprimer l'utilisateur de la base de données
-        $user->delete();
-    }
-}
-```
-
----
-
-### Cas 4 : Vérification et mise à jour
-
-```php
-<?php
-
-declare(strict_types=1);
-
-class IndexVerificationService
-{
-    public function __construct(
-        private readonly GenericIndexerInterface $genericIndexer
-    ) {}
-
-    public function verifyAndFixIndex(): void
-    {
-        $users = User::where('is_active', true)->get();
-        $missing = 0;
-        
-        foreach ($users as $user) {
-            if (! $this->genericIndexer->exists($user)) {
-                $this->genericIndexer->index($user);
-                $missing++;
-            }
-        }
-        
-        echo "✅ {$missing} utilisateurs manquants réindexés\n";
-        
-        $total = $this->genericIndexer->countIndexed(User::class);
-        echo "📊 Total indexé : {$total}\n";
+        $this->indexer->setBatchSize(100);
+        $this->indexer->indexAll(User::class);
+        $this->indexer->indexAll(Product::class);
+        $this->indexer->indexAll(Order::class);
     }
 }
 ```
@@ -419,79 +355,72 @@ class IndexVerificationService
 
 | Situation | Exception | Message |
 |-----------|-----------|---------|
-| Modèle introuvable (indexById) | `ModelNotFoundException` | `Model with ID {id} not found` |
-| Modèle introuvable (deleteById) | `ModelNotFoundException` | `Model with ID {id} not found` |
-| Modèle introuvable (refreshById) | `ModelNotFoundException` | `Model with ID {id} not found` |
+| Modèle non trouvé dans `indexById()` | `ModelNotFoundException` | `Model with ID {$id} not found` |
+| Modèle non trouvé dans `deleteById()` | `ModelNotFoundException` | `Model with ID {$id} not found` |
+| Modèle non trouvé dans `refreshById()` | `ModelNotFoundException` | `Model with ID {$id} not found` |
 
 ---
 
 ## Intégration
 
-### Avec Indexable
+Ce service est le point d'entrée principal pour l'indexation. Il est utilisé par :
 
-Chaque modèle doit implémenter l'interface `Indexable` :
+- **`GenericIndexModelsDirective`** : Pour les commandes CLI
+- **`GenericOrchestratorRecurringTask`** : Pour les tâches récurrentes
+- **`GenericIndexBatchUniqueTask`** : Pour les tâches par lots
 
-```php
-class User extends Model implements Indexable
-{
-    public function shouldBeIndexed(): bool { ... }
-    public function getIndexableData(): StrictAssociative { ... }
-    public function getIndexableCluster(): ClusterVO { ... }
-    public function getKey() { ... }
-    public function getMorphClass() { ... }
-}
+### Flux de données
+
 ```
-
-### Avec IndexableRecordFactory
-
-La méthode `convert()` transforme un modèle en `IndexableRecord` :
-
-```php
-$record = IndexableRecordFactory::convert($model, $cluster);
-```
-
-### Avec IndexerInterface
-
-Les opérations bas niveau sont déléguées à `IndexerInterface` :
-
-```php
-$this->indexer->index($record);
-$this->indexer->indexMany($records);
-$this->indexer->refresh($record);
-$this->indexer->delete($fingerPrint);
-```
-
-### Avec IndexedDocumentRepositoryInterface
-
-La gestion des documents est déléguée au repository :
-
-```php
-$this->documentRepository->existsByFingerPrint($fingerPrint);
-$this->documentRepository->deleteByFingerPrint($fingerPrint);
-$this->documentRepository->deleteByNamespace($namespace);
-$this->documentRepository->countByNamespace($namespace);
+GenericIndexerService
+    │
+    ├── index()
+    │   ├── shouldBeIndexed() → bool
+    │   ├── getIndexableCluster() → ClusterVO
+    │   ├── IndexableRecordFactory::convert() → IndexedDocumentRecord
+    │   ├── existsByFingerPrint() → bool
+    │   └── indexer->index() ou indexer->refresh()
+    │
+    ├── indexAll()
+    │   ├── chunk() par batchSize
+    │   ├── shouldBeIndexed() → bool
+    │   ├── existsByFingerPrint() → bool
+    │   ├── deleteByFingerPrint() (si existe)
+    │   ├── IndexableRecordFactory::convert()
+    │   └── indexer->indexMany()
+    │
+    └── refresh()
+        ├── indexer->delete()
+        ├── shouldBeIndexed() → bool
+        └── indexer->refresh()
 ```
 
 ---
 
 ## Performance
 
-- **Batch processing** : Utilisation de `chunk()` pour éviter les surcharges mémoire
-- **Limitation** : Possibilité de limiter le nombre d'éléments traités
-- **Complexité** : O(n) où n est le nombre de modèles à indexer
-- **Mémoire** : Les opérations en masse utilisent des collections pour minimiser l'empreinte mémoire
+| Opération | Complexité | Notes |
+|-----------|------------|-------|
+| `index()` | O(m) | m = nombre de tokens générés |
+| `indexAll()` | O(n * m) | n = nombre de modèles, m = tokens par modèle |
+| `indexAll()` avec `limit` | O(limit * m) | S'arrête après limit modèles |
+| `deleteAll()` | O(1) | Suppression par namespace |
+
+**Optimisations :**
+
+- `indexAll()` utilise `chunk()` pour éviter la surcharge mémoire
+- Les modèles déjà indexés sont supprimés avant réindexation
+- `indexMany()` utilise le buffering pour les tokens
 
 ---
 
 ## Compatibilité
 
-| Version PHP | Support |
-|-------------|---------|
+| Version | Support |
+|---------|---------|
 | PHP 8.1+ | ✅ Complet |
-| PHP 8.2+ | ✅ Complet |
-| PHP 8.3+ | ✅ Complet |
-| PHP 8.4+ | ✅ Complet |
-| PHP 8.5+ | ✅ Complet |
+| PHP 8.0 | ✅ Complet |
+| Laravel 10+ | ✅ Complet |
 
 ---
 
@@ -502,70 +431,52 @@ $this->documentRepository->countByNamespace($namespace);
 
 declare(strict_types=1);
 
+use AndyDefer\LaravelIndexer\Services\GenericIndexerService;
 use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
 
-class DoctorIndexer
+class IndexingService
 {
     public function __construct(
-        private readonly GenericIndexerInterface $genericIndexer
+        private readonly GenericIndexerInterface $indexer
     ) {}
 
-    public function indexDoctor(int $doctorId): void
+    public function fullReindex(): void
     {
-        // ✅ Indexer un médecin spécifique
-        $this->genericIndexer->indexById(Doctor::class, $doctorId);
+        // Configurer les lots
+        $this->indexer->setBatchSize(50);
+
+        // Réindexer tous les types
+        $this->indexer->reindexAll(User::class);
+        $this->indexer->reindexAll(Product::class);
+        $this->indexer->reindexAll(Order::class);
+
+        // Vérifier le résultat
+        $count = $this->indexer->countIndexed(User::class);
+        echo "Utilisateurs indexés: {$count}\n";
     }
 
-    public function reindexAllDoctors(): void
+    public function indexSpecificModels(array $ids): void
     {
-        // ✅ Réindexer tous les médecins avec des paramètres optimisés
-        $this->genericIndexer
-            ->setBatchSize(50)
-            ->setLimit(null)
-            ->reindexAll(Doctor::class);
+        foreach ($ids as $id) {
+            try {
+                $this->indexer->indexById(User::class, $id);
+            } catch (ModelNotFoundException $e) {
+                echo "Utilisateur {$id} non trouvé\n";
+            }
+        }
     }
 
-    public function getDoctorIndexCount(): int
+    public function cleanup(): void
     {
-        // ✅ Compter les médecins indexés
-        return $this->genericIndexer->countIndexed(Doctor::class);
-    }
+        // Supprimer les utilisateurs inactifs de l'index
+        $inactiveUsers = User::where('active', false)->get();
+        foreach ($inactiveUsers as $user) {
+            $this->indexer->delete($user);
+        }
 
-    public function isDoctorIndexed(int $doctorId): bool
-    {
-        // ✅ Vérifier si un médecin est indexé
-        return $this->genericIndexer->existsById(Doctor::class, $doctorId);
-    }
-
-    public function deleteDoctorIndex(int $doctorId): void
-    {
-        // ✅ Supprimer un médecin de l'index
-        $this->genericIndexer->deleteById(Doctor::class, $doctorId);
-    }
-
-    public function cleanupAllDoctors(): void
-    {
-        // ✅ Supprimer tous les médecins de l'index
-        $this->genericIndexer->deleteAll(Doctor::class);
-    }
-
-    public function refreshDoctorIndex(int $doctorId): void
-    {
-        // ✅ Rafraîchir un médecin dans l'index
-        $this->genericIndexer->refreshById(Doctor::class, $doctorId);
-    }
-
-    public function fullReindexWithProgress(): void
-    {
-        $before = $this->genericIndexer->countIndexed(Doctor::class);
-        
-        $this->genericIndexer
-            ->setBatchSize(100)
-            ->reindexAll(Doctor::class);
-        
-        $after = $this->genericIndexer->countIndexed(Doctor::class);
-        
-        echo "✅ Réindexation terminée : {$before} → {$after}\n";
+        // Vérifier
+        $count = $this->indexer->countIndexed(User::class);
+        echo "Utilisateurs actifs indexés: {$count}\n";
     }
 }
 ```
@@ -575,8 +486,8 @@ class DoctorIndexer
 ## Voir aussi
 
 - `GenericIndexerInterface` - Interface du service
-- `Indexable` - Interface pour les modèles indexables
-- `IndexableRecordFactory` - Factory pour les enregistrements indexables
-- `ClusterVO` - Value Object pour les clusters
-- `IndexerConfig` - Configuration de l'indexeur
+- `Indexable` - Interface des modèles indexables
+- `IndexerInterface` - Service d'indexation sous-jacent
+- `IndexableRecordFactory` - Factory de records
+- `IndexableFingerprintVO` - Value Object de fingerprint
 - `GenericIndexModelsDirective` - Directive CLI pour l'indexation

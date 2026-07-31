@@ -13,7 +13,7 @@ use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexDeleter;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexSearcher;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 /**
  * Main service orchestrating all indexing operations.
@@ -52,7 +52,7 @@ final class IndexerService implements IndexerInterface
     /**
      * {@inheritDoc}
      */
-    public function delete(IndexableFingerPrintVO $fingerprint): void
+    public function delete(IndexableFingerprintVO $fingerprint): void
     {
         $this->deleter->delete($fingerprint);
     }
@@ -76,7 +76,7 @@ final class IndexerService implements IndexerInterface
     /**
      * {@inheritDoc}
      */
-    public function exists(IndexableFingerPrintVO $fingerprint): bool
+    public function exists(IndexableFingerprintVO $fingerprint): bool
     {
         return $this->searcher->exists($fingerprint);
     }

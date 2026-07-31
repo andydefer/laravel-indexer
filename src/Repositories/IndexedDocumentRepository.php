@@ -10,7 +10,7 @@ use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedDocumentRepositoryInt
 use AndyDefer\LaravelIndexer\Models\IndexedDocument;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentFiltersRecord;
 use AndyDefer\LaravelIndexer\Records\IndexedDocumentRecord;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use AndyDefer\Repository\AbstractRepository;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -40,7 +40,7 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
     /**
      * {@inheritDoc}
      */
-    public function findByFingerPrint(IndexableFingerPrintVO $fingerprint): ?IndexedDocument
+    public function findByFingerPrint(IndexableFingerprintVO $fingerprint): ?IndexedDocument
     {
         return $this->model->newQuery()
             ->where('fingerprint', $fingerprint->getValue())
@@ -97,7 +97,7 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
     /**
      * {@inheritDoc}
      */
-    public function deleteByFingerPrint(IndexableFingerPrintVO $fingerprint): int
+    public function deleteByFingerPrint(IndexableFingerprintVO $fingerprint): int
     {
         return $this->model->newQuery()
             ->where('fingerprint', $fingerprint->getValue())
@@ -161,7 +161,7 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
     /**
      * {@inheritDoc}
      */
-    public function existsByFingerPrint(IndexableFingerPrintVO $fingerprint): bool
+    public function existsByFingerPrint(IndexableFingerprintVO $fingerprint): bool
     {
         return $this->model->newQuery()
             ->where('fingerprint', $fingerprint->getValue())

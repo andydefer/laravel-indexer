@@ -13,7 +13,7 @@ use AndyDefer\LaravelIndexer\Records\IndexableSearchResultRecord;
 use AndyDefer\LaravelIndexer\Records\SearchQueryRecord;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
-use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerPrintVO;
+use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
 use AndyDefer\Repository\ValueObjects\ClusterQueries;
 use Illuminate\Support\Collection;
@@ -37,10 +37,10 @@ final class IndexSearcher
     /**
      * Checks whether a document exists by its fingerprint.
      *
-     * @param  IndexableFingerPrintVO  $fingerprint  The fingerprint to check
+     * @param  IndexableFingerprintVO  $fingerprint  The fingerprint to check
      * @return bool True if the document exists
      */
-    public function exists(IndexableFingerPrintVO $fingerprint): bool
+    public function exists(IndexableFingerprintVO $fingerprint): bool
     {
         return $this->documentRepository->existsByFingerPrint($fingerprint);
     }
