@@ -17,12 +17,6 @@ use AndyDefer\PhpServices\Enums\NormalizationMode;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-/**
- * Service for writing tokens to the index.
- *
- * Handles token generation, buffering, and batch insertion for efficient
- * indexing of document content.
- */
 final class IndexWriter
 {
     /** @var array<string, array<string, mixed>> */
@@ -45,11 +39,6 @@ final class IndexWriter
         private readonly IndexerConfigInterface $config,
     ) {}
 
-    /**
-     * Indexes a single document record.
-     *
-     * @param  IndexedDocumentRecord  $entity  The document record to index
-     */
     public function index(IndexedDocumentRecord $entity): void
     {
         $this->resetBuffers();
@@ -63,11 +52,6 @@ final class IndexWriter
         $this->currentDocumentId = null;
     }
 
-    /**
-     * Indexes multiple document records.
-     *
-     * @param  IndexableRecordCollection  $records  The collection of document records to index
-     */
     public function indexMany(IndexableRecordCollection $records): void
     {
         $this->resetBuffers();
@@ -83,12 +67,6 @@ final class IndexWriter
         $this->currentDocumentId = null;
     }
 
-    /**
-     * Creates a new document from a record.
-     *
-     * @param  IndexedDocumentRecord  $record  The document record
-     * @return IndexedDocument The created document
-     */
     private function createDocument(IndexedDocumentRecord $record): IndexedDocument
     {
         $documentRecord = new IndexedDocumentRecord(
@@ -100,78 +78,64 @@ final class IndexWriter
         return $this->documentRepository->create($documentRecord);
     }
 
-    /**
-     * Resets the token and increment buffers.
-     */
     private function resetBuffers(): void
     {
         $this->tokenBuffer = [];
         $this->incrementBuffer = [];
     }
 
-    /**
-     * Indexes document data recursively.
-     *
-     * @param  IndexedDocument  $document  The document being indexed
-     * @param  array<string, mixed>  $data  The data to index
-     * @param  string  $prefix  The field prefix for nested data
-     */
+    private function normalizeValue(mixed $value): string
+    {
+        return match (true) {
+            is_null($value) => '',
+            is_bool($value) => $value ? 'yes' : 'no',
+            is_string($value) && strtolower($value) === 'true' => 'yes',
+            is_string($value) && strtolower($value) === 'false' => 'no',
+            is_array($value) => json_encode($value),
+            is_object($value) && method_exists($value, '__toString') => (string) $value,
+            is_object($value) => json_encode($value),
+            default => (string) $value,
+        };
+    }
+
     private function indexDocumentData(IndexedDocument $document, array $data, string $prefix = ''): void
     {
         foreach ($data as $key => $value) {
             $field = $prefix ? $prefix.'.'.$key : $key;
 
+            if (is_array($value) && $this->isAssociativeArray($value)) {
+                $this->indexDocumentData($document, $value, $field);
+
+                continue;
+            }
+
             if (is_array($value)) {
-                if ($this->isAssociativeArray($value)) {
-                    $this->indexDocumentData($document, $value, $field);
-                } else {
-                    $concatenated = implode('; ', $value);
-                    $this->extractAndBufferTokens($document->id, $field, $concatenated);
-                }
+                $concatenated = implode('; ', $value);
+                $this->extractAndBufferTokens($document->id, $field, $concatenated);
 
                 continue;
             }
 
-            if (is_numeric($value) || is_bool($value)) {
-                $this->extractAndBufferTokens($document->id, $field, (string) $value);
-
-                continue;
+            $normalized = $this->normalizeValue($value);
+            if (! empty($normalized)) {
+                $this->extractAndBufferTokens($document->id, $field, $normalized);
             }
-
-            if (! is_string($value)) {
-                continue;
-            }
-
-            $this->extractAndBufferTokens($document->id, $field, $value);
         }
     }
 
-    /**
-     * Checks if an array is associative (not sequentially indexed).
-     *
-     * @param  array<int|string, mixed>  $array  The array to check
-     * @return bool True if the array is associative
-     */
     private function isAssociativeArray(array $array): bool
     {
         return array_keys($array) !== range(0, count($array) - 1);
     }
 
-    /**
-     * Extracts tokens from a text value and adds them to the buffer.
-     *
-     * @param  string  $documentId  The document ID
-     * @param  string  $field  The field name
-     * @param  string  $value  The text value to tokenize
-     */
     private function extractAndBufferTokens(string $documentId, string $field, string $value): void
     {
-        $minSize = $this->config->getNgramMinSize();
-        $maxSize = $this->config->getNgramMaxSize();
-
         if (empty($value)) {
             return;
         }
+
+        $minSize = $this->config->getNgramMinSize();
+        $maxSize = $this->config->getNgramMaxSize();
 
         if (strlen($value) > $this->config->getMaxTextLength()) {
             $value = substr($value, 0, $this->config->getMaxTextLength());
@@ -186,15 +150,6 @@ final class IndexWriter
         $this->extractAndBufferTokensShort($documentId, $field, $value, $minSize, $maxSize);
     }
 
-    /**
-     * Extracts tokens from short text (under full text max length).
-     *
-     * @param  string  $documentId  The document ID
-     * @param  string  $field  The field name
-     * @param  string  $value  The text value to tokenize
-     * @param  int  $minSize  The minimum n-gram size
-     * @param  int  $maxSize  The maximum n-gram size
-     */
     private function extractAndBufferTokensShort(
         string $documentId,
         string $field,
@@ -202,9 +157,8 @@ final class IndexWriter
         int $minSize,
         int $maxSize
     ): void {
-        $words = $this->extractWordsWithOriginalCase($value);
-        $normalizedValue = $this->textNormalizer->normalize($value);
-        $normalizedWords = $this->textNormalizer->extractWords($normalizedValue);
+        $words = $this->extractWords($value);
+        $normalizedWords = $this->textNormalizer->extractWords($this->textNormalizer->normalize($value));
 
         $count = min(count($words), count($normalizedWords));
 
@@ -212,25 +166,12 @@ final class IndexWriter
             $originalWord = $words[$i] ?? $normalizedWords[$i];
             $normalizedWord = $normalizedWords[$i] ?? '';
 
-            if (empty($normalizedWord)) {
-                continue;
+            if (! empty($normalizedWord)) {
+                $this->processWord($documentId, $field, $normalizedWord, $originalWord, $minSize, $maxSize);
             }
-
-            $this->processWord($documentId, $field, $normalizedWord, $originalWord, $minSize, $maxSize);
         }
     }
 
-    /**
-     * Extracts tokens from long text (over full text max length).
-     *
-     * Splits long text into chunks and processes each chunk separately.
-     *
-     * @param  string  $documentId  The document ID
-     * @param  string  $field  The field name
-     * @param  string  $value  The text value to tokenize
-     * @param  int  $minSize  The minimum n-gram size
-     * @param  int  $maxSize  The maximum n-gram size
-     */
     private function extractAndBufferTokensLong(
         string $documentId,
         string $field,
@@ -238,13 +179,13 @@ final class IndexWriter
         int $minSize,
         int $maxSize
     ): void {
-        $normalizedValue = $this->textNormalizer->normalize($value);
-        $normalizedWords = $this->textNormalizer->extractWords($normalizedValue);
-        $words = $this->extractWordsWithOriginalCase($value);
+        $normalizedWords = $this->textNormalizer->extractWords($this->textNormalizer->normalize($value));
+        $words = $this->extractWords($value);
 
         $index = 0;
         $totalWords = count($normalizedWords);
         $seenChunks = [];
+        $maxLength = $this->config->getFullTextMaxLength();
 
         while ($index < $totalWords) {
             $chunkNormalized = '';
@@ -264,7 +205,7 @@ final class IndexWriter
 
                 $newLength = $chunkLength + ($chunkLength > 0 ? 1 : 0) + $wordLength;
 
-                if ($newLength > $this->config->getFullTextMaxLength() && $chunkLength > 0) {
+                if ($newLength > $maxLength && $chunkLength > 0) {
                     break;
                 }
 
@@ -281,43 +222,33 @@ final class IndexWriter
                 $index++;
             }
 
-            if ($chunkLength > $this->config->getFullTextMaxLength()) {
+            if ($chunkLength > $maxLength) {
                 $this->extractAndBufferTokensShort($documentId, $field, $chunkOriginal, $minSize, $maxSize);
 
                 continue;
             }
 
-            if ($chunkNormalized !== '' && ! in_array($chunkNormalized, $seenChunks)) {
-                $seenChunks[] = $chunkNormalized;
-                $chunkWords = explode(' ', $chunkNormalized);
-                $chunkOriginalWords = explode(' ', $chunkOriginal);
+            if ($chunkNormalized === '' || in_array($chunkNormalized, $seenChunks)) {
+                continue;
+            }
 
-                $count = min(count($chunkWords), count($chunkOriginalWords));
+            $seenChunks[] = $chunkNormalized;
+            $chunkWords = explode(' ', $chunkNormalized);
+            $chunkOriginalWords = explode(' ', $chunkOriginal);
 
-                for ($i = 0; $i < $count; $i++) {
-                    $normalizedWord = $chunkWords[$i] ?? '';
-                    $originalWord = $chunkOriginalWords[$i] ?? $normalizedWord;
+            $count = min(count($chunkWords), count($chunkOriginalWords));
 
-                    if (empty($normalizedWord)) {
-                        continue;
-                    }
+            for ($i = 0; $i < $count; $i++) {
+                $normalizedWord = $chunkWords[$i] ?? '';
+                $originalWord = $chunkOriginalWords[$i] ?? $normalizedWord;
 
+                if (! empty($normalizedWord)) {
                     $this->processWord($documentId, $field, $normalizedWord, $originalWord, $minSize, $maxSize);
                 }
             }
         }
     }
 
-    /**
-     * Processes a single word to generate lexical and metaphone n-grams.
-     *
-     * @param  string  $documentId  The document ID
-     * @param  string  $field  The field name
-     * @param  string  $normalizedWord  The normalized word
-     * @param  string  $originalWord  The original word
-     * @param  int  $minSize  The minimum n-gram size
-     * @param  int  $maxSize  The maximum n-gram size
-     */
     private function processWord(
         string $documentId,
         string $field,
@@ -354,15 +285,6 @@ final class IndexWriter
         }
     }
 
-    /**
-     * Adds a token to the buffer or increments its frequency.
-     *
-     * @param  string  $documentId  The document ID
-     * @param  string  $token  The token value
-     * @param  string  $field  The field name
-     * @param  GramType  $type  The token type
-     * @param  string  $originalText  The original text
-     */
     private function addToBuffer(string $documentId, string $token, string $field, GramType $type, string $originalText): void
     {
         $key = $documentId.'|'.$token.'|'.$field.'|'.$type->value;
@@ -397,12 +319,6 @@ final class IndexWriter
         }
     }
 
-    /**
-     * Flushes the token and increment buffers to the database.
-     *
-     *
-     * @throws \RuntimeException If the flush operation fails
-     */
     private function flushTokens(): void
     {
         if (empty($this->tokenBuffer) && empty($this->incrementBuffer)) {
@@ -414,7 +330,6 @@ final class IndexWriter
 
             if (! empty($this->tokenBuffer)) {
                 $toCreate = array_values($this->tokenBuffer);
-
                 foreach (array_chunk($toCreate, $this->insertChunkSize) as $chunk) {
                     $this->tokenRepository->getModel()->newQuery()->insert($chunk);
                 }
@@ -444,16 +359,8 @@ final class IndexWriter
         $this->resetBuffers();
     }
 
-    /**
-     * Extracts words from text while preserving original case.
-     *
-     * @param  string  $text  The text to extract words from
-     * @return array<int, string> The extracted words
-     */
-    private function extractWordsWithOriginalCase(string $text): array
+    private function extractWords(string $text): array
     {
-        $words = preg_split('/[\s\-_\/]+/', $text, -1, PREG_SPLIT_NO_EMPTY);
-
-        return array_values($words);
+        return array_values(preg_split('/[\s\-_\/]+/', $text, -1, PREG_SPLIT_NO_EMPTY));
     }
 }

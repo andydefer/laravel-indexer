@@ -72,9 +72,8 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
             'city' => 'New York',
             'postal_code' => '10001',
             'hospital' => 'General Hospital',
-            'is_active' => true,
+            'is_active' => 'yes',
         ], $attributes));
-
     }
 
     private function createPharmacy(array $attributes = []): TestPharmacy
@@ -88,7 +87,7 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
             'postal_code' => '10001',
             'phone' => '987654321',
             'email' => 'contact_'.self::$pharmacyCounter.'@centralpharmacy.com',
-            'is_active' => true,
+            'is_active' => 'yes',
         ], $attributes));
     }
 
@@ -100,16 +99,14 @@ final class GenericIndexModelsDirectiveTest extends IntegrationTestCase
             'name' => 'Product '.self::$productCounter,
             'reference' => 'REF-'.str_pad((string) self::$productCounter, 3, '0', STR_PAD_LEFT),
             'description' => 'Test product description '.self::$productCounter,
-            'is_published' => true,
+            'is_published' => 'yes',
         ], $attributes));
     }
 
     public function test_index_all_models(): void
     {
         $this->createDoctor();
-
         $this->createPharmacy();
-
         $this->createProduct();
 
         $response = $this->service->run('index:models ['.TestDoctor::class.','.TestPharmacy::class.','.TestProduct::class.']');

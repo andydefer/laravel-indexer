@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\Proxies\ClusterVOProxy;
 use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
 use Illuminate\Database\Eloquent\Model;
@@ -50,7 +51,7 @@ class TestNonSearchableModel extends Model implements Indexable
 
     public function getIndexableCluster(): ClusterVO
     {
-        return new ClusterVO([
+        return ClusterVOProxy::make([
             'type' => 'non_searchable',
             'status' => 'active',
         ]);

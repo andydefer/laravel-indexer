@@ -35,12 +35,10 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
         $this->app['config']->set('indexer.token_types.ngrams.min_size', 2);
         $this->app['config']->set('indexer.token_types.ngrams.max_size', 4);
 
-        // Re-bind IndexerConfig
         $this->app->singleton(IndexerConfigInterface::class, function ($app) {
             return new IndexerConfig($app['config']);
         });
 
-        // Re-bind IndexWriter avec la nouvelle config
         $this->app->singleton(IndexWriter::class, function ($app) {
             return new IndexWriter(
                 documentRepository: $app->make(IndexedDocumentRepositoryInterface::class),
@@ -51,7 +49,6 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
             );
         });
 
-        // Re-bind IndexSearcher avec la nouvelle config
         $this->app->singleton(IndexSearcher::class, function ($app) {
             return new IndexSearcher(
                 documentRepository: $app->make(IndexedDocumentRepositoryInterface::class),
@@ -59,11 +56,9 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
                 textNormalizer: $app->make(TextNormalizerInterface::class),
                 config: $app->make(IndexerConfigInterface::class),
                 clusterService: $app->make(ClusterService::class),
-
             );
         });
 
-        // Re-bind IndexDeleter
         $this->app->singleton(IndexDeleter::class, function ($app) {
             return new IndexDeleter(
                 documentRepository: $app->make(IndexedDocumentRepositoryInterface::class),
@@ -71,7 +66,6 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
             );
         });
 
-        // Re-bind IndexerService avec les composants rebindés
         $this->app->singleton(IndexerInterface::class, function ($app) {
             return new IndexerService(
                 writer: $app->make(IndexWriter::class),
@@ -80,7 +74,6 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
             );
         });
 
-        // Re-bind GenericIndexerService avec la nouvelle config
         $this->app->singleton(GenericIndexerInterface::class, function ($app) {
             return new GenericIndexerService(
                 indexer: $app->make(IndexerInterface::class),
@@ -106,7 +99,7 @@ final class GenericIndexerServiceTest extends IntegrationTestCase
             'city' => 'New York',
             'postal_code' => '10001',
             'hospital' => 'General Hospital',
-            'is_active' => true,
+            'is_active' => 'yes',
         ], $attributes));
     }
 

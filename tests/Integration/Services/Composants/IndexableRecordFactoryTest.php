@@ -15,8 +15,6 @@ use AndyDefer\LaravelIndexer\ValueObjects\IndexableFingerprintVO;
 
 final class IndexableRecordFactoryTest extends IntegrationTestCase
 {
-    // ==================== TESTS CONVERT ====================
-
     public function test_convert_returns_indexed_document_record_with_cluster(): void
     {
         $entity = new TestIndexableEntity(
@@ -84,7 +82,7 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
             morphClass: 'App\Models\Complex',
             data: [
                 'name' => 'Complex Entity',
-                'active' => true,
+                'active' => 'yes',
                 'count' => 42,
                 'price' => 99.99,
                 'tags' => ['php', 'laravel', 'indexer'],
@@ -102,7 +100,7 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
 
         $data = $record->data->toArray();
         $this->assertEquals('Complex Entity', $data['name']);
-        $this->assertTrue($data['active']);
+        $this->assertEquals('yes', $data['active']);
         $this->assertEquals(42, $data['count']);
         $this->assertEquals(99.99, $data['price']);
         $this->assertEquals(['php', 'laravel', 'indexer'], $data['tags']);
@@ -247,12 +245,12 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
 
         $cluster = new ClusterVO([
             'model' => 'Product',
-            'tenant_company_abc' => true,
-            'tenant_company_xyz' => true,
+            'tenant_company_abc' => 'yes',
+            'tenant_company_xyz' => 'yes',
             'env' => 'production',
-            'category_electronics' => true,
-            'category_music' => true,
-            'category_books' => true,
+            'category_electronics' => 'yes',
+            'category_music' => 'yes',
+            'category_books' => 'yes',
         ]);
         $record = IndexableRecordFactory::convert($entity, $cluster);
 
@@ -261,12 +259,12 @@ final class IndexableRecordFactoryTest extends IntegrationTestCase
 
         $this->assertNotNull($record->cluster);
         $this->assertEquals('Product', $record->cluster->get('model'));
-        $this->assertEquals('true', $record->cluster->get('tenant_company_abc'));
-        $this->assertEquals('true', $record->cluster->get('tenant_company_xyz'));
+        $this->assertEquals('yes', $record->cluster->get('tenant_company_abc'));
+        $this->assertEquals('yes', $record->cluster->get('tenant_company_xyz'));
         $this->assertEquals('production', $record->cluster->get('env'));
-        $this->assertEquals('true', $record->cluster->get('category_electronics'));
-        $this->assertEquals('true', $record->cluster->get('category_music'));
-        $this->assertEquals('true', $record->cluster->get('category_books'));
+        $this->assertEquals('yes', $record->cluster->get('category_electronics'));
+        $this->assertEquals('yes', $record->cluster->get('category_music'));
+        $this->assertEquals('yes', $record->cluster->get('category_books'));
         $this->assertNull($record->cluster->get('nonexistent'));
     }
 }

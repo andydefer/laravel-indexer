@@ -282,8 +282,8 @@ final class IndexWriterTest extends IntegrationTestCase
         $this->assertContains('age', $fields);
         $this->assertContains('score', $fields);
 
-        // ❌ Les booléens ne sont PAS convertis en string
-        $this->assertNotContains('active', $fields);
+        // ✅ Les booléens sont convertis en 'yes'/'no' et indexés
+        $this->assertContains('active', $fields);
 
         // ✅ Vérifier que les tokens de name existent
         $johnToken = $tokens->first(function ($token) {
@@ -302,6 +302,12 @@ final class IndexWriterTest extends IntegrationTestCase
             return $token->field === 'score' && $token->token === '99';
         });
         $this->assertNotNull($scoreToken);
+
+        // ✅ Vérifier que les tokens de active existent
+        $activeToken = $tokens->first(function ($token) {
+            return $token->field === 'active' && $token->token === 'yes';
+        });
+        $this->assertNotNull($activeToken);
     }
 
     public function test_index_uses_config_ngram_sizes(): void
@@ -592,5 +598,222 @@ final class IndexWriterTest extends IntegrationTestCase
         });
         $this->assertNotNull($prToken, "Le n-gramme 'pr' de 'produits' devrait être indexé");
         $this->assertEquals('produits', $prToken->original_text);
+    }
+
+    // ==================== NOUVEAUX TESTS POUR LA NORMALISATION ====================
+
+    public function test_index_normalizes_boolean_php_to_yes_no(): void
+    {
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|1001');
+        $cluster = $this->createClusterVO(['model' => 'User']);
+        $data = StrictAssociative::from([
+            'active' => true,
+            'inactive' => false,
+        ]);
+
+        $record = new IndexedDocumentRecord(
+            fingerprint: $fingerprint,
+            data: $data,
+            cluster: $cluster,
+        );
+
+        $this->indexWriter->index($record);
+
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
+        $tokens = $this->tokenRepository->findByDocumentId($document->id);
+
+        $activeToken = $tokens->first(function ($token) {
+            return $token->field === 'active' && $token->token === 'yes';
+        });
+        $this->assertNotNull($activeToken);
+
+        $inactiveToken = $tokens->first(function ($token) {
+            return $token->field === 'inactive' && $token->token === 'no';
+        });
+        $this->assertNotNull($inactiveToken);
+    }
+
+    public function test_index_normalizes_string_true_false_to_yes_no(): void
+    {
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|1002');
+        $cluster = $this->createClusterVO(['model' => 'User']);
+        $data = StrictAssociative::from([
+            'active' => 'true',
+            'inactive' => 'false',
+            'active_upper' => 'TRUE',
+            'inactive_upper' => 'FALSE',
+        ]);
+
+        $record = new IndexedDocumentRecord(
+            fingerprint: $fingerprint,
+            data: $data,
+            cluster: $cluster,
+        );
+
+        $this->indexWriter->index($record);
+
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
+        $tokens = $this->tokenRepository->findByDocumentId($document->id);
+
+        $activeToken = $tokens->first(function ($token) {
+            return $token->field === 'active' && $token->token === 'yes';
+        });
+        $this->assertNotNull($activeToken);
+
+        $inactiveToken = $tokens->first(function ($token) {
+            return $token->field === 'inactive' && $token->token === 'no';
+        });
+        $this->assertNotNull($inactiveToken);
+
+        $activeUpperToken = $tokens->first(function ($token) {
+            return $token->field === 'active_upper' && $token->token === 'yes';
+        });
+        $this->assertNotNull($activeUpperToken);
+
+        $inactiveUpperToken = $tokens->first(function ($token) {
+            return $token->field === 'inactive_upper' && $token->token === 'no';
+        });
+        $this->assertNotNull($inactiveUpperToken);
+    }
+
+    public function test_index_preserves_yes_no_strings(): void
+    {
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|1003');
+        $cluster = $this->createClusterVO(['model' => 'User']);
+        $data = StrictAssociative::from([
+            'status' => 'yes',
+            'deleted' => 'no',
+        ]);
+
+        $record = new IndexedDocumentRecord(
+            fingerprint: $fingerprint,
+            data: $data,
+            cluster: $cluster,
+        );
+
+        $this->indexWriter->index($record);
+
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
+        $tokens = $this->tokenRepository->findByDocumentId($document->id);
+
+        $statusToken = $tokens->first(function ($token) {
+            return $token->field === 'status' && $token->token === 'yes';
+        });
+        $this->assertNotNull($statusToken);
+
+        $deletedToken = $tokens->first(function ($token) {
+            return $token->field === 'deleted' && $token->token === 'no';
+        });
+        $this->assertNotNull($deletedToken);
+    }
+
+    public function test_index_normalizes_null_to_empty_string(): void
+    {
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|1004');
+        $cluster = $this->createClusterVO(['model' => 'User']);
+        $data = StrictAssociative::from([
+            'name' => 'John Doe',
+            'deleted_at' => null,
+        ]);
+
+        $record = new IndexedDocumentRecord(
+            fingerprint: $fingerprint,
+            data: $data,
+            cluster: $cluster,
+        );
+
+        $this->indexWriter->index($record);
+
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
+        $tokens = $this->tokenRepository->findByDocumentId($document->id);
+
+        $fields = $tokens->pluck('field')->unique()->toArray();
+        $this->assertContains('name', $fields);
+        $this->assertNotContains('deleted_at', $fields);
+    }
+
+    public function test_index_normalizes_nested_booleans(): void
+    {
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|1005');
+        $cluster = $this->createClusterVO(['model' => 'User']);
+        $data = StrictAssociative::from([
+            'profile' => [
+                'verified' => true,
+                'active' => false,
+                'settings' => [
+                    'notifications' => 'true',
+                    'dark_mode' => 'false',
+                ],
+            ],
+        ]);
+
+        $record = new IndexedDocumentRecord(
+            fingerprint: $fingerprint,
+            data: $data,
+            cluster: $cluster,
+        );
+
+        $this->indexWriter->index($record);
+
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
+        $tokens = $this->tokenRepository->findByDocumentId($document->id);
+
+        $verifiedToken = $tokens->first(function ($token) {
+            return $token->field === 'profile.verified' && $token->token === 'yes';
+        });
+        $this->assertNotNull($verifiedToken);
+
+        $activeToken = $tokens->first(function ($token) {
+            return $token->field === 'profile.active' && $token->token === 'no';
+        });
+        $this->assertNotNull($activeToken);
+
+        $notificationsToken = $tokens->first(function ($token) {
+            return $token->field === 'profile.settings.notifications' && $token->token === 'yes';
+        });
+        $this->assertNotNull($notificationsToken);
+
+        $darkModeToken = $tokens->first(function ($token) {
+            return $token->field === 'profile.settings.dark_mode' && $token->token === 'no';
+        });
+        $this->assertNotNull($darkModeToken);
+    }
+
+    public function test_index_handles_mixed_boolean_types_in_array(): void
+    {
+        $fingerprint = new IndexableFingerprintVO('App\Models\User|1006');
+        $cluster = $this->createClusterVO(['model' => 'User']);
+        $data = StrictAssociative::from([
+            'flags' => [true, false, 'true', 'false', 'yes', 'no'],
+        ]);
+
+        $record = new IndexedDocumentRecord(
+            fingerprint: $fingerprint,
+            data: $data,
+            cluster: $cluster,
+        );
+
+        $this->indexWriter->index($record);
+
+        $document = $this->documentRepository->findByFingerPrint($fingerprint);
+        $tokens = $this->tokenRepository->findByDocumentId($document->id);
+
+        $fields = $tokens->pluck('field')->unique()->toArray();
+        $this->assertContains('flags', $fields);
+
+        // ✅ Vérifier que le champ flags a des tokens
+        $flagsTokens = $tokens->filter(function ($token) {
+            return $token->field === 'flags';
+        });
+        $this->assertNotEmpty($flagsTokens);
+
+        // ✅ Vérifier que les tokens contiennent des n-grammes des valeurs
+        $tokenStrings = $flagsTokens->pluck('token')->toArray();
+
+        // Les n-grammes des valeurs devraient être présents
+        $this->assertTrue(
+            count(array_intersect(['ye', 'es', 'no'], $tokenStrings)) > 0,
+            'Les n-grammes "ye", "es" ou "no" devraient être présents'
+        );
     }
 }

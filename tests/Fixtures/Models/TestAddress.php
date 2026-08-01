@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AndyDefer\LaravelIndexer\Tests\Fixtures\Models;
 
 use AndyDefer\DomainStructures\Utils\StrictAssociative;
+use AndyDefer\LaravelCluster\Proxies\ClusterVOProxy;
 use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 use AndyDefer\LaravelIndexer\Contracts\Indexable;
 use Illuminate\Database\Eloquent\Model;
@@ -92,7 +93,7 @@ class TestAddress extends Model implements Indexable
 
     public function getIndexableCluster(): ClusterVO
     {
-        return new ClusterVO([
+        return ClusterVOProxy::make([
             'type' => 'address',
             'status' => $this->is_active,
             'city' => $this->city,

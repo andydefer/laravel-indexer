@@ -27,7 +27,7 @@ class IndexedDocumentTest extends IntegrationTestCase
             'fingerprint' => 'App\Models\User|123',
             'cluster' => [
                 'type' => 'user',
-                'status' => true,
+                'status' => 'yes',  // ✅ Utiliser 'yes' au lieu de true
                 'email' => 'john@example.com',
                 'addresses' => [
                     [
@@ -75,7 +75,7 @@ class IndexedDocumentTest extends IntegrationTestCase
 
         $this->assertInstanceOf(ClusterVO::class, $cluster);
         $this->assertEquals('user', $cluster->get('type'));
-        $this->assertTrue((bool) $cluster->get('status'));
+        $this->assertEquals('yes', $cluster->get('status'));
         $this->assertEquals('john@example.com', $cluster->get('email'));
 
         $nestedData = $cluster->getNestedData();
@@ -159,7 +159,7 @@ class IndexedDocumentTest extends IntegrationTestCase
     {
         $this->assertInstanceOf(ClusterVO::class, $this->document->cluster);
         $this->assertEquals('user', $this->document->cluster->get('type'));
-        $this->assertTrue((bool) $this->document->cluster->get('status'));
+        $this->assertEquals('yes', $this->document->cluster->get('status'));
     }
 
     public function test_data_is_stored_as_strict_associative(): void
