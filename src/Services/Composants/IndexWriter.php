@@ -91,9 +91,6 @@ final class IndexWriter
             is_bool($value) => $value ? 'yes' : 'no',
             is_string($value) && strtolower($value) === 'true' => 'yes',
             is_string($value) && strtolower($value) === 'false' => 'no',
-            is_array($value) => json_encode($value),
-            is_object($value) && method_exists($value, '__toString') => (string) $value,
-            is_object($value) => json_encode($value),
             default => (string) $value,
         };
     }
