@@ -46,8 +46,7 @@ final class IndexWriter
         $document = $this->createDocument($entity);
         $this->currentDocumentId = $document->id;
 
-        $normalizedData = $this->normalizeDocumentData($entity);
-        $this->indexDocumentData($document, $normalizedData);
+        $this->indexDocumentData($document, $this->normal($entity->data->toArray()));
 
         $this->flushTokens();
         $this->currentDocumentId = null;
@@ -61,35 +60,11 @@ final class IndexWriter
             $document = $this->createDocument($record);
             $this->currentDocumentId = $document->id;
 
-            $normalizedData = $this->normalizeDocumentData($record);
-            $this->indexDocumentData($document, $normalizedData);
+            $this->indexDocumentData($document, $this->normal($record->data->toArray()));
         }
 
         $this->flushTokens();
         $this->currentDocumentId = null;
-    }
-
-    /**
-     * Normalizes document data using action_normalizer_chain.
-     *
-     * @param  IndexedDocumentRecord  $record  The document record to normalize
-     * @return array The normalized data
-     *
-     * @throws \InvalidArgumentException If normalization fails
-     */
-    private function normalizeDocumentData(IndexedDocumentRecord $record): array
-    {
-        try {
-            return action_normalizer_chain(true)->normalize($record->data->toArray());
-        } catch (\Throwable $e) {
-            throw new \InvalidArgumentException(sprintf(
-                'Failed to normalize data for document "%s". '
-                .'All values in getIndexableData() must be Transformable (scalars, ValueObjects, Records, or arrays of them). '
-                .'Error: %s',
-                $record->fingerprint->getValue(),
-                $e->getMessage()
-            ), 0, $e);
-        }
     }
 
     private function createDocument(IndexedDocumentRecord $record): IndexedDocument
@@ -155,7 +130,7 @@ final class IndexWriter
             if (is_bool($value)) {
                 throw new \InvalidArgumentException(sprintf(
                     'Cannot index boolean value in field "%s". '
-                    .'Boolean values should be stored in clusters in format (yes/no) for precise filtering, not in indexable data. '
+                    .'Boolean values should be stored in clusters for precise filtering, not in indexable data. '
                     .'Please move "%s" to getIndexableCluster() instead of getIndexableData(). '
                     .'Example: return ClusterVO::from([\'%s\' => $this->%s]);',
                     $field,
@@ -190,12 +165,11 @@ final class IndexWriter
                 continue;
             }
 
-            // ❌ Autres types (objets non-transformables, resources) → Exception
+            // ❌ Autres types (objets, resources) → Exception
             throw new \InvalidArgumentException(sprintf(
                 'Cannot index value of type "%s" in field "%s". '
-                .'Only string values or Transformable objects that normalize to strings should be indexed for text search. '
-                .'Please convert this value to a string or move it to getIndexableCluster(). '
-                .'If this is a ValueObject or Record from DomainStructures, ensure it implements Transformable.',
+                .'Only string values should be indexed for text search. '
+                .'Please convert this value to a string or move it to getIndexableCluster().',
                 get_debug_type($value),
                 $field
             ));
@@ -436,6 +410,13 @@ final class IndexWriter
         }
 
         $this->resetBuffers();
+    }
+
+    private function normal(mixed $data): mixed
+    {
+        $prefilterd = action_normalizer_chain(true)->normalize($data);
+
+        return normalizer_chain(true)->normalize($prefilterd);
     }
 
     private function extractWords(string $text): array
