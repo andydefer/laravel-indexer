@@ -20,11 +20,14 @@ use AndyDefer\Repository\Records\PaginateRecord;
 use AndyDefer\Repository\ValueObjects\ClusterQueries;
 use AndyDefer\Repository\ValueObjects\SelectColumns;
 use AndyDefer\Repository\ValueObjects\SortColumns;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 final class IndexedTokenRepositoryTest extends IntegrationTestCase
 {
+    use RefreshDatabase;
+
     private IndexedTokenRepository $repository;
 
     private IndexedDocumentRepository $documentRepository;

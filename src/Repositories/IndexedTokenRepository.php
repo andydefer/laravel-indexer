@@ -19,6 +19,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Repository implementation for IndexedToken models.
@@ -113,8 +114,9 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
         }
 
         if ($filters->namespace !== null) {
-            $query->whereHas('document', function (Builder $subQuery) use ($filters): void {
-                $subQuery->where('fingerprint', 'LIKE', $filters->namespace.'|%');
+            $escapedNamespace = $this->escapeNamespace($filters->namespace);
+            $query->whereHas('document', function (Builder $subQuery) use ($escapedNamespace): void {
+                $subQuery->where('fingerprint', 'LIKE', $escapedNamespace.'|%');
             });
         }
 
@@ -174,10 +176,12 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
      */
     public function findByTokenAndNamespace(string $token, string $namespace): Collection
     {
+        $escapedNamespace = $this->escapeNamespace($namespace);
+
         return $this->model->newQuery()
             ->where('token', $token)
-            ->whereHas('document', function (Builder $query) use ($namespace): void {
-                $query->where('fingerprint', 'LIKE', $namespace.'|%');
+            ->whereHas('document', function (Builder $query) use ($escapedNamespace): void {
+                $query->where('fingerprint', 'LIKE', $escapedNamespace.'|%');
             })
             ->get();
     }
@@ -204,11 +208,13 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
      */
     public function findByTokenFieldAndNamespace(string $token, string $field, string $namespace): Collection
     {
+        $escapedNamespace = $this->escapeNamespace($namespace);
+
         return $this->model->newQuery()
             ->where('token', $token)
             ->where('field', $field)
-            ->whereHas('document', function (Builder $query) use ($namespace): void {
-                $query->where('fingerprint', 'LIKE', $namespace.'|%');
+            ->whereHas('document', function (Builder $query) use ($escapedNamespace): void {
+                $query->where('fingerprint', 'LIKE', $escapedNamespace.'|%');
             })
             ->get();
     }
@@ -296,9 +302,11 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
      */
     public function findByNamespace(string $namespace): Collection
     {
+        $escapedNamespace = $this->escapeNamespace($namespace);
+
         return $this->model->newQuery()
-            ->whereHas('document', function (Builder $query) use ($namespace): void {
-                $query->where('fingerprint', 'LIKE', $namespace.'|%');
+            ->whereHas('document', function (Builder $query) use ($escapedNamespace): void {
+                $query->where('fingerprint', 'LIKE', $escapedNamespace.'|%');
             })
             ->get();
     }
@@ -450,9 +458,11 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
      */
     public function countByNamespace(string $namespace): int
     {
+        $escapedNamespace = $this->escapeNamespace($namespace);
+
         return $this->model->newQuery()
-            ->whereHas('document', function (Builder $query) use ($namespace): void {
-                $query->where('fingerprint', 'LIKE', $namespace.'|%');
+            ->whereHas('document', function (Builder $query) use ($escapedNamespace): void {
+                $query->where('fingerprint', 'LIKE', $escapedNamespace.'|%');
             })
             ->count();
     }
@@ -499,9 +509,11 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
      */
     public function deleteByNamespace(string $namespace): int
     {
+        $escapedNamespace = $this->escapeNamespace($namespace);
+
         return $this->model->newQuery()
-            ->whereHas('document', function (Builder $query) use ($namespace): void {
-                $query->where('fingerprint', 'LIKE', $namespace.'|%');
+            ->whereHas('document', function (Builder $query) use ($escapedNamespace): void {
+                $query->where('fingerprint', 'LIKE', $escapedNamespace.'|%');
             })
             ->delete();
     }
@@ -573,5 +585,26 @@ final class IndexedTokenRepository extends AbstractRepository implements Indexed
         return $this->model->newQuery()
             ->where('id', $id)
             ->increment('frequency');
+    }
+
+    /**
+     * Échappe les backslashes dans un namespace pour les requêtes SQL LIKE.
+     * MySQL uniquement car le backslash est un caractère d'échappement dans LIKE.
+     * SQLite et PostgreSQL n'ont pas besoin d'échappement.
+     *
+     * @param  string  $namespace  Le namespace à échapper
+     * @return string Le namespace échappé
+     */
+    private function escapeNamespace(string $namespace): string
+    {
+        $driverName = DB::connection()->getDriverName();
+
+        // MySQL uniquement (backslash est un caractère d'échappement)
+        if ($driverName === 'mysql') {
+            return str_replace('\\', '\\\\', $namespace);
+        }
+
+        // SQLite, PostgreSQL, etc. n'ont pas besoin d'échappement
+        return $namespace;
     }
 }

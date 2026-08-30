@@ -15,6 +15,7 @@ use AndyDefer\Repository\AbstractRepository;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -62,8 +63,10 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
      */
     public function findByNamespace(string $namespace): Collection
     {
+        $escapedNamespace = $this->escapeNamespace($namespace);
+
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $namespace.'|%')
+            ->where('fingerprint', 'LIKE', $escapedNamespace.'|%')
             ->get();
     }
 
@@ -119,8 +122,10 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
      */
     public function deleteByNamespace(string $namespace): int
     {
+        $escapedNamespace = $this->escapeNamespace($namespace);
+
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $namespace.'|%')
+            ->where('fingerprint', 'LIKE', $escapedNamespace.'|%')
             ->delete();
     }
 
@@ -141,8 +146,10 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
      */
     public function countByNamespace(string $namespace): int
     {
+        $escapedNamespace = $this->escapeNamespace($namespace);
+
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $namespace.'|%')
+            ->where('fingerprint', 'LIKE', $escapedNamespace.'|%')
             ->count();
     }
 
@@ -173,8 +180,10 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
      */
     public function existsByNamespace(string $namespace): bool
     {
+        $escapedNamespace = $this->escapeNamespace($namespace);
+
         return $this->model->newQuery()
-            ->where('fingerprint', 'LIKE', $namespace.'|%')
+            ->where('fingerprint', 'LIKE', $escapedNamespace.'|%')
             ->exists();
     }
 
@@ -304,7 +313,8 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
         }
 
         if ($filters->namespace !== null) {
-            $query->where('fingerprint', 'LIKE', $filters->namespace.'|%');
+            $escapedNamespace = $this->escapeNamespace($filters->namespace);
+            $query->where('fingerprint', 'LIKE', $escapedNamespace.'|%');
         }
 
         if ($filters->entity_id !== null) {
@@ -435,5 +445,26 @@ final class IndexedDocumentRepository extends AbstractRepository implements Inde
             is_null($value) => '',
             default => (string) $value,
         };
+    }
+
+    /**
+     * Échappe les backslashes dans un namespace pour les requêtes SQL LIKE.
+     * MySQL uniquement car le backslash est un caractère d'échappement dans LIKE.
+     * SQLite et PostgreSQL n'ont pas besoin d'échappement.
+     *
+     * @param  string  $namespace  Le namespace à échapper
+     * @return string Le namespace échappé
+     */
+    private function escapeNamespace(string $namespace): string
+    {
+        $driverName = DB::connection()->getDriverName();
+
+        // MySQL uniquement (backslash est un caractère d'échappement)
+        if ($driverName === 'mysql') {
+            return str_replace('\\', '\\\\', $namespace);
+        }
+
+        // SQLite, PostgreSQL, etc. n'ont pas besoin d'échappement
+        return $namespace;
     }
 }

@@ -10,10 +10,13 @@ use AndyDefer\LaravelCluster\Providers\ClusterServiceProvider;
 use AndyDefer\LaravelIndexer\Providers\IndexerServiceProvider;
 use AndyDefer\Logger\LoggerServiceProvider;
 use AndyDefer\Task\TaskServiceProvider;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 abstract class IntegrationTestCase extends Orchestra
 {
+    use RefreshDatabase;
+
     protected string $databasePath;
 
     protected function stripAnsi(string $text): string
@@ -43,6 +46,28 @@ abstract class IntegrationTestCase extends Orchestra
         ]);
     }
 
+    /**
+     * Définit l'environnement de test avec MySQL par défaut.
+     */
+    /*  protected function defineEnvironment($app): void
+     {
+         // Connexion MySQL par défaut
+         $app['config']->set('database.default', 'mysql');
+         $app['config']->set('database.connections.mysql', [
+             'driver' => 'mysql',
+             'host' => env('DB_HOST', '127.0.0.1'),
+             'port' => env('DB_PORT', '3306'),
+             'database' => env('DB_DATABASE', 'indexer_test'),
+             'username' => env('DB_USERNAME', 'root'),
+             'password' => env('DB_PASSWORD', ''),
+             'charset' => 'utf8mb4',
+             'collation' => 'utf8mb4_unicode_ci',
+             'prefix' => '',
+             'strict' => true,
+             'engine' => null,
+         ]);
+     }
+ */
     protected function setUp(): void
     {
         parent::setUp();
