@@ -115,12 +115,23 @@ final class SearchQueryVO extends AbstractValueObject
     /**
      * Returns the fields associated with a specific n-gram.
      *
-     * @param  string|int|float  $ngram  The n-gram to look up
+     * @param  mixed  $ngram  The n-gram to look up
      * @return string[] The list of fields for the n-gram
+     *
+     * @throws InvalidArgumentException If the ngram is not a string
      */
-    public function getFieldsForNgram(string|int|float $ngram): array
+    public function getFieldsForNgram(mixed $ngram): array
     {
-        $ngram = (string) $ngram;
+        if (! is_string($ngram)) {
+            throw new InvalidArgumentException(sprintf(
+                'Cannot look up n-gram with non-string value. Got: %s. '
+                .'N-grams must be strings. '
+                .'If you are trying to index a numeric value (like price, age, quantity), '
+                .'move it to getIndexableCluster() instead of getIndexableData(). '
+                .'Example: return ClusterVO::from([\'price\' => $this->price]);',
+                get_debug_type($ngram)
+            ));
+        }
 
         return $this->parsed[$ngram] ?? [];
     }
