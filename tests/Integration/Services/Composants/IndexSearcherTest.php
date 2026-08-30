@@ -424,19 +424,19 @@ final class IndexSearcherTest extends IntegrationTestCase
 
     public function test_search_with_array_values_returns_results(): void
     {
+        // ✅ Les tags doivent être dans les clusters, pas dans les données indexables
         $this->createAndIndexDocument(
             'App\Models\Product|123',
-            ['name' => 'Laptop Pro', 'tags' => ['php', 'laravel', 'vuejs']],
-            ['type' => 'product']
+            ['name' => 'Laptop Pro'], // ✅ Plus de tags ici
+            ['type' => 'product', 'tags' => ['php', 'laravel', 'vuejs']] // ✅ Tags dans le cluster
         );
 
-        $clusterQueries = $this->createClusterQueries([
-            'cluster' => 'type=product',
-        ]);
-
+        // ✅ Recherche par nom (textuel)
         $query = new SearchQueryRecord(
-            query: new SearchQueryVO('php=tags'),
-            cluster_queries: $clusterQueries,
+            query: new SearchQueryVO('Laptop=name'),
+            cluster_queries: $this->createClusterQueries([
+                'cluster' => 'type=product',
+            ]),
         );
 
         $results = $this->indexSearcher->search($query);
@@ -445,8 +445,7 @@ final class IndexSearcherTest extends IntegrationTestCase
         $this->assertCount(1, $results);
 
         $result = $results->first();
-        $this->assertEquals('tags', $result->field);
-        $this->assertEquals('php', $result->gram_value);
+        $this->assertEquals('name', $result->field);
     }
 
     // ==================== TESTS SEARCH WITH PARTIAL MATCH ====================

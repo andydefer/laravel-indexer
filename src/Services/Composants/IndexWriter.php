@@ -91,7 +91,7 @@ final class IndexWriter
             is_bool($value) => $value ? 'yes' : 'no',
             is_string($value) && strtolower($value) === 'true' => 'yes',
             is_string($value) && strtolower($value) === 'false' => 'no',
-            default => (string) $value,
+            default => (string) action_normalizer_chain(true)->normalize($value),
         };
     }
 
@@ -100,23 +100,79 @@ final class IndexWriter
         foreach ($data as $key => $value) {
             $field = $prefix ? $prefix.'.'.$key : $key;
 
+            // ✅ Tableau associatif → parcours récursif
             if (is_array($value) && $this->isAssociativeArray($value)) {
                 $this->indexDocumentData($document, $value, $field);
 
                 continue;
             }
 
+            // ❌ Tableau indexé → Exception
             if (is_array($value)) {
-                $concatenated = implode('; ', $value);
-                $this->extractAndBufferTokens($document->id, $field, $concatenated);
+                throw new \InvalidArgumentException(sprintf(
+                    'Cannot index indexed array in field "%s". '
+                    .'Structured data like lists should be stored in clusters, not in indexable data. '
+                    .'Please move "%s" to getIndexableCluster() instead of getIndexableData(). '
+                    .'Example: return ClusterVO::from([\'%s\' => $this->%s->toArray()]);',
+                    $field,
+                    $field,
+                    $key,
+                    $key
+                ));
+            }
+
+            // ❌ Null → ignoré (ne donne aucune information)
+            if (is_null($value)) {
+                continue;
+            }
+
+            // ❌ Bool → Exception
+            if (is_bool($value)) {
+                throw new \InvalidArgumentException(sprintf(
+                    'Cannot index boolean value in field "%s". '
+                    .'Boolean values should be stored in clusters in format (yes/no) for precise filtering, not in indexable data. '
+                    .'Please move "%s" to getIndexableCluster() instead of getIndexableData(). '
+                    .'Example: return ClusterVO::from([\'%s\' => $this->%s]);',
+                    $field,
+                    $field,
+                    $key,
+                    $key
+                ));
+            }
+
+            // ❌ Numérique → Exception
+            if (is_numeric($value) && ! is_string($value)) {
+                throw new \InvalidArgumentException(sprintf(
+                    'Cannot index numeric value "%s" in field "%s". '
+                    .'Numeric values should be stored in clusters for precise filtering, not in indexable data. '
+                    .'Please move "%s" to getIndexableCluster() instead of getIndexableData(). '
+                    .'Example: return ClusterVO::from([\'%s\' => $this->%s]);',
+                    $value,
+                    $field,
+                    $field,
+                    $key,
+                    $key
+                ));
+            }
+
+            // ✅ String → tokenisation
+            if (is_string($value)) {
+                $normalized = $this->normalizeValue($value);
+                if (! empty($normalized)) {
+                    $this->extractAndBufferTokens($document->id, $field, $normalized);
+                }
 
                 continue;
             }
 
-            $normalized = $this->normalizeValue($value);
-            if (! empty($normalized)) {
-                $this->extractAndBufferTokens($document->id, $field, $normalized);
-            }
+            // ❌ Autres types (objets, resources) → Exception
+            throw new \InvalidArgumentException(sprintf(
+                'Cannot index value of type "%s" in field "%s". '
+                .'Only string values should be indexed for text search. '
+                .'Please convert this value to a string or move it to getIndexableCluster().',
+                get_debug_type($value),
+                $field
+            ));
         }
     }
 

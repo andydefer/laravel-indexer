@@ -1,3 +1,4 @@
+```markdown
 # Laravel Indexer - Documentation Complète
 
 ## Table des matières
@@ -137,6 +138,20 @@ INDEXER_MAX_TEXT_LENGTH=2000
 
 Votre modèle doit implémenter l'interface `Indexable`.
 
+### 3.1 Règles d'indexation
+
+| Type de donnée | Comportement | Explication |
+|----------------|--------------|-------------|
+| **String** | ✅ Indexé | Recherche textuelle |
+| **Booléen PHP** (`true`/`false`) | ❌ Exception | Doit être dans les clusters |
+| **Numérique** (`int`/`float`) | ❌ Exception | Doit être dans les clusters |
+| **Tableau associatif** | ✅ Parcours récursif | Structure préservée (notation pointée) |
+| **Tableau indexé** | ❌ Exception | Doit être dans les clusters |
+| **Null** | ❌ Ignoré | Pas d'information |
+| **Enum** | ✅ Indexé (valeur) | Converti en string |
+
+### 3.2 Implémentation
+
 ```php
 <?php
 
@@ -160,21 +175,41 @@ class User extends Model implements Indexable
     /**
      * Retourne les données à indexer.
      *
-     * Ces données seront tokenisées et rendues recherchables.
+     * ⚠️ Seuls les STRINGS sont indexés.
+     * Les booléens, numériques et tableaux indexés doivent être dans les clusters.
      */
     public function getIndexableData(): StrictAssociative
     {
         return StrictAssociative::from([
-            'name' => $this->name,
-            'email' => $this->email,
-            'bio' => $this->bio,
-            'skills' => $this->skills,
-            'city' => $this->city,
+            'name' => $this->name,           // ✅ String
+            'email' => $this->email,         // ✅ String
+            'bio' => $this->bio,             // ✅ String
+            'skills' => $this->skills,       // ✅ String
+            'city' => $this->city,           // ✅ String
+            'country' => $this->country,     // ✅ String
+            // ❌ 'is_active' => $this->is_active, // Bool → Cluster
+            // ❌ 'age' => $this->age,             // Numeric → Cluster
+            // ❌ 'tags' => ['php', 'laravel'],    // Indexed array → Cluster
+        ]);
+    }
+
+    /**
+     * Retourne le cluster contextuel du modèle.
+     *
+     * Les clusters permettent le filtrage contextuel.
+     */
+    public function getIndexableCluster(): ClusterVO
+    {
+        return ClusterVO::from([
+            'type' => 'user',
+            'tenant' => $this->tenant_id,
+            'status' => $this->is_active ? 'active' : 'inactive',
+            'role' => $this->role,
             'country' => $this->country,
-            'profile' => [
-                'twitter' => $this->twitter_handle,
-                'github' => $this->github_handle,
-            ],
+            'city' => $this->city,
+            'verified' => $this->email_verified_at !== null ? 'yes' : 'no',
+            'age' => $this->age,                         // ✅ Numeric
+            'tags' => $this->tags->toArray(),            // ✅ Array
         ]);
     }
 
@@ -185,41 +220,24 @@ class User extends Model implements Indexable
     {
         return self::class;
     }
-
-    /**
-     * Retourne le cluster contextuel du modèle.
-     *
-     * Le cluster permet de filtrer les recherches par contexte
-     * (tenant, rôle, statut, géolocalisation, etc.).
-     */
-    public function getIndexableCluster(): ClusterVO
-    {
-        return new ClusterVO([
-            'type' => 'user',
-            'tenant' => $this->tenant_id,
-            'status' => $this->is_active ? 'active' : 'inactive',
-            'role' => $this->role,
-            'country' => $this->country,
-            'city' => $this->city,
-            'verified' => $this->email_verified_at !== null ? 'true' : 'false',
-        ]);
-    }
 }
 ```
 
-### 3.1 Données imbriquées
+### 3.3 Données imbriquées (associatives)
 
 Les données imbriquées sont automatiquement aplaties pour l'indexation :
 
 ```php
-// Dans getIndexableData()
-return StrictAssociative::from([
-    'name' => 'John Doe',
-    'profile' => [
-        'twitter' => '@johndoe',
-        'github' => 'johndoe',
-    ],
-]);
+public function getIndexableData(): StrictAssociative
+{
+    return StrictAssociative::from([
+        'name' => 'John Doe',
+        'profile' => [  // ✅ Associative array → parcours récursif
+            'twitter' => '@johndoe',
+            'github' => 'johndoe',
+        ],
+    ]);
+}
 
 // Données indexées :
 // - name: John Doe
@@ -227,7 +245,7 @@ return StrictAssociative::from([
 // - profile.github: johndoe
 ```
 
-### 3.2 Recherche par champ spécifique
+### 3.4 Recherche par champ spécifique
 
 ```php
 // Recherche dans le champ 'name'
@@ -250,26 +268,36 @@ Un cluster est un **filtre contextuel** qui permet de restreindre les recherches
 
 ```php
 // Exemple : Filtrer les utilisateurs actifs avec rôle admin
-$cluster = new ClusterVO([
+$cluster = ClusterVO::from([
     'status' => 'active',
     'role' => 'admin',
 ]);
 ```
 
-### 4.2 Création d'un cluster
+### 4.2 Types de données à mettre dans les clusters
+
+| Type | Exemple | Pourquoi |
+|------|---------|----------|
+| **Booléens** | `is_active: true` | Filtrage exact |
+| **Numériques** | `price: 1000` | Filtrage précis (>=, <=) |
+| **Énumérations** | `status: active` | Filtrage par état |
+| **Listes/Tableaux** | `tags: ['php', 'laravel']` | Filtrage de listes |
+| **Dates** | `created_at: 2024-01-01` | Filtrage temporel |
+
+### 4.3 Création d'un cluster
 
 ```php
 use AndyDefer\LaravelCluster\ValueObjects\ClusterVO;
 
 // Création simple
-$cluster = new ClusterVO([
+$cluster = ClusterVO::from([
     'status' => 'active',
     'role' => 'admin',
     'tenant' => 'company_abc',
 ]);
 
 // Création avec données imbriquées
-$cluster = new ClusterVO([
+$cluster = ClusterVO::from([
     'user' => [
         'status' => 'active',
         'role' => 'admin',
@@ -281,10 +309,10 @@ $cluster = new ClusterVO([
 ]);
 ```
 
-### 4.3 Accès aux données
+### 4.4 Accès aux données
 
 ```php
-$cluster = new ClusterVO([
+$cluster = ClusterVO::from([
     'status' => 'active',
     'role' => 'admin',
     'profile' => [
@@ -304,20 +332,22 @@ if ($cluster->has('profile.name')) {
 }
 ```
 
-### 4.4 Utilisation dans le modèle
+### 4.5 Utilisation dans le modèle
 
 ```php
 public function getIndexableCluster(): ClusterVO
 {
-    return new ClusterVO([
+    return ClusterVO::from([
         'type' => 'user',
         'status' => $this->is_active ? 'active' : 'inactive',
         'role' => $this->role,
         'tenant' => $this->tenant_id,
         'country' => $this->country,
         'city' => $this->city,
-        'verified' => $this->email_verified_at !== null ? 'true' : 'false',
-        'has_orders' => $this->orders()->count() > 0 ? 'true' : 'false',
+        'verified' => $this->email_verified_at !== null ? 'yes' : 'no',
+        'age' => $this->age,
+        'has_orders' => $this->orders()->count() > 0 ? 'yes' : 'no',
+        'tags' => $this->tags->pluck('name')->toArray(),
     ]);
 }
 ```
@@ -1237,7 +1267,7 @@ class ProductSearchService
             $conditions[] = "price<={$filters['max_price']}";
         }
         if (isset($filters['in_stock'])) {
-            $conditions[] = "in_stock=" . ($filters['in_stock'] ? 'true' : 'false');
+            $conditions[] = "in_stock=" . ($filters['in_stock'] ? 'yes' : 'no');
         }
 
         $clusterQuery = implode(' & ', $conditions);
@@ -1368,6 +1398,9 @@ dd($user->getIndexableCluster()->toArray());
 | Résultats incomplets | Token size trop petit | Augmenter `min_size` dans la config |
 | Indexation lente | Batch size trop petit | Augmenter `batch_size` |
 | Erreur de syntaxe | Parenthèses mal équilibrées | Vérifier les parenthèses dans la requête |
+| Tableau indexé refusé | Données mal structurées | Déplacer dans les clusters |
+| Booléen refusé | Type non pris en charge | Déplacer dans les clusters |
+| Numérique refusé | Type non pris en charge | Déplacer dans les clusters |
 
 ### 17.4 Vérification de l'index
 
@@ -1394,8 +1427,30 @@ User::where('is_active', true)->chunk(100, function ($users) {
     // Indexer uniquement les utilisateurs actifs
 });
 
+// ✅ Recommandé - Utiliser les clusters pour les filtres
+public function getIndexableCluster(): ClusterVO
+{
+    return ClusterVO::from([
+        'status' => $this->is_active ? 'active' : 'inactive',
+        'role' => $this->role,
+        'age' => $this->age,  // ✅ Numeric → cluster
+        'is_verified' => $this->verified ? 'yes' : 'no',  // ✅ Boolean → cluster
+        'tags' => $this->tags->toArray(),  // ✅ Array → cluster
+    ]);
+}
+
 // ❌ À éviter - Indexer sans batch
 User::all()->each(fn($user) => $this->indexer->index($user));
+
+// ❌ À éviter - Indexer des données non-textuelles
+public function getIndexableData(): StrictAssociative
+{
+    return StrictAssociative::from([
+        'is_active' => $this->is_active,  // ❌ Boolean → exception
+        'age' => $this->age,              // ❌ Numeric → exception
+        'tags' => $this->tags->toArray(), // ❌ Indexed array → exception
+    ]);
+}
 ```
 
 ### 18.2 Recherche
@@ -1431,28 +1486,21 @@ return [
 ];
 ```
 
-### 18.4 Optimisation des modèles
+### 18.4 Récapitulatif des types de données
 
-```php
-public function shouldBeIndexed(): bool
-{
-    // ✅ Indexer uniquement les modèles actifs
-    return $this->is_active && !$this->trashed();
-}
-
-public function getIndexableCluster(): ClusterVO
-{
-    // ✅ Utiliser des clusters pour le filtrage
-    return new ClusterVO([
-        'status' => $this->is_active ? 'active' : 'inactive',
-        'tenant' => $this->tenant_id,
-        // ✅ Éviter les valeurs trop dynamiques
-    ]);
-}
-```
+| Type | getIndexableData() | getIndexableCluster() |
+|------|-------------------|----------------------|
+| String (nom, description, bio) | ✅ Indexé | ❌ Non |
+| Booléen (is_active, verified) | ❌ Exception | ✅ Filtrage |
+| Numérique (price, age, quantity) | ❌ Exception | ✅ Filtrage |
+| Enum (status, type, role) | ✅ Valeur string | ✅ Filtrage |
+| Tableau associatif | ✅ Parcours récursif | ❌ Non |
+| Tableau indexé (tags, listes) | ❌ Exception | ✅ Filtrage |
+| Null | ❌ Ignoré | ❌ Ignoré |
 
 ---
 
 ## License
 
 MIT © [Andy Defer](https://github.com/andydefer)
+```
