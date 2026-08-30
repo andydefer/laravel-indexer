@@ -46,7 +46,8 @@ final class IndexWriter
         $document = $this->createDocument($entity);
         $this->currentDocumentId = $document->id;
 
-        $this->indexDocumentData($document, $entity->data->toArray());
+        $normalizedData = $this->normalizeDocumentData($entity);
+        $this->indexDocumentData($document, $normalizedData);
 
         $this->flushTokens();
         $this->currentDocumentId = null;
@@ -60,11 +61,35 @@ final class IndexWriter
             $document = $this->createDocument($record);
             $this->currentDocumentId = $document->id;
 
-            $this->indexDocumentData($document, $record->data->toArray());
+            $normalizedData = $this->normalizeDocumentData($record);
+            $this->indexDocumentData($document, $normalizedData);
         }
 
         $this->flushTokens();
         $this->currentDocumentId = null;
+    }
+
+    /**
+     * Normalizes document data using action_normalizer_chain.
+     *
+     * @param  IndexedDocumentRecord  $record  The document record to normalize
+     * @return array The normalized data
+     *
+     * @throws \InvalidArgumentException If normalization fails
+     */
+    private function normalizeDocumentData(IndexedDocumentRecord $record): array
+    {
+        try {
+            return action_normalizer_chain(true)->normalize($record->data->toArray());
+        } catch (\Throwable $e) {
+            throw new \InvalidArgumentException(sprintf(
+                'Failed to normalize data for document "%s". '
+                .'All values in getIndexableData() must be Transformable (scalars, ValueObjects, Records, or arrays of them). '
+                .'Error: %s',
+                $record->fingerprint->getValue(),
+                $e->getMessage()
+            ), 0, $e);
+        }
     }
 
     private function createDocument(IndexedDocumentRecord $record): IndexedDocument
@@ -165,11 +190,12 @@ final class IndexWriter
                 continue;
             }
 
-            // ❌ Autres types (objets, resources) → Exception
+            // ❌ Autres types (objets non-transformables, resources) → Exception
             throw new \InvalidArgumentException(sprintf(
                 'Cannot index value of type "%s" in field "%s". '
-                .'Only string values should be indexed for text search. '
-                .'Please convert this value to a string or move it to getIndexableCluster().',
+                .'Only string values or Transformable objects that normalize to strings should be indexed for text search. '
+                .'Please convert this value to a string or move it to getIndexableCluster(). '
+                .'If this is a ValueObject or Record from DomainStructures, ensure it implements Transformable.',
                 get_debug_type($value),
                 $field
             ));
