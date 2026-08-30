@@ -1,4 +1,3 @@
-```markdown
 # Laravel Indexer - Documentation Complète
 
 ## Table des matières
