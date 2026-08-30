@@ -27,7 +27,6 @@ use AndyDefer\PhpServices\Contracts\TextNormalizerConfigInterface;
 use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
 use AndyDefer\PhpServices\Services\NGramGeneratorService;
 use AndyDefer\PhpServices\Services\TextNormalizerService;
-use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -88,20 +87,16 @@ final class IndexerServiceProvider extends ServiceProvider
     private function registerConfigs(): void
     {
         $this->app->singleton(IndexerConfig::class, function ($app): IndexerConfig {
-            return new IndexerConfig($app->make(ConfigRepository::class));
-        });
-
-        $this->app->singleton(IndexerConfigInterface::class, function ($app): IndexerConfigInterface {
-            return $app->make(IndexerConfig::class);
+            return new IndexerConfig($app['config']);
         });
 
         $this->app->singleton(TextNormalizerConfig::class, function ($app): TextNormalizerConfig {
-            return new TextNormalizerConfig($app->make(ConfigRepository::class));
+            return new TextNormalizerConfig($app['config']);
         });
 
-        $this->app->singleton(TextNormalizerConfigInterface::class, function ($app): TextNormalizerConfigInterface {
-            return $app->make(TextNormalizerConfig::class);
-        });
+        $this->app->bind(IndexerConfigInterface::class, IndexerConfig::class);
+        $this->app->bind(TextNormalizerConfigInterface::class, TextNormalizerConfig::class);
+
     }
 
     /**
