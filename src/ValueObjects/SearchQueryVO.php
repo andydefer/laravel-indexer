@@ -115,11 +115,13 @@ final class SearchQueryVO extends AbstractValueObject
     /**
      * Returns the fields associated with a specific n-gram.
      *
-     * @param  string  $ngram  The n-gram to look up
+     * @param  string|int|float  $ngram  The n-gram to look up
      * @return string[] The list of fields for the n-gram
      */
-    public function getFieldsForNgram(string $ngram): array
+    public function getFieldsForNgram(string|int|float $ngram): array
     {
+        $ngram = (string) $ngram;
+
         return $this->parsed[$ngram] ?? [];
     }
 
