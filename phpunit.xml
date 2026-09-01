@@ -9,6 +9,10 @@
             <directory>tests/Integration</directory>
         </testsuite>
 
+       <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+
          
 <!-- 
         <testsuite name="Benchmark">

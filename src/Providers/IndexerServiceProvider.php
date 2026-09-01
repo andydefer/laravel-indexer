@@ -1,5 +1,7 @@
 <?php
 
+// src/Providers/IndexerServiceProvider.php
+
 declare(strict_types=1);
 
 namespace AndyDefer\LaravelIndexer\Providers;
@@ -14,12 +16,14 @@ use AndyDefer\LaravelIndexer\Contracts\GenericIndexerInterface;
 use AndyDefer\LaravelIndexer\Contracts\IndexerInterface;
 use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedDocumentRepositoryInterface;
 use AndyDefer\LaravelIndexer\Contracts\Repositories\IndexedTokenRepositoryInterface;
+use AndyDefer\LaravelIndexer\Contracts\Services\IndexableFieldDiscoveryServiceInterface;
 use AndyDefer\LaravelIndexer\Repositories\IndexedDocumentRepository;
 use AndyDefer\LaravelIndexer\Repositories\IndexedTokenRepository;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexDeleter;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexSearcher;
 use AndyDefer\LaravelIndexer\Services\Composants\IndexWriter;
 use AndyDefer\LaravelIndexer\Services\GenericIndexerService;
+use AndyDefer\LaravelIndexer\Services\IndexableFieldDiscoveryService;
 use AndyDefer\LaravelIndexer\Services\IndexerService;
 use AndyDefer\PhpServices\Configs\TextNormalizerConfig;
 use AndyDefer\PhpServices\Contracts\Services\NGramGeneratorInterface;
@@ -28,6 +32,7 @@ use AndyDefer\PhpServices\Contracts\TextNormalizerInterface;
 use AndyDefer\PhpServices\Services\NGramGeneratorService;
 use AndyDefer\PhpServices\Services\TextNormalizerService;
 use Illuminate\Support\ServiceProvider;
+use PhpParser\Parser;
 
 /**
  * Laravel service provider for the indexer package.
@@ -58,6 +63,7 @@ final class IndexerServiceProvider extends ServiceProvider
         $this->registerRepositories();
         $this->registerComposants();
         $this->registerServices();
+        $this->registerFieldDiscoveryService();
         $this->registerAliases();
     }
 
@@ -96,7 +102,6 @@ final class IndexerServiceProvider extends ServiceProvider
 
         $this->app->bind(IndexerConfigInterface::class, IndexerConfig::class);
         $this->app->bind(TextNormalizerConfigInterface::class, TextNormalizerConfig::class);
-
     }
 
     /**
@@ -104,7 +109,6 @@ final class IndexerServiceProvider extends ServiceProvider
      */
     private function registerNormalizer(): void
     {
-
         $this->app->singleton(NormalizerInterface::class, function ($app): NormalizerInterface {
             return $app->make(NormalizerChain::class);
         });
@@ -121,9 +125,7 @@ final class IndexerServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(TextNormalizerInterface::class, function ($app): TextNormalizerInterface {
-            return $app->make(TextNormalizerService::class);
-        });
+        $this->app->bind(TextNormalizerInterface::class, TextNormalizerService::class);
     }
 
     /**
@@ -137,9 +139,7 @@ final class IndexerServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(NGramGeneratorInterface::class, function ($app): NGramGeneratorInterface {
-            return $app->make(NGramGeneratorService::class);
-        });
+        $this->app->bind(NGramGeneratorInterface::class, NGramGeneratorService::class);
     }
 
     /**
@@ -165,13 +165,8 @@ final class IndexerServiceProvider extends ServiceProvider
             return new IndexedTokenRepository;
         });
 
-        $this->app->singleton(IndexedDocumentRepositoryInterface::class, function ($app): IndexedDocumentRepositoryInterface {
-            return $app->make(IndexedDocumentRepository::class);
-        });
-
-        $this->app->singleton(IndexedTokenRepositoryInterface::class, function ($app): IndexedTokenRepositoryInterface {
-            return $app->make(IndexedTokenRepository::class);
-        });
+        $this->app->bind(IndexedDocumentRepositoryInterface::class, IndexedDocumentRepository::class);
+        $this->app->bind(IndexedTokenRepositoryInterface::class, IndexedTokenRepository::class);
     }
 
     /**
@@ -220,9 +215,7 @@ final class IndexerServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(IndexerInterface::class, function ($app): IndexerInterface {
-            return $app->make(IndexerService::class);
-        });
+        $this->app->bind(IndexerInterface::class, IndexerService::class);
 
         $this->app->singleton(GenericIndexerService::class, function ($app): GenericIndexerService {
             return new GenericIndexerService(
@@ -232,9 +225,21 @@ final class IndexerServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(GenericIndexerInterface::class, function ($app): GenericIndexerInterface {
-            return $app->make(GenericIndexerService::class);
+        $this->app->bind(GenericIndexerInterface::class, GenericIndexerService::class);
+    }
+
+    /**
+     * Registers the field discovery service in the container.
+     */
+    private function registerFieldDiscoveryService(): void
+    {
+        $this->app->singleton(IndexableFieldDiscoveryService::class, function ($app): IndexableFieldDiscoveryService {
+            return new IndexableFieldDiscoveryService(
+                parser: $app->make(Parser::class)
+            );
         });
+
+        $this->app->bind(IndexableFieldDiscoveryServiceInterface::class, IndexableFieldDiscoveryService::class);
     }
 
     /**
@@ -251,5 +256,6 @@ final class IndexerServiceProvider extends ServiceProvider
         $this->app->alias(GenericIndexerInterface::class, 'indexer.generic');
         $this->app->alias(GenericIndexerService::class, 'indexer.generic.service');
         $this->app->alias(IndexerConfigInterface::class, 'indexer.config');
+        $this->app->alias(IndexableFieldDiscoveryServiceInterface::class, 'indexer.field.discovery');
     }
 }

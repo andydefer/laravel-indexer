@@ -20,6 +20,8 @@
 16. [Cas d'usage concrets](#16-cas-dusage-concrets)
 17. [Débogage et résolution des problèmes](#17-débogage-et-résolution-des-problèmes)
 18. [Performance et bonnes pratiques](#18-performance-et-bonnes-pratiques)
+19. [Découverte automatique des champs indexables](#19-découverte-automatique-des-champs-indexables)
+20. [Validation des champs de recherche](#20-validation-des-champs-de-recherche)
 
 ---
 
@@ -1499,7 +1501,223 @@ return [
 
 ---
 
+## 19. Découverte automatique des champs indexables
+
+### 19.1 Présentation
+
+Le package fournit un système de découverte automatique des champs indexables via l'analyse AST (Abstract Syntax Tree) du code source. Cela permet de :
+
+- Détecter automatiquement les champs définis dans `getIndexableData()`
+- Générer des règles de validation dynamiques
+- Proposer des suggestions de champs pour l'interface utilisateur
+- Éviter la duplication manuelle de la configuration
+
+### 19.2 Service de découverte
+
+Le `IndexableFieldDiscoveryService` analyse le code source des modèles sans les instancier :
+
+```php
+use AndyDefer\LaravelIndexer\Services\IndexableFieldDiscoveryService;
+
+$service = app(IndexableFieldDiscoveryService::class);
+
+// Découvrir les champs d'un modèle
+$fields = $service->discoverFields(User::class);
+// ['name', 'email', 'slug', 'profile.bio', 'profile.social.twitter']
+
+// Découvrir plusieurs modèles
+$allFields = $service->discoverFieldsForMany([
+    User::class,
+    Product::class,
+]);
+
+// Découvrir tous les modèles d'un répertoire
+$directoryFields = $service->discoverFieldsInDirectory(
+    __DIR__ . '/Models',
+    'App\Models'
+);
+```
+
+### 19.3 Helper public
+
+Le helper `IndexableFieldHelper` fournit une API simple pour l'utilisation en production :
+
+```php
+use AndyDefer\LaravelIndexer\Helpers\IndexableFieldHelper;
+
+// Récupérer les champs indexables
+$fields = IndexableFieldHelper::getSearchableFields(User::class);
+
+// Générer des règles de validation
+$rules = IndexableFieldHelper::getFieldsRule(User::class);
+// [
+//   'fields' => ['sometimes', 'array'],
+//   'fields.*' => ['string', 'in:name,email,slug,profile.bio']
+// ]
+
+// Obtenir les champs par défaut (premiers 3)
+$defaultFields = IndexableFieldHelper::getDefaultFields(User::class);
+// ['name', 'email', 'slug']
+```
+
+### 19.4 Formats supportés
+
+Le visitor AST supporte plusieurs syntaxes pour l'extraction des champs :
+
+```php
+// Format 1: StrictAssociative::from([...])
+return StrictAssociative::from([
+    'name' => $this->name,
+    'email' => $this->email,
+]);
+
+// Format 2: new StrictAssociative([...])
+return new StrictAssociative([
+    'name' => $this->name,
+]);
+
+// Format 3: Variable assignée
+$data = ['name' => $this->name];
+return StrictAssociative::from($data);
+
+// Format 4: $this->from([...])
+return $this->from([
+    'name' => $this->name,
+]);
+
+// Format 5: Structures imbriquées
+return StrictAssociative::from([
+    'profile' => [
+        'bio' => $this->bio,
+        'social' => [
+            'twitter' => $this->twitter,
+        ],
+    ],
+]);
+// Découverte : profile, profile.bio, profile.social, profile.social.twitter
+
+// Format 6: Opérateurs ternaires
+return StrictAssociative::from([
+    'status' => $this->is_active ? 'active' : 'inactive',
+    'profile' => $this->profile ? [
+        'bio' => $this->profile->bio,
+    ] : null,
+]);
+```
+
+### 19.5 Intégration avec Laravel Validator
+
+```php
+use AndyDefer\LaravelIndexer\Rules\SearchableFieldsRule;
+
+// Dans un Form Request
+public function rules(): array
+{
+    return [
+        'q' => ['required', 'string', 'min:2'],
+        'fields' => ['sometimes', 'array', new SearchableFieldsRule(User::class)],
+        'fields.*' => ['string'],
+        'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
+    ];
+}
+```
+
+### 19.6 Performance et cache
+
+Pour les environnements de production, il est recommandé de mettre en cache les résultats :
+
+```php
+use Illuminate\Support\Facades\Cache;
+
+$fields = Cache::remember(
+    "indexable_fields_" . md5(User::class),
+    3600,
+    fn() => IndexableFieldHelper::getSearchableFields(User::class)
+);
+```
+
+---
+
+## 20. Validation des champs de recherche
+
+### 20.1 SearchableFieldsRule
+
+La règle de validation `SearchableFieldsRule` permet de valider que les champs soumis existent bien dans le modèle cible :
+
+```php
+use AndyDefer\LaravelIndexer\Rules\SearchableFieldsRule;
+
+$rule = new SearchableFieldsRule(User::class);
+$validator = Validator::make($data, [
+    'fields' => ['array', $rule],
+    'fields.*' => ['string'],
+]);
+
+// Validation des champs
+$data = ['fields' => ['name', 'email', 'invalid_field']];
+$validator->fails(); // true
+$validator->errors()->first('fields');
+// "Invalid field(s): invalid_field. Allowed fields: name, email, slug"
+```
+
+### 20.2 Messages d'erreur
+
+| Situation | Message |
+|-----------|---------|
+| Valeur non tableau | `The :attribute must be an array.` |
+| Modèle inexistant | `The specified model class does not exist.` |
+| Modèle non indexable | `The specified model class must implement Indexable.` |
+| Aucun champ trouvé | `No searchable fields found for this model.` |
+| Champs invalides | `Invalid field(s): {list}. Allowed fields: {list}` |
+
+### 20.3 Exemple complet d'utilisation
+
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use AndyDefer\LaravelIndexer\Rules\SearchableFieldsRule;
+use App\Models\User;
+use Illuminate\Foundation\Http\FormRequest;
+
+final class SearchUsersRequest extends FormRequest
+{
+    public function rules(): array
+    {
+        return [
+            'q' => ['required', 'string', 'min:2', 'max:100'],
+            'fields' => [
+                'sometimes',
+                'array',
+                'min:1',
+                new SearchableFieldsRule(User::class),
+            ],
+            'fields.*' => ['string', 'distinct'],
+            'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'sort' => ['sometimes', 'string', 'in:asc,desc'],
+        ];
+    }
+
+    public function getQuery(): string
+    {
+        return $this->validated('q');
+    }
+
+    public function getFields(): array
+    {
+        return $this->validated('fields', ['name', 'email']);
+    }
+
+    public function getLimit(): int
+    {
+        return $this->validated('limit', 20);
+    }
+}
+```
+
+---
+
 ## License
 
 MIT © [Andy Defer](https://github.com/andydefer)
-```
