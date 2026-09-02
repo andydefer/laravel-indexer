@@ -95,10 +95,12 @@ final class SearchQueryVO extends AbstractValueObject
     /**
      * Returns the parsed query as a StrictAssociative array.
      *
-     * @return StrictAssociative<string, string[]> The parsed query
+     * @return string The parsed query
      */
-    public function getValue(): StrictAssociative
+    public function getValue(): string
     {
+        return $this->value;
+
         return StrictAssociative::from($this->parsed);
     }
 
