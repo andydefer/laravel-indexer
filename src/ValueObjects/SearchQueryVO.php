@@ -101,6 +101,10 @@ final class SearchQueryVO extends AbstractValueObject
     {
         return $this->value;
 
+    }
+
+    public function getParts(): StrictAssociative
+    {
         return StrictAssociative::from($this->parsed);
     }
 
